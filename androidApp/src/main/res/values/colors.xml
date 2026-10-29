@@ -1,0 +1,15 @@
+<resources><color name="background">#f7f8fa</color>
+<color name="surface">#ffffff</color>
+<color name="text">#20242b</color>
+<color name="muted">#7a828e</color>
+<color name="line">#e4e7ec</color>
+<color name="field">#edf0f4</color>
+<color name="blue">#1769eb</color>
+<color name="selected">#e8f0ff</color>
+<color name="outer">#e7eaf0</color>
+<color name="white">#ffffff</color>
+<color name="house">#5288eb</color>
+<color name="food">#67b9ac</color>
+<color name="kids">#a18ad4</color>
+<color name="car">#e5ad64</color>
+<color name="shopping">#de879d</color></resources>

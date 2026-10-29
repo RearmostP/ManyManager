@@ -1,1 +1,4 @@
-<resources><string name="theme_light">בהיר</string><string name="theme_dark">כהה</string></resources>
+<resources>
+    <string name="theme_light">בהיר</string>
+    <string name="theme_dark">כהה</string>
+</resources>

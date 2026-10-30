@@ -65,4 +65,18 @@
     <string name="no_payment_methods">Способов оплаты пока нет</string>
     <string name="management_unavailable">Добавление пока недоступно</string>
     <string name="ils_amount">₪ %1$s</string>
+    <string name="remaining_budget">Остаток бюджета</string>
+    <string name="budget_of_total">Из месячного бюджета %1$s</string>
+    <string name="monthly_budget">Месячный бюджет</string>
+    <string name="budget_by_source">Бюджет по источникам</string>
+    <string name="budget_management">Управление бюджетом</string>
+    <string name="budget_add_sources_first">Добавьте способ оплаты, чтобы задать бюджет</string>
+    <string name="manage_payment_sources">Управление способами оплаты</string>
+    <string name="apply_budget">Применить бюджет</string>
+    <string name="budget_amount_for_source">Месячный бюджет для %1$s, в шекелях</string>
+    <string name="budget_invalid_amount">Введите корректную неотрицательную сумму с двумя знаками после запятой или менее</string>
+    <string name="budget_amount_applied">Бюджет для %1$s обновлён</string>
+    <string name="budget_toggle_description">Месячный бюджет: осталось %1$s из %2$s. Разбивка по источникам</string>
+    <string name="budget_expanded">Разбивка бюджета открыта</string>
+    <string name="budget_collapsed">Разбивка бюджета закрыта</string>
 </resources>

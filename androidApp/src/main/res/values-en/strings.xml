@@ -65,4 +65,18 @@
     <string name="no_payment_methods">No payment methods yet</string>
     <string name="management_unavailable">Adding items is not yet available</string>
     <string name="ils_amount">₪ %1$s</string>
+    <string name="remaining_budget">Remaining budget</string>
+    <string name="budget_of_total">Of a monthly budget of %1$s</string>
+    <string name="monthly_budget">Monthly budget</string>
+    <string name="budget_by_source">Budget by source</string>
+    <string name="budget_management">Budget management</string>
+    <string name="budget_add_sources_first">Add a payment source to set a budget</string>
+    <string name="manage_payment_sources">Manage payment sources</string>
+    <string name="apply_budget">Apply budget</string>
+    <string name="budget_amount_for_source">Monthly budget for %1$s, in ILS</string>
+    <string name="budget_invalid_amount">Enter a valid non-negative amount with up to two decimal places</string>
+    <string name="budget_amount_applied">Budget for %1$s updated</string>
+    <string name="budget_toggle_description">Monthly budget: %1$s remaining out of %2$s. Breakdown by source</string>
+    <string name="budget_expanded">Budget breakdown expanded</string>
+    <string name="budget_collapsed">Budget breakdown collapsed</string>
 </resources>

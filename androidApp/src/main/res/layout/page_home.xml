@@ -31,48 +31,117 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:background="@drawable/card"
-        android:padding="29dp"
+        android:padding="24dp"
         android:elevation="2dp">
         <TextView
+            android:id="@+id/homeMonth"
             style="@style/Text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textSize="13sp"
-            android:textColor="@color/muted"
-            android:id="@+id/homeMonth" />
-        <Space
-            android:layout_width="1dp"
-            android:layout_height="24dp" />
-        <TextView
-            style="@style/Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/amount_zero"
-            android:textSize="50sp"
-            android:textColor="@color/text"
-            android:textDirection="ltr"
-            android:gravity="start"
-            android:textStyle="bold"
-            android:id="@+id/homeTotal" />
-        <Space
-            android:layout_width="1dp"
-            android:layout_height="12dp" />
-        <TextView
-            style="@style/Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/monthly_total"
             android:textSize="13sp"
             android:textColor="@color/muted" />
-        <TextView
-            style="@style/Text"
+        <com.example.manymanager.BudgetOverviewLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/no_expenses"
-            android:textSize="13sp"
-            android:textColor="@color/muted"
-            android:id="@+id/homeEmpty"
-            android:layout_marginTop="16dp" />
+            android:layout_marginTop="24dp">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    style="@style/Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/monthly_total"
+                    android:minLines="2"
+                    android:textSize="13sp"
+                    android:textColor="@color/muted" />
+                <TextView
+                    android:id="@+id/homeTotal"
+                    style="@style/Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/amount_zero"
+                    android:textSize="34sp"
+                    android:textDirection="ltr"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/homeEmpty"
+                    style="@style/Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/no_expenses"
+                    android:textSize="12sp"
+                    android:textColor="@color/muted" />
+            </LinearLayout>
+            <LinearLayout
+                android:id="@+id/homeBudgetArea"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical"
+                android:clickable="true"
+                android:focusable="true"
+                android:foreground="?android:attr/selectableItemBackground">
+                <TextView
+                    style="@style/Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/remaining_budget"
+                    android:minLines="2"
+                    android:textSize="13sp"
+                    android:textColor="@color/muted" />
+                <TextView
+                    android:id="@+id/homeBudgetRemaining"
+                    style="@style/Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textSize="34sp"
+                    android:textDirection="ltr"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/homeBudgetTotal"
+                    style="@style/Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/muted" />
+            </LinearLayout>
+        </com.example.manymanager.BudgetOverviewLayout>
+        <ScrollView
+            android:id="@+id/budgetBreakdown"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:background="@drawable/chip"
+            android:padding="16dp"
+            android:visibility="gone"
+            android:nestedScrollingEnabled="true">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <TextView
+                    style="@style/Text"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/budget_by_source"
+                    android:textSize="16sp"
+                    android:textStyle="bold"
+                    android:accessibilityHeading="true" />
+                <LinearLayout
+                    android:id="@+id/budgetBreakdownRows"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:orientation="vertical" />
+            </LinearLayout>
+        </ScrollView>
     </LinearLayout>
     <Space
         android:layout_width="1dp"

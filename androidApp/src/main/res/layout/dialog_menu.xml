@@ -69,6 +69,25 @@
         style="@style/Text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:text="@string/budget_management"
+        android:textSize="17sp"
+        android:textColor="@color/text"
+        android:id="@+id/nav3"
+        android:paddingTop="20dp"
+        android:paddingBottom="20dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?android:attr/selectableItemBackground" />
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:text="@string/settings"
         android:textSize="17sp"
         android:textColor="@color/text"

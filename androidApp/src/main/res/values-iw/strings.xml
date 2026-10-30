@@ -65,4 +65,18 @@
     <string name="no_payment_methods">עדיין אין אמצעי תשלום</string>
     <string name="management_unavailable">הוספה עדיין אינה זמינה</string>
     <string name="ils_amount">₪ %1$s</string>
+    <string name="remaining_budget">נותר מהתקציב</string>
+    <string name="budget_of_total">מתוך תקציב של %1$s</string>
+    <string name="monthly_budget">תקציב חודשי</string>
+    <string name="budget_by_source">תקציב לפי מקור</string>
+    <string name="budget_management">ניהול תקציב</string>
+    <string name="budget_add_sources_first">יש להוסיף אמצעי הוצאה כדי להגדיר תקציב</string>
+    <string name="manage_payment_sources">ניהול אמצעי הוצאה</string>
+    <string name="apply_budget">החלת תקציב</string>
+    <string name="budget_amount_for_source">תקציב חודשי עבור %1$s, בשקלים</string>
+    <string name="budget_invalid_amount">יש להזין סכום תקין שאינו שלילי, עם עד שתי ספרות אחרי הנקודה</string>
+    <string name="budget_amount_applied">התקציב עבור %1$s עודכן</string>
+    <string name="budget_toggle_description">תקציב חודשי: נותרו %1$s מתוך %2$s. פירוט לפי מקור</string>
+    <string name="budget_expanded">פירוט התקציב פתוח</string>
+    <string name="budget_collapsed">פירוט התקציב סגור</string>
 </resources>

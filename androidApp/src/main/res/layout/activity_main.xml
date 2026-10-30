@@ -55,6 +55,10 @@
                         layout="@layout/page_home"
                         android:visibility="gone" />
                     <include
+                        android:id="@+id/budgetPage"
+                        layout="@layout/page_budget"
+                        android:visibility="gone" />
+                    <include
                         android:id="@+id/settingsPage"
                         layout="@layout/page_settings"
                         android:visibility="gone" />

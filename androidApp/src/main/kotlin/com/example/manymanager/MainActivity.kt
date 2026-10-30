@@ -19,6 +19,8 @@ import androidx.core.os.LocaleListCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.lifecycle.ViewModelProvider
+import java.time.YearMonth
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.min
@@ -29,11 +31,18 @@ class MainActivity : AppCompatActivity() {
     private val pageHistory = mutableListOf<PageVisit>()
     private val pageBackCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
+            if (page == 0 && budgetState.breakdownExpanded) {
+                homeBudgetUi?.setExpanded(false)
+                return
+            }
             val previous = pageHistory.removeLastOrNull() ?: PageVisit(0, 0, 0)
             selectPage(previous.page, animate = true, scrollY = previous.scrollY)
             selectTab(previous.tab)
         }
     }
+    private val budgetState by lazy { ViewModelProvider(this)[BudgetViewModel::class.java] }
+    private var homeBudgetUi: BudgetHomeUi? = null
+    private var budgetManagementUi: BudgetManagementUi? = null
     private var page = 0
     private var tab = 0
     private var currentDate = LocalDate.now()
@@ -83,6 +92,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderContent(savedInstanceState: Bundle?) {
+        homeBudgetUi?.dispose()
+        homeBudgetUi = null
+        budgetManagementUi = null
         dismissActiveDialogImmediately()
         currentDate = savedInstanceState?.takeIf { it.containsKey("currentDate") }
             ?.getLong("currentDate")?.let(LocalDate::ofEpochDay) ?: currentDate
@@ -97,7 +109,14 @@ class MainActivity : AppCompatActivity() {
         // Keep the reference's 440dp content width on larger displays.
         val container = findViewById<View>(R.id.appContainer)
         container.layoutParams = (container.layoutParams as FrameLayout.LayoutParams).apply {
-            width = min(resources.displayMetrics.widthPixels, dp(440))
+            width = min(window.windowManager.currentWindowMetrics.bounds.width(), dp(440))
+        }
+        findViewById<View>(R.id.windowRoot).addOnLayoutChangeListener { root, _, _, _, _, _, _, _, _ ->
+            val available = (root.width - root.paddingLeft - root.paddingRight).coerceAtLeast(0)
+            val target = min(available, dp(440))
+            if (target > 0 && container.layoutParams.width != target) {
+                container.layoutParams = container.layoutParams.apply { width = target }
+            }
         }
         findViewById<View>(R.id.windowRoot).setOnApplyWindowInsetsListener { view, insets ->
             val safe = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
@@ -167,6 +186,13 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.monthLabel).text = month
         findViewById<TextView>(R.id.homeMonth).text = month
         bindEmptyState()
+        budgetState.homeMonth = YearMonth.from(currentDate)
+        homeBudgetUi = BudgetHomeUi(findViewById(R.id.homePage), budgetState) {
+            pageBackCallback.isEnabled = page != 0 || budgetState.breakdownExpanded
+        }
+        budgetManagementUi = BudgetManagementUi(
+            findViewById(R.id.budgetPage), budgetState, ::openPaymentSources
+        ) { homeBudgetUi?.refresh() }
         listOf(R.id.previousMonth, R.id.nextMonth).forEach { id ->
             findViewById<View>(id).apply {
                 isEnabled = false
@@ -229,6 +255,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun navigateToPage(index: Int) {
         if (index == page) return
+        if (index == 3) budgetState.managementMonth = budgetState.homeMonth
         if (index == 0) {
             pageHistory.clear()
         } else {
@@ -245,9 +272,12 @@ class MainActivity : AppCompatActivity() {
             durationMillis = if (page == 1) 200L else 180L,
             background = getColor(R.color.background),
             updatePage = {
+                if (page == 0 && index != 0) homeBudgetUi?.setExpanded(false, animate = false)
                 page = index
-                pageBackCallback.isEnabled = index != 0
-                listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage).forEachIndexed { i, id ->
+                pageBackCallback.isEnabled = index != 0 || budgetState.breakdownExpanded
+                if (index == 0) homeBudgetUi?.refresh()
+                if (index == 3) budgetManagementUi?.render()
+                listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage, R.id.budgetPage).forEachIndexed { i, id ->
                     findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
                 }
             },
@@ -319,6 +349,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun openPaymentSources() {
+        navigateToPage(2)
+        if (R.id.sourcesDetails !in expanded) findViewById<View>(R.id.sourcesToggle).performClick()
+        findViewById<View>(R.id.sourcesDetails).post {
+            val section = findViewById<View>(R.id.sourcesDetails)
+            section.requestRectangleOnScreen(Rect(0, 0, section.width, section.height), false)
+        }
+    }
+
     private fun showMenu() {
         dismissActiveDialogImmediately()
         val dialog = SideMenuDialog(this, findViewById(R.id.menuButton), ::navigateToPage)
@@ -370,6 +409,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        homeBudgetUi?.dispose()
+        homeBudgetUi = null
+        budgetManagementUi = null
         appearanceTransition.clear()
         dismissActiveDialogImmediately()
         super.onDestroy()

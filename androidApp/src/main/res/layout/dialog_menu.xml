@@ -1,2 +1,83 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:layoutDirection="locale" android:padding="25dp"><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="23dp"><TextView style="@style/Text" android:layout_height="wrap_content" android:text="@string/ui_109" android:textSize="23sp" android:textColor="@color/text" android:layout_width="0dp" android:layout_weight="1" android:textStyle="bold"/><ImageButton android:id="@+id/closeDialog" style="@style/IconButton" android:src="@drawable/ic_close" android:contentDescription="@string/ui_110"/></LinearLayout><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_111" android:textSize="17sp" android:textColor="@color/text" android:id="@+id/nav0" android:paddingTop="20dp" android:paddingBottom="20dp" android:paddingStart="8dp" android:paddingEnd="8dp" android:clickable="true" android:focusable="true" android:background="?android:attr/selectableItemBackground"/><View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line"/><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_112" android:textSize="17sp" android:textColor="@color/text" android:id="@+id/nav1" android:paddingTop="20dp" android:paddingBottom="20dp" android:paddingStart="8dp" android:paddingEnd="8dp" android:clickable="true" android:focusable="true" android:background="?android:attr/selectableItemBackground"/><View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/line"/><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_113" android:textSize="17sp" android:textColor="@color/text" android:id="@+id/nav2" android:paddingTop="20dp" android:paddingBottom="20dp" android:paddingStart="8dp" android:paddingEnd="8dp" android:clickable="true" android:focusable="true" android:background="?android:attr/selectableItemBackground"/></LinearLayout>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layoutDirection="locale"
+    android:padding="25dp">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="23dp">
+        <TextView
+            style="@style/Text"
+            android:layout_height="wrap_content"
+            android:text="@string/menu_title"
+            android:textSize="23sp"
+            android:textColor="@color/text"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:textStyle="bold" />
+        <ImageButton
+            android:id="@+id/closeDialog"
+            style="@style/IconButton"
+            android:src="@drawable/ic_close"
+            android:contentDescription="@string/close" />
+    </LinearLayout>
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/home_screen"
+        android:textSize="17sp"
+        android:textColor="@color/text"
+        android:id="@+id/nav0"
+        android:paddingTop="20dp"
+        android:paddingBottom="20dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?android:attr/selectableItemBackground" />
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/expense_summary"
+        android:textSize="17sp"
+        android:textColor="@color/text"
+        android:id="@+id/nav1"
+        android:paddingTop="20dp"
+        android:paddingBottom="20dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?android:attr/selectableItemBackground" />
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line" />
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/settings"
+        android:textSize="17sp"
+        android:textColor="@color/text"
+        android:id="@+id/nav2"
+        android:paddingTop="20dp"
+        android:paddingBottom="20dp"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:clickable="true"
+        android:focusable="true"
+        android:background="?android:attr/selectableItemBackground" />
+</LinearLayout>

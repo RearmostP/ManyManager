@@ -4,28 +4,13 @@ import android.app.Dialog
 import android.content.res.Configuration
 import android.os.Parcelable
 import android.util.SparseArray
-import android.animation.ValueAnimator
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.graphics.drawable.BitmapDrawable
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Rect
-import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
-import android.view.Gravity
-import android.view.MotionEvent
-import android.view.ViewConfiguration
 import android.view.View
-import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
-import android.widget.ImageView
-import android.view.animation.AccelerateDecelerateInterpolator
-import androidx.core.view.doOnPreDraw
 import androidx.core.view.doOnAttach
-import androidx.lifecycle.ViewModelProvider
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -36,10 +21,9 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import kotlin.math.min
 
-/** XML-only visual prototype. All amounts and expense rows are static sample data. */
+/** Coordinates the XML screens, navigation, and application appearance. */
 class MainActivity : AppCompatActivity() {
     private data class PageVisit(val page: Int, val tab: Int, val scrollY: Int)
     private val pageHistory = mutableListOf<PageVisit>()
@@ -52,25 +36,17 @@ class MainActivity : AppCompatActivity() {
     }
     private var page = 0
     private var tab = 0
-    private var sampleDate = LocalDate.now()
-    private companion object {
-        // Preview preference survives Activity recreation without storing app data.
-        var dark = false
-    }
-    private val appearanceTransition by lazy {
-        ViewModelProvider(this)[AppearanceTransitionState::class.java]
-    }
-    private var transitionOverlay: ImageView? = null
-    private var pageTransition: ValueAnimator? = null
-    private var appearanceChanging = false
-    private var appearanceTransitionDuration = 500L
+    private var currentDate = LocalDate.now()
+    private val preferences by lazy { AppearancePreferences(this) }
+    private var dark = false
+    private val appearanceTransition by lazy { AppearanceTransitionState(window) }
     private var contentReady = false
     private var renderedConfiguration: Configuration? = null
     private var activeDialog: Dialog? = null
     private val expanded = mutableSetOf<Int>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        dark = savedInstanceState?.getBoolean("dark", dark) ?: dark
+        dark = preferences.dark
         // AppCompat owns both locale and night-mode configuration; no competing Context override.
         delegate.localNightMode = if (dark) AppCompatDelegate.MODE_NIGHT_YES
             else AppCompatDelegate.MODE_NIGHT_NO
@@ -96,7 +72,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         val state = Bundle().also { saveUiState(it) }
-        if (!appearanceChanging) {
+        if (!appearanceTransition.isChanging) {
             val languageChanged = previous != null && previous.locales != newConfig.locales
             prepareAppearanceTransition(if (languageChanged) 250L else 500L)
         }
@@ -108,8 +84,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderContent(savedInstanceState: Bundle?) {
         dismissActiveDialogImmediately()
-        sampleDate = savedInstanceState?.takeIf { it.containsKey("sampleDate") }
-            ?.getLong("sampleDate")?.let(LocalDate::ofEpochDay) ?: sampleDate
+        currentDate = savedInstanceState?.takeIf { it.containsKey("currentDate") }
+            ?.getLong("currentDate")?.let(LocalDate::ofEpochDay) ?: currentDate
         enableEdgeToEdge(
             statusBarStyle = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
                 else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
@@ -187,11 +163,16 @@ class MainActivity : AppCompatActivity() {
 
         bindLanguages()
         val locale = resources.configuration.locales[0]
-        val month = sampleDate.format(DateTimeFormatter.ofPattern("LLLL yyyy", locale))
+        val month = currentDate.format(DateTimeFormatter.ofPattern("LLLL yyyy", locale))
         findViewById<TextView>(R.id.monthLabel).text = month
         findViewById<TextView>(R.id.homeMonth).text = month
-        findViewById<TextView>(R.id.sampleDayLabel).text =
-            sampleDate.withDayOfMonth(1).format(DateTimeFormatter.ofPattern("d MMMM", locale))
+        bindEmptyState()
+        listOf(R.id.previousMonth, R.id.nextMonth).forEach { id ->
+            findViewById<View>(id).apply {
+                isEnabled = false
+                alpha = 0.45f
+            }
+        }
         selectPage(page)
         selectTab(tab)
         if (savedInstanceState?.getBoolean("expenseOpen") == true) {
@@ -214,44 +195,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun prepareAppearanceTransition(durationMillis: Long = 500L) {
-        pageTransition?.cancel()
-        appearanceTransitionDuration = durationMillis
-        appearanceChanging = true
-        if (!ValueAnimator.areAnimatorsEnabled()) return
-        val root = findViewById<View>(R.id.windowRoot)
-        if (root.width == 0 || root.height == 0) return
-        // Half resolution keeps the temporary frame small, even on high-density devices.
-        val frame = Bitmap.createBitmap(
-            (root.width / 2).coerceAtLeast(1),
-            (root.height / 2).coerceAtLeast(1),
-            Bitmap.Config.ARGB_8888
-        )
-        val canvas = Canvas(frame)
-        canvas.scale(frame.width.toFloat() / root.width, frame.height.toFloat() / root.height)
-        root.draw(canvas)
-        appearanceTransition.snapshot = frame
-        window.setWindowAnimations(0)
+        appearanceTransition.prepare(findViewById(R.id.windowRoot), durationMillis)
     }
 
     private fun finishAppearanceTransition(savedInstanceState: Bundle?) {
-        val parent = findViewById<ViewGroup>(android.R.id.content)
-        val frame = appearanceTransition.snapshot
-        appearanceTransition.snapshot = null
-        val overlay = frame?.let {
-            window.setWindowAnimations(0)
-            ImageView(this).apply {
-                setImageBitmap(it)
-                scaleType = ImageView.ScaleType.FIT_XY
-                layoutDirection = View.LAYOUT_DIRECTION_LTR
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-                isClickable = true
-                parent.addView(this, ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
-                ))
-            }
-        }
-        transitionOverlay = overlay
-        parent.doOnPreDraw {
+        appearanceTransition.finish(findViewById(android.R.id.content)) {
             savedInstanceState?.getSparseParcelableArray<Parcelable>("viewHierarchy")?.let {
                 findViewById<View>(R.id.windowRoot).restoreHierarchyState(it)
             }
@@ -260,19 +208,23 @@ class MainActivity : AppCompatActivity() {
                     0, savedInstanceState.getInt("pageScrollY")
                 )
             }
-            overlay?.animate()
-                ?.alpha(0f)
-                ?.setDuration(if (ValueAnimator.areAnimatorsEnabled()) appearanceTransitionDuration else 0L)
-                ?.setInterpolator(AccelerateDecelerateInterpolator())
-                ?.withEndAction {
-                    parent.removeView(overlay)
-                    overlay.setImageDrawable(null)
-                    transitionOverlay = null
-                    appearanceChanging = false
-                }
-                ?.start()
-            if (overlay == null) appearanceChanging = false
         }
+    }
+
+    private fun bindEmptyState() {
+        val numbers = java.text.NumberFormat.getIntegerInstance(resources.configuration.locales[0])
+        val total = numbers.format(ExpenseUiData.monthlyTotal)
+        findViewById<TextView>(R.id.homeTotal).text = getString(R.string.ils_amount, total)
+        findViewById<TextView>(R.id.summaryTotal).text = total
+        findViewById<TextView>(R.id.summaryCount).text = getString(
+            R.string.monthly_expense_count, numbers.format(ExpenseUiData.expenseCount)
+        )
+        findViewById<View>(R.id.homeEmpty).visibility =
+            if (ExpenseUiData.expenseCount == 0) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.settingsCategoriesEmpty).visibility =
+            if (ExpenseUiData.categories.isEmpty()) View.VISIBLE else View.GONE
+        findViewById<View>(R.id.settingsPaymentMethodsEmpty).visibility =
+            if (ExpenseUiData.paymentMethods.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun navigateToPage(index: Int) {
@@ -286,54 +238,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectPage(index: Int, animate: Boolean = false, scrollY: Int = 0) {
-        pageTransition?.cancel()
         val scroll = findViewById<ScrollView>(R.id.pageScroll)
-        val transitionDuration = if (page == 1) 200L else 180L
-        val previousFrame = if (animate && page != index &&
-            ValueAnimator.areAnimatorsEnabled() && scroll.width > 0 && scroll.height > 0
-        ) {
-            val bitmap = Bitmap.createBitmap(
-                (scroll.width / 2).coerceAtLeast(1),
-                (scroll.height / 2).coerceAtLeast(1),
-                Bitmap.Config.ARGB_8888
-            )
-            Canvas(bitmap).apply {
-                scale(bitmap.width.toFloat() / scroll.width, bitmap.height.toFloat() / scroll.height)
-                drawColor(getColor(R.color.background))
-                scroll.draw(this)
-            }
-            BitmapDrawable(resources, bitmap).apply {
-                setBounds(0, 0, scroll.width, scroll.height)
-                scroll.overlay.add(this)
-            }
-        } else null
-
-        page = index
-        pageBackCallback.isEnabled = index != 0
-        listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage).forEachIndexed { i, id ->
-            findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
-        }
-        // Keep the old frame visible until the destination has been laid out and scrolled.
-        val animator = previousFrame?.let { frame ->
-            ValueAnimator.ofInt(255, 0).apply {
-                duration = transitionDuration
-                interpolator = AccelerateDecelerateInterpolator()
-                addUpdateListener { frame.alpha = it.animatedValue as Int }
-                addListener(object : AnimatorListenerAdapter() {
-                    override fun onAnimationEnd(animation: Animator) {
-                        scroll.overlay.remove(frame)
-                        if (pageTransition === animation) pageTransition = null
-                    }
-                })
-            }
-        }
-        pageTransition = animator
-        animator?.start()
-        scroll.doOnPreDraw {
-            if (page == index && pageTransition === animator) {
-                scroll.scrollTo(0, scrollY)
-            }
-        }
+        appearanceTransition.changePage(
+            scroll = scroll,
+            animate = animate && page != index,
+            durationMillis = if (page == 1) 200L else 180L,
+            background = getColor(R.color.background),
+            updatePage = {
+                page = index
+                pageBackCallback.isEnabled = index != 0
+                listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage).forEachIndexed { i, id ->
+                    findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
+                }
+            },
+            restoreScroll = { scroll.scrollTo(0, scrollY) }
+        )
     }
 
     private fun selectTab(index: Int) {
@@ -381,7 +300,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun selectLanguage(tag: String) {
-        if (activeLanguage() == tag || appearanceChanging || transitionOverlay != null) return
+        if (activeLanguage() == tag || appearanceTransition.isChanging) return
         prepareAppearanceTransition(durationMillis = 250L)
         page = 2
         expanded.add(R.id.languageDetails)
@@ -391,8 +310,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun changeTheme(value: Boolean) {
-        if (dark != value && !appearanceChanging && transitionOverlay == null) {
+        if (dark != value && !appearanceTransition.isChanging) {
             prepareAppearanceTransition()
+            preferences.dark = value
             dark = value
             delegate.localNightMode = if (value) AppCompatDelegate.MODE_NIGHT_YES
                 else AppCompatDelegate.MODE_NIGHT_NO
@@ -400,69 +320,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showMenu() {
-        val dialog = sideMenu()
-        listOf(R.id.nav0, R.id.nav1, R.id.nav2).forEachIndexed { index, id ->
-            dialog.findViewById<View>(id).setOnClickListener {
-                navigateToPage(index)
-                dialog.dismiss()
-            }
-        }
-    }
-
-    private fun sideMenu(): Dialog {
         dismissActiveDialogImmediately()
-        val dialog = SideMenuDialog(this)
-        val button = findViewById<View>(R.id.menuButton)
-        val position = IntArray(2)
-        button.getLocationOnScreen(position)
-        val bounds = window.windowManager.currentWindowMetrics.bounds
-        val fromRight = position[0] + button.width / 2 > bounds.centerX()
-        val menuWidth = min(dp(320), (bounds.width() * 0.85f).toInt())
-        val content = layoutInflater.inflate(R.layout.dialog_menu, null)
-        val panel = ScrollView(this).apply {
-            isFillViewport = true
-            setBackgroundResource(if (fromRight) R.drawable.menu_from_right else R.drawable.menu_from_left)
-            clipToOutline = true
-            addView(content)
-        }
-        val host = FrameLayout(this).apply {
-            layoutDirection = resources.configuration.layoutDirection
-            addView(panel, FrameLayout.LayoutParams(
-                menuWidth,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                if (fromRight) Gravity.RIGHT else Gravity.LEFT
-            ))
-            setOnClickListener { dialog.dismiss() }
-        }
-        content.isClickable = true
-        content.findViewById<View>(R.id.closeDialog).setOnClickListener { dialog.dismiss() }
-        host.setOnApplyWindowInsetsListener { view, insets ->
-            val safe = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
-            view.setPadding(safe.left, safe.top, safe.right, safe.bottom)
-            WindowInsets.CONSUMED
-        }
-        dialog.setContentView(host)
-        dialog.window?.apply {
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            attributes = attributes.apply {
-                dimAmount = 0.38f
-                windowAnimations = 0
-            }
-            setDecorFitsSystemWindows(false)
-        }
-        dialog.panelView = panel
-        dialog.opensFromRight = fromRight
-        panel.translationX = if (fromRight) menuWidth.toFloat() else -menuWidth.toFloat()
-        dialog.show()
-        dialog.window?.setLayout(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        )
-        host.requestApplyInsets()
-        panel.animate().translationX(0f).setDuration(280).start()
+        val dialog = SideMenuDialog(this, findViewById(R.id.menuButton), ::navigateToPage)
         activeDialog = dialog
-        return dialog
+        dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
+        dialog.show()
     }
 
     private fun dismissActiveDialogImmediately() {
@@ -476,101 +338,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showExpense() {
-        val dialog = sheet(R.layout.dialog_expense, true)
-        // Fields illustrate the form; there is deliberately no save action or data storage.
-        dialog.findViewById<TextView>(R.id.expenseDate).text =
-            sampleDate.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-                .withLocale(resources.configuration.locales[0]))
-    }
-
-    private fun enableExpenseDrag(dialog: Dialog, content: View) {
-        val handle = content.findViewById<View>(R.id.expenseDragHandle) ?: return
-        val slop = ViewConfiguration.get(this).scaledTouchSlop
-        var startY = 0f
-        var dragging = false
-        handle.setOnTouchListener { view, event ->
-            if ((dialog as? ExpenseSheetDialog)?.isDismissing == true) return@setOnTouchListener true
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    content.animate().cancel()
-                    startY = event.rawY - content.translationY
-                    dragging = false
-                    view.parent.requestDisallowInterceptTouchEvent(true)
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    val distance = (event.rawY - startY).coerceAtLeast(0f)
-                    if (distance > slop) dragging = true
-                    if (dragging) content.translationY = distance
-                    true
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    view.parent.requestDisallowInterceptTouchEvent(false)
-                    if (event.actionMasked == MotionEvent.ACTION_UP &&
-                        dragging && content.translationY >= dp(64)
-                    ) {
-                        dialog.dismiss()
-                    } else {
-                        content.animate().translationY(0f).setDuration(180).start()
-                        if (!dragging && event.actionMasked == MotionEvent.ACTION_UP) {
-                            view.performClick()
-                        }
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
-    }
-
-    private fun sheet(layout: Int, tall: Boolean): Dialog {
         dismissActiveDialogImmediately()
-        val dialog = ExpenseSheetDialog(this)
-        val content = layoutInflater.inflate(layout, null)
-        // The transparent window fills the screen; only the sheet wraps its content.
-        // FrameLayout constrains long forms to the available height and anchors them below.
-        val host = FrameLayout(this).apply {
-            layoutDirection = resources.configuration.layoutDirection
-            addView(content, FrameLayout.LayoutParams(
-                min(resources.displayMetrics.widthPixels, dp(440)),
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            ))
-            setOnClickListener { dialog.dismiss() }
-        }
-        content.isClickable = true
-        dialog.sheetView = content
-        enableExpenseDrag(dialog, content)
-        content.findViewById<View>(R.id.closeDialog).setOnClickListener { dialog.dismiss() }
-        host.setOnApplyWindowInsetsListener { view, insets ->
-            val safe = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout())
-            val ime = insets.getInsets(WindowInsets.Type.ime())
-            val bottom = maxOf(safe.bottom, ime.bottom)
-            val available = (window.windowManager.currentWindowMetrics.bounds.height() -
-                safe.top - bottom).coerceAtLeast(0)
-            val topGap = if (tall) (available * 0.08f).toInt() else 0
-            view.setPadding(safe.left, safe.top + topGap, safe.right, bottom)
-            WindowInsets.CONSUMED
-        }
-        dialog.setContentView(host)
-        dialog.window?.apply {
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
-            setGravity(Gravity.BOTTOM)
-            addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            attributes = attributes.apply {
-                dimAmount = 0.38f
-                windowAnimations = 0
-            }
-            setDecorFitsSystemWindows(false)
-        }
-        dialog.show()
-        dialog.window?.setLayout(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.MATCH_PARENT
-        )
-        host.requestApplyInsets()
+        val dialog = ExpenseSheetDialog(this, currentDate)
         activeDialog = dialog
-        return dialog
+        dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
+        dialog.show()
     }
 
     private fun saveUiState(outState: Bundle) {
@@ -583,13 +355,12 @@ class MainActivity : AppCompatActivity() {
         outState.putBoolean("expenseOpen", expenseOpen)
         if (expenseOpen) outState.putBundle("expenseDialogState", activeDialog?.onSaveInstanceState())
         outState.putInt("pageScrollY", findViewById<ScrollView>(R.id.pageScroll).scrollY)
-        outState.putBoolean("dark", dark)
         outState.putInt("page", page)
         outState.putIntArray("pageHistory", pageHistory.flatMap {
             listOf(it.page, it.tab, it.scrollY)
         }.toIntArray())
         outState.putInt("tab", tab)
-        outState.putLong("sampleDate", sampleDate.toEpochDay())
+        outState.putLong("currentDate", currentDate.toEpochDay())
         outState.putIntArray("expanded", expanded.toIntArray())
     }
 
@@ -599,10 +370,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        pageTransition?.cancel()
-        transitionOverlay?.animate()?.cancel()
-        transitionOverlay?.setImageDrawable(null)
-        transitionOverlay = null
+        appearanceTransition.clear()
         dismissActiveDialogImmediately()
         super.onDestroy()
     }

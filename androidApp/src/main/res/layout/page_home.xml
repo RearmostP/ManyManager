@@ -1,2 +1,106 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" ><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_67" android:textSize="13sp" android:textColor="@color/muted" /><Space android:layout_width="1dp" android:layout_height="10dp"/><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_68" android:textSize="34sp" android:textColor="@color/text" android:textStyle="bold" android:letterSpacing="-0.03"/><Space android:layout_width="1dp" android:layout_height="28dp"/><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:background="@drawable/card" android:padding="29dp" android:elevation="2dp"><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_69" android:textSize="13sp" android:textColor="@color/muted" android:id="@+id/homeMonth"/><Space android:layout_width="1dp" android:layout_height="24dp"/><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_70" android:textSize="50sp" android:textColor="@color/text" android:textDirection="ltr" android:gravity="start" android:textStyle="bold"/><Space android:layout_width="1dp" android:layout_height="12dp"/><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_71" android:textSize="13sp" android:textColor="@color/muted" /></LinearLayout><Space android:layout_width="1dp" android:layout_height="175dp"/><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_72" android:textSize="17sp" android:textColor="@color/white" android:id="@+id/addExpense" android:gravity="center" android:textStyle="bold" android:background="@drawable/primary" android:minHeight="58dp" android:padding="17dp" android:clickable="true" android:focusable="true"/><Space android:layout_width="1dp" android:layout_height="17dp"/><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_73" android:textSize="12sp" android:textColor="@color/muted" android:gravity="center"/></LinearLayout>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/home_intro"
+        android:textSize="13sp"
+        android:textColor="@color/muted" />
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="10dp" />
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/home_title"
+        android:textSize="34sp"
+        android:textColor="@color/text"
+        android:textStyle="bold"
+        android:letterSpacing="-0.03" />
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="28dp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/card"
+        android:padding="29dp"
+        android:elevation="2dp">
+        <TextView
+            style="@style/Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="13sp"
+            android:textColor="@color/muted"
+            android:id="@+id/homeMonth" />
+        <Space
+            android:layout_width="1dp"
+            android:layout_height="24dp" />
+        <TextView
+            style="@style/Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/amount_zero"
+            android:textSize="50sp"
+            android:textColor="@color/text"
+            android:textDirection="ltr"
+            android:gravity="start"
+            android:textStyle="bold"
+            android:id="@+id/homeTotal" />
+        <Space
+            android:layout_width="1dp"
+            android:layout_height="12dp" />
+        <TextView
+            style="@style/Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/monthly_total"
+            android:textSize="13sp"
+            android:textColor="@color/muted" />
+        <TextView
+            style="@style/Text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/no_expenses"
+            android:textSize="13sp"
+            android:textColor="@color/muted"
+            android:id="@+id/homeEmpty"
+            android:layout_marginTop="16dp" />
+    </LinearLayout>
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="175dp" />
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/add_expense"
+        android:textSize="17sp"
+        android:textColor="@color/white"
+        android:id="@+id/addExpense"
+        android:gravity="center"
+        android:textStyle="bold"
+        android:background="@drawable/primary"
+        android:minHeight="58dp"
+        android:padding="17dp"
+        android:clickable="true"
+        android:focusable="true" />
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="17dp" />
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/home_footer"
+        android:textSize="12sp"
+        android:textColor="@color/muted"
+        android:gravity="center" />
+</LinearLayout>

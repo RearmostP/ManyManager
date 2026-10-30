@@ -1,2 +1,169 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" ><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_4" android:textSize="13sp" android:textColor="@color/muted" /><Space android:layout_width="1dp" android:layout_height="10dp"/><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_5" android:textSize="34sp" android:textColor="@color/text" android:textStyle="bold" android:letterSpacing="-0.03"/><Space android:layout_width="1dp" android:layout_height="28dp"/><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center"><ImageButton android:id="@+id/previousMonth" style="@style/IconButton" android:src="@drawable/ic_right" android:contentDescription="@string/ui_6"/><TextView style="@style/Text" android:layout_height="wrap_content" android:text="@string/ui_7" android:textSize="15sp" android:textColor="@color/text" android:id="@+id/monthLabel" android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:textStyle="bold"/><ImageButton android:id="@+id/nextMonth" style="@style/IconButton" android:src="@drawable/ic_left" android:contentDescription="@string/ui_8"/></LinearLayout><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layoutDirection="ltr" android:gravity="center" android:layout_marginTop="17dp" android:layout_marginBottom="6dp"><TextView style="@style/Text" android:layout_height="wrap_content" android:text="@string/ui_9" android:textSize="26sp" android:textColor="@color/muted" android:layout_width="wrap_content" android:layout_marginEnd="5dp"/><TextView style="@style/Text" android:layout_height="wrap_content" android:text="@string/ui_10" android:textSize="48sp" android:textColor="@color/text" android:layout_width="wrap_content" android:textStyle="bold" android:letterSpacing="-0.035"/></LinearLayout><TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/ui_11" android:textSize="13sp" android:textColor="@color/muted" android:gravity="center"/><Space android:layout_width="1dp" android:layout_height="26dp"/><LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" ><TextView style="@style/Text" android:layout_height="wrap_content" android:text="@string/ui_12" android:textSize="13sp" android:textColor="@color/blue" android:id="@+id/categoryTab" android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:minHeight="49dp" android:paddingTop="10dp" android:paddingBottom="10dp" android:paddingStart="3dp" android:paddingEnd="3dp" android:clickable="true" android:focusable="true" android:background="@drawable/tab_selected" android:textStyle="bold"/><TextView style="@style/Text" android:layout_height="wrap_content" android:text="@string/ui_13" android:textSize="13sp" android:textColor="@color/muted" android:id="@+id/sourceTab" android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:minHeight="49dp" android:paddingTop="10dp" android:paddingBottom="10dp" android:paddingStart="3dp" android:paddingEnd="3dp" android:clickable="true" android:focusable="true" android:background="@drawable/tab_idle" /><TextView style="@style/Text" android:layout_height="wrap_content" android:text="@string/ui_14" android:textSize="13sp" android:textColor="@color/muted" android:id="@+id/allTab" android:layout_width="0dp" android:layout_weight="1" android:gravity="center" android:minHeight="49dp" android:paddingTop="10dp" android:paddingBottom="10dp" android:paddingStart="3dp" android:paddingEnd="3dp" android:clickable="true" android:focusable="true" android:background="@drawable/tab_idle" /></LinearLayout><Space android:layout_width="1dp" android:layout_height="25dp"/><include android:id="@+id/categoryPanel" layout="@layout/panel_categories"/><include android:id="@+id/sourcePanel" layout="@layout/panel_sources" android:visibility="gone"/><include android:id="@+id/allPanel" layout="@layout/panel_all" android:visibility="gone"/></LinearLayout>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/summary_intro"
+        android:textSize="13sp"
+        android:textColor="@color/muted" />
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="10dp" />
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/expense_summary"
+        android:textSize="34sp"
+        android:textColor="@color/text"
+        android:textStyle="bold"
+        android:letterSpacing="-0.03" />
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="28dp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+        <ImageButton
+            android:id="@+id/previousMonth"
+            style="@style/IconButton"
+            android:src="@drawable/ic_right"
+            android:contentDescription="@string/previous_month" />
+        <TextView
+            style="@style/Text"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textColor="@color/text"
+            android:id="@+id/monthLabel"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textStyle="bold" />
+        <ImageButton
+            android:id="@+id/nextMonth"
+            style="@style/IconButton"
+            android:src="@drawable/ic_left"
+            android:contentDescription="@string/next_month" />
+    </LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layoutDirection="ltr"
+        android:gravity="center"
+        android:layout_marginTop="17dp"
+        android:layout_marginBottom="6dp">
+        <TextView
+            style="@style/Text"
+            android:layout_height="wrap_content"
+            android:text="@string/ils_symbol"
+            android:textSize="26sp"
+            android:textColor="@color/muted"
+            android:layout_width="wrap_content"
+            android:layout_marginEnd="5dp" />
+        <TextView
+            style="@style/Text"
+            android:layout_height="wrap_content"
+            android:text="@string/amount_zero"
+            android:textSize="48sp"
+            android:textColor="@color/text"
+            android:layout_width="wrap_content"
+            android:textStyle="bold"
+            android:letterSpacing="-0.035"
+            android:id="@+id/summaryTotal" />
+    </LinearLayout>
+    <TextView
+        style="@style/Text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/monthly_expense_count"
+        android:textSize="13sp"
+        android:textColor="@color/muted"
+        android:gravity="center"
+        android:id="@+id/summaryCount" />
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="26dp" />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            style="@style/Text"
+            android:layout_height="wrap_content"
+            android:text="@string/by_category"
+            android:textSize="13sp"
+            android:textColor="@color/blue"
+            android:id="@+id/categoryTab"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:minHeight="49dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:paddingStart="3dp"
+            android:paddingEnd="3dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/tab_selected"
+            android:textStyle="bold" />
+        <TextView
+            style="@style/Text"
+            android:layout_height="wrap_content"
+            android:text="@string/by_payment_method"
+            android:textSize="13sp"
+            android:textColor="@color/muted"
+            android:id="@+id/sourceTab"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:minHeight="49dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:paddingStart="3dp"
+            android:paddingEnd="3dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/tab_idle" />
+        <TextView
+            style="@style/Text"
+            android:layout_height="wrap_content"
+            android:text="@string/all_expenses"
+            android:textSize="13sp"
+            android:textColor="@color/muted"
+            android:id="@+id/allTab"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:minHeight="49dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:paddingStart="3dp"
+            android:paddingEnd="3dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:background="@drawable/tab_idle" />
+    </LinearLayout>
+    <Space
+        android:layout_width="1dp"
+        android:layout_height="25dp" />
+    <include
+        android:id="@+id/categoryPanel"
+        layout="@layout/panel_categories" />
+    <include
+        android:id="@+id/sourcePanel"
+        layout="@layout/panel_sources"
+        android:visibility="gone" />
+    <include
+        android:id="@+id/allPanel"
+        layout="@layout/panel_all"
+        android:visibility="gone" />
+</LinearLayout>

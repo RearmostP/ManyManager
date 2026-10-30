@@ -5,46 +5,24 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.util.AttributeSet
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.doOnPreDraw
-import kotlin.math.ceil
 
-/** Two balanced areas when space allows; stacked at narrow widths, large fonts or amounts. */
+/** Backward-compatible layout placeholder. */
 class BudgetOverviewLayout @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
-) : LinearLayout(context, attrs) {
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val available = MeasureSpec.getSize(widthMeasureSpec) - paddingLeft - paddingRight
-        val gap = (16 * resources.displayMetrics.density).toInt()
-        val amountWidth = listOf(R.id.homeTotal, R.id.homeBudgetRemaining).maxOf { id ->
-            findViewById<TextView>(id)?.let { ceil(it.paint.measureText(it.text.toString())).toInt() } ?: 0
-        }
-        val stack = available < 280 * resources.displayMetrics.density ||
-            resources.configuration.fontScale > 1.25f || amountWidth * 2 + gap > available
-        orientation = if (stack) VERTICAL else HORIZONTAL
-        for (index in 0 until childCount) {
-            ((getChildAt(index) as? ViewGroup)?.getChildAt(0) as? TextView)?.minLines = if (stack) 1 else 2
-            (getChildAt(index).layoutParams as LayoutParams).apply {
-                width = if (stack) LayoutParams.MATCH_PARENT else 0
-                weight = if (stack) 0f else 1f
-                marginEnd = if (!stack && index == 0) gap else 0
-                bottomMargin = if (stack && index == 0) gap else 0
-                resolveLayoutDirection(layoutDirection)
-            }
-        }
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec)
-    }
-}
+) : LinearLayout(context, attrs)
 
-/** Inline, bounded budget breakdown anchored below Home's budget area. */
+/** Inline budget breakdown anchored below Home's remaining budget row. */
 class BudgetHomeUi(
     private val root: View,
     private val state: BudgetViewModel,
@@ -52,8 +30,9 @@ class BudgetHomeUi(
 ) {
     private val context = root.context
     private val area = root.findViewById<View>(R.id.homeBudgetArea)
-    private val panel = root.findViewById<ScrollView>(R.id.budgetBreakdown)
+    private val panel = root.findViewById<View>(R.id.budgetBreakdown)
     private val rows = root.findViewById<LinearLayout>(R.id.budgetBreakdownRows)
+    private val chevron = root.findViewById<ImageView>(R.id.budgetChevron)
     private var animator: ValueAnimator? = null
     private var pendingDraw: OneShotPreDrawListener? = null
 
@@ -68,37 +47,59 @@ class BudgetHomeUi(
 
     fun refresh() {
         val total = state.allocations.total(state.homeMonth)
-        // Spending is deliberately not consulted: this is the allocation preview.
-        val formatted = money(total)
-        root.findViewById<TextView>(R.id.homeBudgetRemaining).text = formatted
-        root.findViewById<TextView>(R.id.homeBudgetTotal).text =
-            context.getString(R.string.budget_of_total, formatted)
-        area.contentDescription = context.getString(R.string.budget_toggle_description, formatted, formatted)
+        val remaining = (total - ExpenseUiData.monthlyTotal).coerceAtLeast(0L)
+        val formattedRemaining = money(remaining)
+        val formattedTotal = money(total)
+
+        root.findViewById<TextView>(R.id.homeBudgetRemaining).text = formattedRemaining
+        root.findViewById<TextView>(R.id.homeBudgetTotal).text = formattedTotal
+        area.contentDescription = context.getString(
+            R.string.budget_toggle_description, formattedRemaining, formattedTotal
+        )
+
         rows.removeAllViews()
         if (state.allocations.sources.isEmpty()) {
-            rows.addView(label(context.getString(R.string.no_payment_methods)))
+            rows.addView(TextView(context, null, 0, R.style.Text).apply {
+                text = context.getString(R.string.no_budget_sources_yet)
+                textSize = 14f
+                setTextColor(context.getColor(R.color.muted))
+                gravity = Gravity.CENTER_HORIZONTAL
+                setPadding(0, dp(12), 0, dp(6))
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            })
         } else {
             state.allocations.sources.forEach { source ->
+                val sourceAmount = state.allocations.amount(state.homeMonth, source.id)
                 rows.addView(LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
                     setPadding(0, dp(8), 0, dp(8))
-                    addView(label(source.name))
-                    addView(label(money(state.allocations.amount(state.homeMonth, source.id))).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
+
+                    addView(TextView(context, null, 0, R.style.Text).apply {
+                        text = source.name
+                        textSize = 14f
+                        setTextColor(context.getColor(R.color.text))
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                    })
+
+                    addView(TextView(context, null, 0, R.style.Text).apply {
+                        text = money(sourceAmount)
+                        textSize = 14f
+                        setTextColor(context.getColor(R.color.muted))
                         textDirection = View.TEXT_DIRECTION_LTR
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
+                        )
                     })
                 })
             }
         }
         setExpanded(state.breakdownExpanded, animate = false)
-    }
-
-    private fun label(value: String) = TextView(context, null, 0, R.style.Text).apply {
-        text = value
-        textSize = 13f
-        setTextColor(context.getColor(R.color.muted))
-        layoutParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        )
     }
 
     fun setExpanded(expanded: Boolean, animate: Boolean = true) {
@@ -108,6 +109,15 @@ class BudgetHomeUi(
         pendingDraw?.removeListener()
         pendingDraw = null
         state.breakdownExpanded = expanded
+
+        chevron?.animate()?.cancel()
+        val targetRotation = if (expanded) 180f else 0f
+        if (animate && ValueAnimator.areAnimatorsEnabled()) {
+            chevron?.animate()?.rotation(targetRotation)?.setDuration(200L)?.start()
+        } else {
+            chevron?.rotation = targetRotation
+        }
+
         ViewCompat.setStateDescription(area, context.getString(
             if (expanded) R.string.budget_expanded else R.string.budget_collapsed
         ))
@@ -120,10 +130,12 @@ class BudgetHomeUi(
             true
         }
         onExpandedChanged()
+
         if (!expanded && (!animate || !ValueAnimator.areAnimatorsEnabled())) {
             panel.visibility = View.GONE
             return
         }
+
         if ((panel.parent as View).width == 0) {
             panel.visibility = if (expanded) View.VISIBLE else View.GONE
             if (expanded) pendingDraw = root.doOnPreDraw {
@@ -132,13 +144,14 @@ class BudgetHomeUi(
             }
             return
         }
+
         val start = if (panel.visibility == View.VISIBLE) panel.height else 0
         val parent = panel.parent as View
         val width = parent.width - parent.paddingLeft - parent.paddingRight
         panel.visibility = View.VISIBLE
         panel.measure(
             View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-            View.MeasureSpec.makeMeasureSpec(dp(260), View.MeasureSpec.AT_MOST)
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         )
         val target = if (expanded) panel.measuredHeight else 0
         if (!animate || !ValueAnimator.areAnimatorsEnabled()) {
@@ -147,7 +160,7 @@ class BudgetHomeUi(
             return
         }
         animator = ValueAnimator.ofInt(start, target).apply {
-            duration = 160L
+            duration = 180L
             interpolator = AccelerateDecelerateInterpolator()
             addUpdateListener { panel.layoutParams = panel.layoutParams.apply { height = it.animatedValue as Int } }
             addListener(object : AnimatorListenerAdapter() {

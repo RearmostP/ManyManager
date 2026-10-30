@@ -240,13 +240,11 @@ class MainActivity : AppCompatActivity() {
     private fun bindEmptyState() {
         val numbers = java.text.NumberFormat.getIntegerInstance(resources.configuration.locales[0])
         val total = numbers.format(ExpenseUiData.monthlyTotal)
-        findViewById<TextView>(R.id.homeTotal).text = getString(R.string.ils_amount, total)
+        findViewById<TextView>(R.id.homeTotal).text = total
         findViewById<TextView>(R.id.summaryTotal).text = total
         findViewById<TextView>(R.id.summaryCount).text = getString(
             R.string.monthly_expense_count, numbers.format(ExpenseUiData.expenseCount)
         )
-        findViewById<View>(R.id.homeEmpty).visibility =
-            if (ExpenseUiData.expenseCount == 0) View.VISIBLE else View.GONE
         findViewById<View>(R.id.settingsCategoriesEmpty).visibility =
             if (ExpenseUiData.categories.isEmpty()) View.VISIBLE else View.GONE
         findViewById<View>(R.id.settingsPaymentMethodsEmpty).visibility =

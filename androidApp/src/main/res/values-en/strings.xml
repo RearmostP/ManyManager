@@ -22,7 +22,7 @@
     <string name="home_intro">Just log it. Get on with your day.</string>
     <string name="home_title">My expenses</string>
     <string name="monthly_total">Total expenses this month</string>
-    <string name="add_expense">＋ Add expense</string>
+    <string name="add_expense">Add Expense</string>
     <string name="home_footer">One more small expense. A little more order.</string>
     <string name="settings_intro">Everything, your way</string>
     <string name="settings">Settings</string>
@@ -65,6 +65,8 @@
     <string name="no_payment_methods">No payment methods yet</string>
     <string name="management_unavailable">Adding items is not yet available</string>
     <string name="ils_amount">₪ %1$s</string>
+    <string name="total_budget_for_month">Total budget for the month</string>
+    <string name="no_budget_sources_yet">No budget sources yet</string>
     <string name="remaining_budget">Remaining budget</string>
     <string name="budget_of_total">Of a monthly budget of %1$s</string>
     <string name="monthly_budget">Monthly budget</string>

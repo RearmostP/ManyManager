@@ -22,7 +22,7 @@
     <string name="home_intro">Просто запишите. И продолжайте свой день.</string>
     <string name="home_title">Мои расходы</string>
     <string name="monthly_total">Всего расходов за месяц</string>
-    <string name="add_expense">＋ Добавить расход</string>
+    <string name="add_expense">Добавить расход</string>
     <string name="home_footer">Ещё один небольшой расход. Чуть больше порядка.</string>
     <string name="settings_intro">Всё по-вашему</string>
     <string name="settings">Настройки</string>
@@ -65,6 +65,8 @@
     <string name="no_payment_methods">Способов оплаты пока нет</string>
     <string name="management_unavailable">Добавление пока недоступно</string>
     <string name="ils_amount">₪ %1$s</string>
+    <string name="total_budget_for_month">Общий бюджет на месяц</string>
+    <string name="no_budget_sources_yet">Источников бюджета пока нет</string>
     <string name="remaining_budget">Остаток бюджета</string>
     <string name="budget_of_total">Из месячного бюджета %1$s</string>
     <string name="monthly_budget">Месячный бюджет</string>

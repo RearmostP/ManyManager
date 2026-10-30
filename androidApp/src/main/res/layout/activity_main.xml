@@ -49,11 +49,11 @@
                     android:paddingBottom="32dp">
                     <include
                         android:id="@+id/summaryPage"
-                        layout="@layout/page_summary" />
+                        layout="@layout/page_summary"
+                        android:visibility="gone" />
                     <include
                         android:id="@+id/homePage"
-                        layout="@layout/page_home"
-                        android:visibility="gone" />
+                        layout="@layout/page_home" />
                     <include
                         android:id="@+id/budgetPage"
                         layout="@layout/page_budget"

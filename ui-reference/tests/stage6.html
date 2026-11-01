@@ -1,0 +1,57 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<base href="../">
+<title>Stage 6 companion checks</title>
+<h1>Stage 6 companion checks</h1>
+<pre id="results">Running…</pre>
+<script type="module">
+import {periodFor,periodKey,adjacentPeriod} from "../js/budget-period.js";
+import {previewModel,addSource,amountFor,totalFor,updateSource,previewAdjustment} from "../js/preview-model.js";
+import {state,closeOverlay,changePage} from "../js/state.js";
+import {beginCategoryCreation,confirmCategoryCreation} from "../js/components/category-dialog.js";
+import {expense} from "../js/components/expense-sheet.js";
+import {home} from "../js/screens/home.js";
+import {canConfirmSourceEdit} from "../js/components/source-dialog.js";
+import {loadLanguage} from "../js/i18n.js";
+const results=[];
+function check(condition,label){if(!condition)throw Error(label);results.push("PASS "+label)}
+try{
+ await loadLanguage("en");state.language="en";
+ const before=new Date(2026,10,9),after=new Date(2026,10,10);
+ check(periodKey(before)==="2026-10"&&periodKey(after)==="2026-11","before/after 10th");
+ check(periodFor(after).endExclusive.getMonth()===11,"November 10 to December 9");
+ check(periodKey(adjacentPeriod(new Date(2026,11,31),1))==="2027-01","year navigation without date overflow");
+ const a=addSource(" Same ",after,1200),b=addSource("Same",after,0);
+ check(a.id!==b.id&&a.name===b.name,"duplicate names retain distinct IDs");
+ check(amountFor(after,a.id)===1200,"initial allocation");
+ check(previewAdjustment(after,a.id,200)===1400&&amountFor(after,a.id)===1200,"preview never writes");
+ check(!updateSource(a.id,"Wrong",after,-1300)&&a.name==="Same"&&amountFor(after,a.id)===1200,"invalid edit is atomic");
+ check(updateSource(a.id,"Renamed",after,200)&&a.id===previewModel.sources[0].id,"rename preserves ID");
+ const next=adjacentPeriod(after,1);
+ check(totalFor(next)===0&&previewModel.sources.length===2,"period isolation retains zero-allocation sources");
+ state.currentDate=before;state.budgetMonth=after;
+ changePage(3,{scrollTop:0});
+ check(periodKey(state.budgetMonth)==="2026-10","management entry selects active period before 10th");
+ state.dialogMonth=after;state.sourceDraft={sourceId:a.id,name:"Renamed",adjustment:"99",operation:"deduct"};
+ check(!canConfirmSourceEdit(),"negative allocation cannot confirm");
+ state.sourceDraft.adjustment="";
+ check(canConfirmSourceEdit(),"empty adjustment means zero");
+ state.overlay="expense";
+ state.expenseDraft={amount:"12.34",date:"09/11/2026",note:"Keep me",categoryId:null,sourceId:b.id};
+ const beforeDraft=JSON.stringify(state.expenseDraft);
+ addSource("Third",next,0);expense();
+ check(JSON.stringify(state.expenseDraft)===beforeDraft,"source refresh preserves entire draft");
+ const host=document.createElement("div");host.innerHTML=expense();
+ check(host.querySelectorAll('[data-action="expense-source"]').length===3,"zero-allocation sources offered");
+ check(host.querySelector('[data-action="expense-source"].selected').dataset.id===b.id,"selection uses source ID");
+ beginCategoryCreation();state.categoryDraft="Food";check(confirmCategoryCreation(),"category creation succeeds");
+ check(state.overlay==="expense"&&state.expenseDraft.categoryId&&state.expenseDraft.sourceId===b.id&&state.expenseDraft.amount==="12.34"&&state.expenseDraft.note==="Keep me"&&state.expenseDraft.date==="09/11/2026","category return preserves draft");
+ const categoryId=state.expenseDraft.categoryId;
+ beginCategoryCreation();closeOverlay();
+ check(state.expenseDraft.categoryId===categoryId&&state.overlay==="expense","category cancellation");
+ state.currentDate=after;state.budgetMonth=next;
+ check(home().includes("Renamed")&&home().includes("14"),"home follows active period independently of management");
+ document.getElementById("results").textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
+}catch(error){document.getElementById("results").textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}
+</script>

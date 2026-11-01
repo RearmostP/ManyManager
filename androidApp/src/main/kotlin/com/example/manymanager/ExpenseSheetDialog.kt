@@ -1,30 +1,30 @@
 package com.example.manymanager
 
 import android.animation.ValueAnimator
-import android.app.Dialog
 import android.app.Activity
+import android.app.Dialog
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.os.Bundle
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.WindowInsets
-import android.widget.FrameLayout
-import android.widget.TextView
+import android.view.animation.AccelerateInterpolator
+import android.view.animation.DecelerateInterpolator
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.os.Bundle
+import android.widget.TextView
+import androidx.core.view.OneShotPreDrawListener
+import androidx.core.view.doOnPreDraw
 import androidx.core.widget.doAfterTextChanged
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.min
-import android.view.View
-import android.view.animation.AccelerateInterpolator
-import android.view.animation.DecelerateInterpolator
-import androidx.core.view.OneShotPreDrawListener
-import androidx.core.view.doOnPreDraw
 
 /** Form values and choices are independent of rendered views and survive configuration changes. */
 class ExpenseDraft(
@@ -56,9 +56,10 @@ class ExpenseDraft(
 /** Slides only the expense sheet away, leaving the Activity beneath it in place. */
 class ExpenseSheetDialog(
     activity: Activity, date: LocalDate,
-    categories: CategoryListState, sources: List<PaymentSource>,
+    categories: CategoryListState, sources: SourceListState,
     val draft: ExpenseDraft,
     private val onRetryCategories: () -> Unit = {},
+    private val onRetrySources: () -> Unit = {},
     onAddCategory: () -> Unit,
 ) : Dialog(activity) {
     private val resources get() = context.resources
@@ -124,13 +125,10 @@ class ExpenseSheetDialog(
             setText(draft.note)
             doAfterTextChanged { draft.note = it.toString() }
         }
-        // Sources are the same identities shown on Budget Management. Expense saving is not implemented.
+        // Expense saving is not implemented.
         content.findViewById<View>(R.id.saveExpense).isEnabled = false
-        content.findViewById<View>(R.id.expensePaymentMethodsEmpty).visibility =
-            if (sources.isEmpty()) View.VISIBLE else View.GONE
         renderCategories(categories)
-        bindChoices(content.findViewById(R.id.expenseSourceChoices),
-            sources.map { it.id to it.name }, true)
+        renderSources(sources)
         content.findViewById<View>(R.id.expenseNewCategory).setOnClickListener { onAddCategory() }
     }
 
@@ -152,6 +150,26 @@ class ExpenseSheetDialog(
         }
     }
 
+    /** Refreshes only source choices, leaving every other draft field and its view intact. */
+    fun renderSources(state: SourceListState) {
+        val content = sheetView ?: return
+        content.findViewById<TextView>(R.id.expensePaymentMethodsEmpty).apply {
+            val message = state.statusMessage()
+            visibility = if (message == null) View.GONE else View.VISIBLE
+            message?.let { setText(it) }
+            setOnClickListener { onRetrySources() }
+            isClickable = state is SourceListState.Failed
+            isFocusable = isClickable
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        // Loading/failure never clears the selected ID or any draft field.
+        val container = content.findViewById<LinearLayout>(R.id.expenseSourceChoices)
+        container.removeAllViews()
+        if (state is SourceListState.Ready) {
+            bindChoices(container, state.sources.map { it.id to it.name }, true)
+        }
+    }
+
     fun selectCategory(id: String, state: CategoryListState) {
         draft.categoryId = id
         // The creation result may arrive before the list emission. Keep the ID in that race.
@@ -168,19 +186,20 @@ class ExpenseSheetDialog(
                 textSize = 14f
                 minHeight = dp(48)
                 setPadding(dp(14), dp(14), dp(14), dp(14))
-                setBackgroundResource(if ((if (sourceChoices) draft.sourceId else draft.categoryId) == id)
-                    R.drawable.chip_active else R.drawable.chip)
-                isSelected = (if (sourceChoices) draft.sourceId else draft.categoryId) == id
-                setTextColor(context.getColor(if (isSelected) R.color.blue else R.color.text))
+                val active = (if (sourceChoices) draft.sourceId else draft.categoryId) == id
+                setBackgroundResource(if (active) R.drawable.chip_active else R.drawable.chip)
+                isSelected = active
+                setTextColor(context.getColor(if (active) R.color.blue else R.color.text))
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
                     if (sourceChoices) draft.sourceId = id else draft.categoryId = id
                     for (index in 0 until container.childCount) {
                         (container.getChildAt(index) as TextView).apply {
-                            isSelected = tag == id
-                            setBackgroundResource(if (isSelected) R.drawable.chip_active else R.drawable.chip)
-                            setTextColor(context.getColor(if (isSelected) R.color.blue else R.color.text))
+                            val selected = tag == id
+                            isSelected = selected
+                            setBackgroundResource(if (selected) R.drawable.chip_active else R.drawable.chip)
+                            setTextColor(context.getColor(if (selected) R.color.blue else R.color.text))
                         }
                     }
                 }

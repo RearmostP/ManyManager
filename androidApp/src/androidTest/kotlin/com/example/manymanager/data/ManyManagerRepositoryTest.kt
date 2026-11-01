@@ -395,6 +395,101 @@ class ManyManagerRepositoryTest {
         assertTrue(restoredCreation.interrupted)
     }
 
+    @Test fun viewModelSourceCreationEditingAndPeriodNavigation() = runBlocking {
+        val store = ViewModelStore()
+        val factory = PersistentDataViewModelFactory(repository)
+        val model = withContext(Dispatchers.Main) {
+            ViewModelProvider(store, factory)[PersistentDataViewModel::class.java]
+        }
+        val statesChannel = Channel<PersistentDataState>(Channel.UNLIMITED)
+        val collection = model.state.onEach { statesChannel.send(it) }.launchIn(this)
+        try {
+            val initial = withTimeout(10_000) {
+                model.state.first { it is PersistentDataState.Ready }
+            } as PersistentDataState.Ready
+            val currentPeriod = initial.snapshot.period
+
+            withContext(Dispatchers.Main) {
+                model.beginSourceCreation(currentPeriod)
+                model.updateSourceCreationName("Cash")
+                model.updateSourceCreationAmount("250.00")
+            }
+            val createJob = withContext(Dispatchers.Main) { model.submitSourceCreation() }
+            assertNotNull(createJob)
+            createJob?.join()
+
+            val createdSource = (model.sourceCreationState.value?.result as? DataResult.Success)?.value
+            assertNotNull(createdSource)
+            assertEquals("Cash", createdSource?.name)
+
+            val readyState = withTimeout(10_000) {
+                model.state.first {
+                    it is PersistentDataState.Ready && it.snapshot.sources.any { s -> s.source.id == createdSource?.id }
+                }
+            } as PersistentDataState.Ready
+            val sourceBudget = readyState.snapshot.sources.single { it.source.id == createdSource?.id }
+            assertEquals(25000L, sourceBudget.allocatedMinor)
+
+            withContext(Dispatchers.Main) {
+                model.beginSourceEditing(sourceBudget.source, currentPeriod, sourceBudget.allocatedMinor)
+                model.updateSourceEditingName("Main Cash")
+                model.updateSourceEditingAdjustment("50.00", true)
+            }
+            val preview = withTimeout(10_000) {
+                model.sourceEditingState.first { it?.previewResult is DataResult.Success }
+            }?.previewResult as DataResult.Success
+            assertEquals(30000L, preview.value.resultingAllocatedMinor)
+
+            val editJob = withContext(Dispatchers.Main) { model.submitSourceEditing() }
+            assertNotNull(editJob)
+            editJob?.join()
+
+            val updatedState = withTimeout(10_000) {
+                model.state.first {
+                    it is PersistentDataState.Ready && it.snapshot.sources.any { s -> s.source.name == "Main Cash" && s.allocatedMinor == 30000L }
+                }
+            } as PersistentDataState.Ready
+            assertEquals(30000L, updatedState.snapshot.totalAllocatedMinor)
+
+            withContext(Dispatchers.Main) { model.selectNextPeriod() }
+            val nextState = withTimeout(10_000) {
+                model.state.first { it is PersistentDataState.Ready && it.snapshot.period != currentPeriod }
+            } as PersistentDataState.Ready
+            assertEquals(0L, nextState.snapshot.totalAllocatedMinor)
+
+            withContext(Dispatchers.Main) { model.selectPreviousPeriod() }
+            val prevState = withTimeout(10_000) {
+                model.state.first { it is PersistentDataState.Ready && it.snapshot.period == currentPeriod }
+            } as PersistentDataState.Ready
+            assertEquals(30000L, prevState.snapshot.totalAllocatedMinor)
+        } finally {
+            withContext(Dispatchers.Main) { store.clear() }
+            collection.cancelAndJoin()
+        }
+    }
+
+    @Test fun sourceCreationAndEditingStateBundleSaveRestore() {
+        val creationState = SourceCreationState(period = period, name = "Bank", initialAmountText = "100.00", submitting = true)
+        val creationBundle = creationState.toBundle()
+        val restoredCreation = checkNotNull(SourceCreationState.fromBundle(creationBundle))
+        assertEquals(period, restoredCreation.period)
+        assertEquals("Bank", restoredCreation.name)
+        assertEquals("100.00", restoredCreation.initialAmountText)
+        assertTrue(restoredCreation.interrupted)
+
+        val source = BudgetSource(owner, "src-1", "Bank")
+        val editingState = SourceEditingState(source = source, period = period, currentAllocationMinor = 10000L, name = "Main Bank", adjustmentText = "20.00", isAdd = false, submitting = true)
+        val editingBundle = editingState.toBundle()
+        val restoredEditing = checkNotNull(SourceEditingState.fromBundle(editingBundle))
+        assertEquals(source.id, restoredEditing.source.id)
+        assertEquals(period, restoredEditing.period)
+        assertEquals(10000L, restoredEditing.currentAllocationMinor)
+        assertEquals("Main Bank", restoredEditing.name)
+        assertEquals("20.00", restoredEditing.adjustmentText)
+        assertFalse(restoredEditing.isAdd)
+        assertTrue(restoredEditing.interrupted)
+    }
+
     @Test fun unsupportedSavedStartDayIsReportedAndNeverRewritten() = runBlocking {
         database.openHelper.writableDatabase.execSQL(
             "UPDATE calculators SET periodStartDay = 30 WHERE id = ?", arrayOf(owner)
@@ -495,6 +590,181 @@ class ManyManagerRepositoryTest {
         } finally {
             withContext(Dispatchers.Main) { store.clear() }
             collection.cancelAndJoin()
+        }
+    }
+
+    @Test fun sourceFormsGuardPendingWritesPreserveFailuresAndCancelWithoutWriting() = runBlocking {
+        val waiting = CompletableDeferred<Result<CalculatorEntity>>()
+        val store = ViewModelStore()
+        val model = withContext(Dispatchers.Main) {
+            ViewModelProvider(store, PersistentDataViewModelFactory(
+                ManyManagerRepository(database, waiting, clock)
+            ))[PersistentDataViewModel::class.java]
+        }
+        try {
+            val pending = withContext(Dispatchers.Main) {
+                model.beginSourceCreation(period)
+                model.updateSourceCreationName(" Cash ")
+                model.updateSourceCreationAmount("12.34")
+                val first = model.submitSourceCreation()
+                assertNull(model.submitSourceCreation())
+                model.cancelSourceCreation()
+                assertTrue(model.sourceCreationState.value!!.submitting)
+                // Reattaching/restoring a window must not replace or resubmit its pending state.
+                model.restoreSourceCreation(SourceCreationState(period, "Wrong", "99"))
+                first!!
+            }
+            waiting.complete(Result.success(database.dao().calculator(owner)!!))
+            pending.join()
+            val source = success(model.sourceCreationState.value!!.result!!)
+            assertEquals(1234L, snapshot().totalAllocatedMinor)
+            withContext(Dispatchers.Main) {
+                assertNull(model.submitSourceCreation())
+                model.acknowledgeSourceCreation()
+                model.beginSourceEditing(source, period, 1234)
+                model.updateSourceEditingName("Cancelled")
+                model.updateSourceEditingAdjustment("1", false)
+                model.cancelSourceEditing()
+            }
+            assertEquals("Cash", snapshot().sources.single().source.name)
+            assertEquals(1234L, snapshot().totalAllocatedMinor)
+
+            database.openHelper.writableDatabase.execSQL("""
+                CREATE TRIGGER form_fail BEFORE INSERT ON budget_allocations
+                BEGIN SELECT RAISE(ABORT, 'fixture'); END
+            """.trimIndent())
+            val failed = withContext(Dispatchers.Main) {
+                model.beginSourceCreation(period)
+                model.updateSourceCreationName("Retry me")
+                model.updateSourceCreationAmount("7.89")
+                model.submitSourceCreation()!!
+            }
+            failed.join()
+            assertTrue(model.sourceCreationState.value!!.result is DataResult.Failure)
+            assertEquals("Retry me", model.sourceCreationState.value!!.name)
+            assertEquals("7.89", model.sourceCreationState.value!!.initialAmountText)
+            assertEquals(1, snapshot().sources.size)
+            database.openHelper.writableDatabase.execSQL("DROP TRIGGER form_fail")
+            withContext(Dispatchers.Main) { model.submitSourceCreation()!! }.join()
+            assertEquals(2, snapshot().sources.size)
+        } finally { withContext(Dispatchers.Main) { store.clear() } }
+    }
+
+    @Test fun latestPreviewDisablesInvalidInputAndAdjustmentCannotBeAppliedTwice() = runBlocking {
+        val source = success(repository.createSourceWithInitialAllocation("Cash", period, 1000))
+        val store = ViewModelStore()
+        val model = withContext(Dispatchers.Main) {
+            ViewModelProvider(store, PersistentDataViewModelFactory(repository))[PersistentDataViewModel::class.java]
+        }
+        try {
+            withContext(Dispatchers.Main) {
+                model.beginSourceEditing(source, period, 1000)
+                model.updateSourceEditingAdjustment("3", true)
+            }
+            withTimeout(10_000) { model.sourceEditingState.first {
+                (it?.previewResult as? DataResult.Success)?.value?.resultingAllocatedMinor == 1300L
+            } }
+            withContext(Dispatchers.Main) {
+                model.updateSourceEditingAdjustment("999", false)
+                assertNull(model.sourceEditingState.value!!.previewResult)
+                assertNull(model.submitSourceEditing())
+                model.updateSourceEditingAdjustment("invalid", true)
+                assertTrue(model.sourceEditingState.value!!.previewResult is DataResult.Failure)
+                assertNull(model.submitSourceEditing())
+                model.updateSourceEditingAdjustment("2", false)
+            }
+            withTimeout(10_000) { model.sourceEditingState.first {
+                (it?.previewResult as? DataResult.Success)?.value?.resultingAllocatedMinor == 800L
+            } }
+            database.openHelper.writableDatabase.execSQL("""
+                CREATE TRIGGER edit_form_fail BEFORE UPDATE ON budget_allocations
+                BEGIN SELECT RAISE(ABORT, 'fixture'); END
+            """.trimIndent())
+            val job = withContext(Dispatchers.Main) {
+                model.updateSourceEditingName("Renamed")
+                val pending = model.submitSourceEditing()!!
+                assertNull(model.submitSourceEditing())
+                pending
+            }
+            job.join()
+            val failed = model.sourceEditingState.value!!
+            assertTrue(failed.submitResult is DataResult.Failure)
+            assertEquals("Renamed", failed.name)
+            assertEquals("2", failed.adjustmentText)
+            assertFalse(failed.isAdd)
+            assertEquals("Cash", snapshot().sources.single().source.name)
+            assertEquals(1000L, snapshot().totalAllocatedMinor)
+            database.openHelper.writableDatabase.execSQL("DROP TRIGGER edit_form_fail")
+            withContext(Dispatchers.Main) { model.submitSourceEditing()!! }.join()
+            withContext(Dispatchers.Main) { assertNull(model.submitSourceEditing()) }
+            assertEquals(800L, snapshot().totalAllocatedMinor)
+            assertEquals(source.id, snapshot().sources.single().source.id)
+            val restored = SourceEditingState.fromBundle(model.sourceEditingState.value!!.toBundle())!!
+            assertTrue(restored.submitResult is DataResult.Success)
+        } finally { withContext(Dispatchers.Main) { store.clear() } }
+    }
+
+    @Test fun activeBudgetAndSourceChoicesRemainIndependentOfHistoricalSelectionAndOverflow() = runBlocking {
+        val source = success(repository.createSourceWithInitialAllocation("Cash", period, 400))
+        val next = BudgetPeriodCalculator(10, clock).next(period)
+        val store = ViewModelStore()
+        val model = withContext(Dispatchers.Main) {
+            ViewModelProvider(store, PersistentDataViewModelFactory(repository))[PersistentDataViewModel::class.java]
+        }
+        val active = model.activeBudget.launchIn(this)
+        val selected = model.state.launchIn(this)
+        val sources = model.sources.launchIn(this)
+        try {
+            withContext(Dispatchers.Main) { model.selectPeriod(next) }
+            withTimeout(10_000) { model.state.first {
+                it is PersistentDataState.Ready && it.snapshot.period == next && it.snapshot.totalAllocatedMinor == 0L
+            } }
+            val home = withTimeout(10_000) {
+                model.activeBudget.first { it is PersistentDataState.Ready }
+            } as PersistentDataState.Ready
+            assertEquals(period, home.snapshot.period)
+            assertEquals(400L, home.snapshot.totalAllocatedMinor)
+            fixtureExpense("overflow-a", Long.MAX_VALUE, period.start, source.id)
+            fixtureExpense("overflow-b", 1, period.start, source.id)
+            withTimeout(10_000) { model.activeBudget.first { it is PersistentDataState.Failed } }
+            val choices = withTimeout(10_000) {
+                model.sources.first { it is SourceListState.Ready }
+            } as SourceListState.Ready
+            assertEquals(listOf(source), choices.sources)
+            assertEquals(next, model.selectedPeriod)
+        } finally {
+            withContext(Dispatchers.Main) { store.clear() }
+            active.cancelAndJoin(); selected.cancelAndJoin(); sources.cancelAndJoin()
+        }
+    }
+
+    @Test fun repositorySourcesAllocationsAndRelationshipsSurviveDatabaseReopen() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = "source-reopen-${java.util.UUID.randomUUID()}.db"
+        var disk = Room.databaseBuilder(context, ManyManagerDatabase::class.java, file).build()
+        try {
+            fun repo(db: ManyManagerDatabase, calculator: CalculatorEntity) =
+                ManyManagerRepository(db, CompletableDeferred(Result.success(calculator)), clock)
+            var durable = repo(disk, disk.dao().initializeLocalCalculator())
+            val first = success(durable.createSourceWithInitialAllocation("Same", period, 125))
+            val second = success(durable.createSourceWithInitialAllocation("Same", period, 0))
+            disk.dao().insertExpense(ExpenseEntity(owner, "relationship", 30, period.startEpochDay, null, first.id))
+            success(durable.updateSourceAndAdjustAllocation(first.id, "Renamed", period, 25))
+            disk.close()
+            disk = Room.databaseBuilder(context, ManyManagerDatabase::class.java, file).build()
+            durable = repo(disk, disk.dao().initializeLocalCalculator())
+            val reopened = success(durable.snapshot(period))
+            assertEquals(setOf(first.id, second.id), reopened.sources.map { it.source.id }.toSet())
+            assertEquals("Renamed", reopened.sources.single { it.source.id == first.id }.source.name)
+            assertEquals(150L, reopened.totalAllocatedMinor)
+            assertEquals(first.id, reopened.expenses.single().sourceId)
+            assertEquals(30L, reopened.totalSpentMinor)
+            val next = success(durable.snapshot(BudgetPeriodCalculator(10, clock).next(period)))
+            assertEquals(0L, next.totalAllocatedMinor)
+            assertEquals(2, next.sources.size)
+        } finally {
+            disk.close()
+            context.deleteDatabase(file)
         }
     }
 

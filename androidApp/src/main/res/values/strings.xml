@@ -81,6 +81,9 @@
     <string name="edit_source">עריכת מקור תקציב</string>
     <string name="source_name">שם מקור התקציב</string>
     <string name="source_name_required">יש להזין שם מקור</string>
+    <string name="source_saving">שומר…</string>
+    <string name="source_save_error">שמירת מקור התקציב נכשלה. יש לנסות שוב.</string>
+    <string name="source_save_interrupted">הפעולה הופרעה. יש לבדוק אם נשמרה לפני ניסיון נוסף.</string>
     <string name="initial_budget">תקציב התחלתי לחודש הנבחר</string>
     <string name="budget_for_month">תקציב עבור %1$s</string>
     <string name="current_budget">תקציב נוכחי: %1$s</string>
@@ -91,4 +94,8 @@
     <string name="update_budget">עדכון תקציב</string>
     <string name="budget_plus_symbol">+</string>
     <string name="budget_minus_symbol">−</string>
+    <string name="sources_loading">טוען מקורות תקציב…</string>
+    <string name="sources_load_error">טעינת המקורות נכשלה. לחץ לניסיון חוזר.</string>
+    <string name="budget_loading">טוען תקציב…</string>
+    <string name="budget_load_error">טעינת התקציב נכשלה. לחץ לניסיון חוזר.</string>
 </resources>

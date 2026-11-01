@@ -1,3 +1,4 @@
+import {adjacentPeriod} from "./budget-period.js";
 import {state,changePage,goBack,closeOverlay} from "./state.js";
 import {loadLanguage,t,shortDate} from "./i18n.js";
 import {icon} from "./icons.js";
@@ -10,7 +11,7 @@ import {categories} from "./screens/categories.js";
 import {drawer} from "./components/drawer.js";
 import {expense} from "./components/expense-sheet.js";
 import {categoryDialog,beginCategoryCreation,confirmCategoryCreation} from "./components/category-dialog.js";
-import {sourceDialog,sourcePreview} from "./components/source-dialog.js";
+import {sourceDialog,sourcePreview,canConfirmSourceEdit} from "./components/source-dialog.js";
 
 const app=document.getElementById("app");
 const page=document.getElementById("page");
@@ -20,6 +21,7 @@ const menuButton=document.getElementById("menu-button");
 const translate=key=>t(state.language,key);
 
 function render(){
+  state.currentDate=new Date();
   document.documentElement.lang=state.language;
   document.documentElement.dir=state.language==="he"?"rtl":"ltr";
   document.documentElement.dataset.theme=state.theme;
@@ -62,6 +64,7 @@ document.addEventListener("input",event=>{
     clearError("source-error");
     if(state.overlay==="edit-source"){
       document.getElementById("source-preview").textContent=sourcePreview();
+      document.querySelector('[data-action="confirm-edit-source"]').disabled=!canConfirmSourceEdit();
     }
   }
 });
@@ -127,7 +130,7 @@ document.addEventListener("click",async event=>{
       state.tab=Number(button.dataset.index);renderKeepScroll();break;
     case "budget-prev":
     case "budget-next":
-      state.budgetMonth.setMonth(state.budgetMonth.getMonth()+(button.dataset.action==="budget-prev"?-1:1));
+      state.budgetMonth=adjacentPeriod(state.budgetMonth,button.dataset.action==="budget-prev"?-1:1);
       renderKeepScroll();break;
     case "toggle-setting":{
       const key=button.dataset.key;
@@ -145,6 +148,12 @@ document.addEventListener("click",async event=>{
       state.theme=button.dataset.value;renderKeepScroll();break;
   }
 });
+function refreshToday(){
+  if(new Date().toDateString()!==state.currentDate.toDateString())renderKeepScroll();
+}
+window.addEventListener("focus",refreshToday);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshToday()});
+setInterval(()=>{if(!document.hidden)refreshToday()},60000);
 menuButton.addEventListener("click",()=>{state.overlay="menu";renderKeepScroll()});
 document.addEventListener("keydown",event=>{
   if(event.key==="Escape"||(event.key==="Backspace"&&event.target.tagName!=="INPUT"&&event.target.tagName!=="TEXTAREA")){

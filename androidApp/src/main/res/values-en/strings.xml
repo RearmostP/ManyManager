@@ -81,6 +81,9 @@
     <string name="edit_source">Edit budget source</string>
     <string name="source_name">Budget source name</string>
     <string name="source_name_required">Enter a source name</string>
+    <string name="source_saving">Saving…</string>
+    <string name="source_save_error">Failed to save budget source. Please try again.</string>
+    <string name="source_save_interrupted">Operation was interrupted. Check if saved before retrying.</string>
     <string name="initial_budget">Initial budget for the selected month</string>
     <string name="budget_for_month">Budget for %1$s</string>
     <string name="current_budget">Current budget: %1$s</string>
@@ -91,4 +94,8 @@
     <string name="update_budget">Update budget</string>
     <string name="budget_plus_symbol">+</string>
     <string name="budget_minus_symbol">−</string>
+    <string name="sources_loading">Loading budget sources…</string>
+    <string name="sources_load_error">Failed to load sources. Tap to retry.</string>
+    <string name="budget_loading">Loading budget…</string>
+    <string name="budget_load_error">Failed to load budget. Tap to retry.</string>
 </resources>

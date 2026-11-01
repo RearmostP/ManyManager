@@ -2,37 +2,39 @@ package com.example.manymanager
 
 import android.app.Dialog
 import android.content.res.Configuration
-import android.os.Parcelable
-import android.util.SparseArray
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.core.content.ContextCompat
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Bundle
+import android.os.Parcelable
+import android.util.SparseArray
 import android.view.View
 import android.view.WindowInsets
 import android.widget.FrameLayout
-import androidx.core.view.doOnAttach
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.EditText
-import androidx.appcompat.app.AlertDialog
-import android.content.DialogInterface
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
-import androidx.core.content.ContextCompat
-import androidx.core.os.LocaleListCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
-import androidx.lifecycle.ViewModelProvider
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
+import androidx.core.view.doOnAttach
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import com.example.manymanager.domain.BudgetPeriod
+import com.example.manymanager.domain.BudgetSource
 import com.example.manymanager.domain.DataResult
-import kotlinx.coroutines.launch
-import java.time.YearMonth
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.min
+import kotlinx.coroutines.launch
 
 /** Coordinates the XML screens, navigation, and application appearance. */
 class MainActivity : AppCompatActivity() {
@@ -42,12 +44,14 @@ class MainActivity : AppCompatActivity() {
         override fun handleOnBackPressed() { navigateBack() }
     }
     private val budgetState by lazy { ViewModelProvider(this)[BudgetViewModel::class.java] }
-    private val categoryState by lazy {
+    private val persistentViewModel by lazy {
         ViewModelProvider(this, PersistentDataViewModelFactory(
             (application as ManyManagerApplication).repository
         ))[PersistentDataViewModel::class.java]
     }
     private var categoryDialog: CategoryCreationDialog? = null
+    private var sourceCreationDialog: SourceCreationDialog? = null
+    private var sourceEditingDialog: SourceEditingDialog? = null
     private var homeBudgetUi: BudgetHomeUi? = null
     private var budgetManagementUi: BudgetManagementUi? = null
     private var categoryManagementUi: CategoryManagementUi? = null
@@ -65,24 +69,56 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         dark = preferences.dark
-        // AppCompat owns both locale and night-mode configuration; no competing Context override.
         delegate.localNightMode = if (dark) AppCompatDelegate.MODE_NIGHT_YES
             else AppCompatDelegate.MODE_NIGHT_NO
         super.onCreate(savedInstanceState)
-        // AppCompat has restored its saved locales by this point. Preserve Hebrew for
-        // installations without a selection, regardless of the device language.
         if (AppCompatDelegate.getApplicationLocales().isEmpty) {
             AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("he"))
         }
         onBackPressedDispatcher.addCallback(this, pageBackCallback)
+        savedInstanceState?.getLongArray("selectedBudgetPeriod")?.let {
+            persistentViewModel.selectPeriod(BudgetPeriod(LocalDate.ofEpochDay(it[0]), LocalDate.ofEpochDay(it[1])))
+        }
         renderContent(savedInstanceState)
-        // Installed once per Activity, never once per renderContent/appearance change.
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                launch { categoryState.categories.collect(::renderCategoryState) }
-                launch { categoryState.categoryCreation.collect(::renderCategoryCreation) }
+                launch { persistentViewModel.state.collect(::renderPersistentDataState) }
+                launch { persistentViewModel.activeBudget.collect(::renderActiveBudget) }
+                launch { persistentViewModel.sources.collect(::renderSources) }
+                launch { persistentViewModel.categories.collect(::renderCategoryState) }
+                launch { persistentViewModel.categoryCreation.collect(::renderCategoryCreation) }
+                launch { persistentViewModel.sourceCreationState.collect(::renderSourceCreation) }
+                launch { persistentViewModel.sourceEditingState.collect(::renderSourceEditing) }
             }
         }
+    }
+
+    private val dateChanges = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) { refreshDate() }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        ContextCompat.registerReceiver(this, dateChanges, IntentFilter().apply {
+            addAction(Intent.ACTION_DATE_CHANGED)
+            addAction(Intent.ACTION_TIME_CHANGED)
+            addAction(Intent.ACTION_TIMEZONE_CHANGED)
+        }, ContextCompat.RECEIVER_NOT_EXPORTED)
+    }
+
+    override fun onStop() {
+        unregisterReceiver(dateChanges)
+        super.onStop()
+    }
+
+    private fun refreshDate() {
+        currentDate = LocalDate.now()
+        if (contentReady) persistentViewModel.refresh()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshDate()
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -103,7 +139,6 @@ class MainActivity : AppCompatActivity() {
         }
         contentReady = false
         super.onConfigurationChanged(newConfig)
-        // Reload all XML resources in the existing window: no blank Activity surface.
         renderContent(state)
     }
 
@@ -123,7 +158,6 @@ class MainActivity : AppCompatActivity() {
         )
         setContentView(R.layout.activity_main)
 
-        // Keep the reference's 440dp content width on larger displays.
         val container = findViewById<View>(R.id.appContainer)
         container.layoutParams = (container.layoutParams as FrameLayout.LayoutParams).apply {
             width = min(window.windowManager.currentWindowMetrics.bounds.width(), dp(440))
@@ -198,17 +232,23 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.monthLabel).text = month
         findViewById<TextView>(R.id.homeMonth).text = month
         bindEmptyState()
-        budgetState.homeMonth = YearMonth.from(currentDate)
-        homeBudgetUi = BudgetHomeUi(findViewById(R.id.homePage), budgetState) {
+
+        homeBudgetUi = BudgetHomeUi(findViewById(R.id.homePage), {
+            homeBudgetUi?.setExpanded(!budgetState.breakdownExpanded)
+        }) { expanded ->
+            budgetState.breakdownExpanded = expanded
             pageBackCallback.isEnabled = page != 0 || budgetState.breakdownExpanded
         }
         budgetManagementUi = BudgetManagementUi(
-            findViewById(R.id.budgetPage), budgetState,
-            ::showAddSource, ::showEditSource
+            findViewById(R.id.budgetPage),
+            persistentViewModel::selectPreviousPeriod,
+            persistentViewModel::selectNextPeriod,
+            ::showAddSource,
+            ::showEditSource
         )
         categoryManagementUi = CategoryManagementUi(
             findViewById(R.id.categoriesPage), ::navigateBack, ::showAddCategory,
-            categoryState::retryCategories
+            persistentViewModel::retryCategories
         )
         listOf(R.id.previousMonth, R.id.nextMonth).forEach { id ->
             findViewById<View>(id).apply {
@@ -230,12 +270,23 @@ class MainActivity : AppCompatActivity() {
             }
         }
         savedInstanceState?.getBundle("categoryCreation")?.let {
-            categoryState.restoreCategoryCreation(CategoryCreationState.fromBundle(it))
+            persistentViewModel.restoreCategoryCreation(CategoryCreationState.fromBundle(it))
+        }
+        savedInstanceState?.getBundle("sourceCreation")?.let {
+            SourceCreationState.fromBundle(it)?.let(persistentViewModel::restoreSourceCreation)
+        }
+        savedInstanceState?.getBundle("sourceEditing")?.let {
+            SourceEditingState.fromBundle(it)?.let(persistentViewModel::restoreSourceEditing)
         }
         renderedConfiguration = Configuration(resources.configuration)
         contentReady = true
-        renderCategoryState(categoryState.categories.value)
-        renderCategoryCreation(categoryState.categoryCreation.value)
+        renderPersistentDataState(persistentViewModel.state.value)
+        renderActiveBudget(persistentViewModel.activeBudget.value)
+        renderSources(persistentViewModel.sources.value)
+        renderCategoryState(persistentViewModel.categories.value)
+        renderCategoryCreation(persistentViewModel.categoryCreation.value)
+        renderSourceCreation(persistentViewModel.sourceCreationState.value)
+        renderSourceEditing(persistentViewModel.sourceEditingState.value)
         finishAppearanceTransition(savedInstanceState)
     }
 
@@ -257,18 +308,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun bindEmptyState() {
-        val numbers = java.text.NumberFormat.getIntegerInstance(resources.configuration.locales[0])
-        val total = numbers.format(ExpenseUiData.monthlyTotal)
-        findViewById<TextView>(R.id.homeTotal).text = total
-        findViewById<TextView>(R.id.summaryTotal).text = total
-        findViewById<TextView>(R.id.summaryCount).text = getString(
-            R.string.monthly_expense_count, numbers.format(ExpenseUiData.expenseCount)
-        )
-        bindCategorySummary(categoryState.categories.value)
-        findViewById<TextView>(R.id.sourceSummaryEmpty).setText(
-            if (budgetState.allocations.sources.isEmpty()) R.string.no_payment_methods
-            else R.string.no_expenses
-        )
+        renderActiveBudget(persistentViewModel.activeBudget.value)
+        bindCategorySummary(persistentViewModel.categories.value)
     }
 
     private fun navigateBack() {
@@ -283,7 +324,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun navigateToPage(index: Int) {
         if (index == page) return
-        if (index == 3) budgetState.managementMonth = budgetState.homeMonth
         if (index == 0) {
             pageHistory.clear()
         } else {
@@ -303,9 +343,11 @@ class MainActivity : AppCompatActivity() {
                 if (page == 0 && index != 0) homeBudgetUi?.setExpanded(false, animate = false)
                 page = index
                 pageBackCallback.isEnabled = index != 0 || budgetState.breakdownExpanded
-                if (index == 0) homeBudgetUi?.refresh()
-                if (index == 3) budgetManagementUi?.render()
-                if (index == 4) categoryManagementUi?.render(categoryState.categories.value)
+                if (index == 3 && contentReady) persistentViewModel.selectPeriod(null)
+                (persistentViewModel.state.value as? PersistentDataState.Ready)?.snapshot?.let { snapshot ->
+                    budgetManagementUi?.render(snapshot)
+                    categoryManagementUi?.render(persistentViewModel.categories.value)
+                }
                 listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage,
                     R.id.budgetPage, R.id.categoriesPage).forEachIndexed { i, id ->
                     findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
@@ -364,8 +406,6 @@ class MainActivity : AppCompatActivity() {
         prepareAppearanceTransition(durationMillis = 250L)
         page = 2
         expanded.add(R.id.languageDetails)
-        // Updates the existing window and persists through AndroidX (API 30–32) or
-        // the platform LocaleManager (API 33+), including system-settings changes.
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
     }
 
@@ -379,35 +419,123 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun refreshManagedData() {
-        budgetManagementUi?.render()
-        categoryManagementUi?.render(categoryState.categories.value)
-        bindEmptyState()
-        homeBudgetUi?.refresh()
+    private fun renderPersistentDataState(state: PersistentDataState) {
+        if (!contentReady) return
+        budgetManagementUi?.renderState(state, persistentViewModel::refresh)
     }
 
-    private fun showAddSource(month: YearMonth) {
-        dismissActiveDialogImmediately()
-        val dialog = BudgetSourceDialogs.add(this, budgetState, month, ::refreshManagedData)
-        activeDialog = dialog
-        dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
-        dialog.showWithRoundedSurface()
+    private fun renderActiveBudget(state: PersistentDataState) {
+        if (!contentReady) return
+        homeBudgetUi?.renderState(state, budgetState.breakdownExpanded, persistentViewModel::refresh)
+        val snapshot = (state as? PersistentDataState.Ready)?.snapshot
+        val total = snapshot?.let { BudgetAmounts.number(it.totalSpentMinor, resources.configuration.locales[0]) } ?: "—"
+        findViewById<TextView>(R.id.homeTotal).text = total
+        findViewById<TextView>(R.id.summaryTotal).text = total
+        findViewById<TextView>(R.id.summaryCount).text = snapshot?.let {
+            getString(R.string.monthly_expense_count,
+                java.text.NumberFormat.getIntegerInstance(resources.configuration.locales[0]).format(it.expenseCount))
+        } ?: "—"
+        snapshot?.let {
+            val label = BudgetPeriodFormatter.format(this, it.period)
+            findViewById<TextView>(R.id.homeMonth).text = label
+            findViewById<TextView>(R.id.monthLabel).text = label
+        }
     }
 
-    private fun showEditSource(source: PaymentSource, month: YearMonth) {
+    private fun renderSources(state: SourceListState) {
+        if (!contentReady) return
+        expenseDialog?.renderSources(state)
+        findViewById<TextView>(R.id.sourceSummaryEmpty).apply {
+            setText(state.statusMessage() ?: R.string.no_expenses)
+            setOnClickListener { persistentViewModel.retrySources() }
+            isClickable = state is SourceListState.Failed
+            isFocusable = isClickable
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+    }
+
+    private fun showAddSource(period: BudgetPeriod) {
         dismissActiveDialogImmediately()
-        val dialog = BudgetSourceDialogs.edit(this, budgetState, source, month, ::refreshManagedData)
-        activeDialog = dialog
-        dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
-        dialog.showWithRoundedSurface()
+        persistentViewModel.beginSourceCreation(period)
+        renderSourceCreation(persistentViewModel.sourceCreationState.value)
+    }
+
+    private fun showEditSource(source: BudgetSource, period: BudgetPeriod, currentAllocation: Long) {
+        dismissActiveDialogImmediately()
+        persistentViewModel.beginSourceEditing(source, period, currentAllocation)
+        renderSourceEditing(persistentViewModel.sourceEditingState.value)
+    }
+
+    private fun renderSourceCreation(state: SourceCreationState?) {
+        if (!contentReady || isFinishing || isDestroyed) return
+        if (state == null) {
+            sourceCreationDialog?.dispose()
+            if (activeDialog === sourceCreationDialog?.dialog) {
+                activeDialog = expenseDialog?.takeIf { it.isShowing }
+            }
+            sourceCreationDialog = null
+            return
+        }
+        val created = (state.result as? DataResult.Success)?.value
+        if (created != null) {
+            sourceCreationDialog?.dispose()
+            sourceCreationDialog = null
+            activeDialog = expenseDialog?.takeIf { it.isShowing }
+            persistentViewModel.acknowledgeSourceCreation()
+            return
+        }
+        if (sourceCreationDialog == null) {
+            val window = SourceCreationDialog(this,
+                persistentViewModel::updateSourceCreationName,
+                persistentViewModel::updateSourceCreationAmount,
+                { persistentViewModel.submitSourceCreation() },
+                persistentViewModel::cancelSourceCreation
+            )
+            sourceCreationDialog = window
+            activeDialog = window.dialog
+            window.show()
+        }
+        sourceCreationDialog?.render(state)
+    }
+
+    private fun renderSourceEditing(state: SourceEditingState?) {
+        if (!contentReady || isFinishing || isDestroyed) return
+        if (state == null) {
+            sourceEditingDialog?.dispose()
+            if (activeDialog === sourceEditingDialog?.dialog) {
+                activeDialog = expenseDialog?.takeIf { it.isShowing }
+            }
+            sourceEditingDialog = null
+            return
+        }
+        val updated = (state.submitResult as? DataResult.Success)?.value
+        if (updated != null) {
+            sourceEditingDialog?.dispose()
+            sourceEditingDialog = null
+            activeDialog = expenseDialog?.takeIf { it.isShowing }
+            persistentViewModel.acknowledgeSourceEditing()
+            return
+        }
+        if (sourceEditingDialog == null) {
+            val window = SourceEditingDialog(this,
+                persistentViewModel::updateSourceEditingName,
+                persistentViewModel::updateSourceEditingAdjustment,
+                { persistentViewModel.submitSourceEditing() },
+                persistentViewModel::cancelSourceEditing
+            )
+            sourceEditingDialog = window
+            activeDialog = window.dialog
+            window.show()
+        }
+        sourceEditingDialog?.render(state)
     }
 
     private fun showAddCategory() = showAddCategory(null)
 
     private fun showAddCategory(fromExpense: ExpenseSheetDialog?) {
         if (fromExpense == null) dismissActiveDialogImmediately()
-        categoryState.beginCategoryCreation(fromExpense != null)
-        renderCategoryCreation(categoryState.categoryCreation.value)
+        persistentViewModel.beginCategoryCreation(fromExpense != null)
+        renderCategoryCreation(persistentViewModel.categoryCreation.value)
     }
 
     private fun renderCategoryState(state: CategoryListState) {
@@ -420,7 +548,7 @@ class MainActivity : AppCompatActivity() {
     private fun bindCategorySummary(state: CategoryListState) {
         findViewById<TextView>(R.id.categorySummaryEmpty).apply {
             setText(state.statusMessage() ?: R.string.no_expenses)
-            setOnClickListener { categoryState.retryCategories() }
+            setOnClickListener { persistentViewModel.retryCategories() }
             isClickable = state is CategoryListState.Failed
             isFocusable = state is CategoryListState.Failed
             accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
@@ -440,19 +568,19 @@ class MainActivity : AppCompatActivity() {
         val created = (state.result as? DataResult.Success)?.value
         if (created != null) {
             if (state.fromExpense) {
-                expenseDialog?.selectCategory(created.id, categoryState.categories.value)
+                expenseDialog?.selectCategory(created.id, persistentViewModel.categories.value)
             }
             categoryDialog?.dispose()
             categoryDialog = null
             activeDialog = expenseDialog?.takeIf { it.isShowing }
-            categoryState.acknowledgeCategoryCreation()
+            persistentViewModel.acknowledgeCategoryCreation()
             return
         }
         if (categoryDialog == null) {
             val window = CategoryCreationDialog(this,
-                categoryState::updateCategoryName,
-                { categoryState.submitCategoryCreation() },
-                categoryState::cancelCategoryCreation)
+                persistentViewModel::updateCategoryName,
+                { persistentViewModel.submitCategoryCreation() },
+                persistentViewModel::cancelCategoryCreation)
             categoryDialog = window
             activeDialog = window.dialog
             window.show()
@@ -471,6 +599,10 @@ class MainActivity : AppCompatActivity() {
     private fun dismissActiveDialogImmediately() {
         categoryDialog?.dispose()
         categoryDialog = null
+        sourceCreationDialog?.dispose()
+        sourceCreationDialog = null
+        sourceEditingDialog?.dispose()
+        sourceEditingDialog = null
         val dialog = activeDialog
         when (dialog) {
             is ExpenseSheetDialog -> dialog.dismissImmediately()
@@ -488,8 +620,9 @@ class MainActivity : AppCompatActivity() {
         dismissActiveDialogImmediately()
         lateinit var dialog: ExpenseSheetDialog
         dialog = ExpenseSheetDialog(this, currentDate,
-            categoryState.categories.value, budgetState.allocations.sources, draft,
-            onRetryCategories = categoryState::retryCategories
+            persistentViewModel.categories.value, persistentViewModel.sources.value, draft,
+            onRetryCategories = persistentViewModel::retryCategories,
+            onRetrySources = persistentViewModel::retrySources
         ) { showAddCategory(dialog) }
         expenseDialog = dialog
         activeDialog = dialog
@@ -506,8 +639,17 @@ class MainActivity : AppCompatActivity() {
         outState.putSparseParcelableArray("viewHierarchy", hierarchy)
         expenseDialog?.takeIf { it.isShowing }
             ?.let { outState.putBundle("expenseDraft", it.draft.toBundle()) }
-        categoryState.categoryCreation.value?.let {
+        persistentViewModel.categoryCreation.value?.let {
             outState.putBundle("categoryCreation", it.toBundle())
+        }
+        persistentViewModel.sourceCreationState.value?.let {
+            outState.putBundle("sourceCreation", it.toBundle())
+        }
+        persistentViewModel.sourceEditingState.value?.let {
+            outState.putBundle("sourceEditing", it.toBundle())
+        }
+        persistentViewModel.selectedPeriod?.let {
+            outState.putLongArray("selectedBudgetPeriod", longArrayOf(it.startEpochDay, it.endExclusiveEpochDay))
         }
         outState.putInt("pageScrollY", findViewById<ScrollView>(R.id.pageScroll).scrollY)
         outState.putInt("page", page)

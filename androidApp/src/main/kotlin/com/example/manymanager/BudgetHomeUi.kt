@@ -16,6 +16,7 @@ import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.doOnPreDraw
+import com.example.manymanager.domain.BudgetSnapshot
 
 /** Backward-compatible layout placeholder. */
 class BudgetOverviewLayout @JvmOverloads constructor(
@@ -25,29 +26,47 @@ class BudgetOverviewLayout @JvmOverloads constructor(
 /** Inline budget breakdown anchored below Home's remaining budget row. */
 class BudgetHomeUi(
     private val root: View,
-    private val state: BudgetViewModel,
-    private val onExpandedChanged: () -> Unit
+    private val onToggleExpanded: () -> Unit,
+    private val onExpandedChanged: (Boolean) -> Unit,
 ) {
     private val context = root.context
     private val area = root.findViewById<View>(R.id.homeBudgetArea)
     private val panel = root.findViewById<View>(R.id.budgetBreakdown)
     private val rows = root.findViewById<LinearLayout>(R.id.budgetBreakdownRows)
     private val chevron = root.findViewById<ImageView>(R.id.budgetChevron)
+    private var isExpanded = false
     private var animator: ValueAnimator? = null
     private var pendingDraw: OneShotPreDrawListener? = null
 
     init {
-        area.setOnClickListener { setExpanded(!state.breakdownExpanded) }
-        refresh()
+        area.setOnClickListener { onToggleExpanded() }
     }
 
     private fun money(amount: Long): String = context.getString(
         R.string.ils_amount, BudgetAmounts.number(amount, context.resources.configuration.locales[0])
     )
 
-    fun refresh() {
-        val total = state.allocations.total(state.homeMonth)
-        val remaining = total - ExpenseUiData.monthlyTotal
+    fun renderState(state: PersistentDataState, expanded: Boolean, onRetry: () -> Unit) {
+        if (state is PersistentDataState.Ready) {
+            area.setOnClickListener { onToggleExpanded() }
+            render(state.snapshot, expanded)
+            return
+        }
+        root.findViewById<TextView>(R.id.homeBudgetRemaining).setText(
+            if (state is PersistentDataState.Failed) R.string.budget_load_error else R.string.budget_loading
+        )
+        root.findViewById<TextView>(R.id.homeBudgetTotal).text = "—"
+        rows.removeAllViews()
+        area.contentDescription = context.getString(
+            if (state is PersistentDataState.Failed) R.string.budget_load_error else R.string.budget_loading
+        )
+        area.setOnClickListener { if (state is PersistentDataState.Failed) onRetry() }
+        setExpanded(expanded, animate = false)
+    }
+
+    fun render(snapshot: BudgetSnapshot, expanded: Boolean) {
+        val total = snapshot.totalAllocatedMinor
+        val remaining = snapshot.remainingMinor
         val formattedRemaining = money(remaining)
         val formattedTotal = money(total)
 
@@ -58,7 +77,7 @@ class BudgetHomeUi(
         )
 
         rows.removeAllViews()
-        if (state.allocations.sources.isEmpty()) {
+        if (snapshot.sources.isEmpty()) {
             rows.addView(TextView(context, null, 0, R.style.Text).apply {
                 text = context.getString(R.string.no_budget_sources_yet)
                 textSize = 14f
@@ -70,8 +89,7 @@ class BudgetHomeUi(
                 )
             })
         } else {
-            state.allocations.sources.forEach { source ->
-                val sourceAmount = state.allocations.amount(state.homeMonth, source.id)
+            snapshot.sources.forEach { sourceBudget ->
                 rows.addView(LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
@@ -81,14 +99,14 @@ class BudgetHomeUi(
                     )
 
                     addView(TextView(context, null, 0, R.style.Text).apply {
-                        text = source.name
+                        text = sourceBudget.source.name
                         textSize = 14f
                         setTextColor(context.getColor(R.color.text))
                         layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                     })
 
                     addView(TextView(context, null, 0, R.style.Text).apply {
-                        text = money(sourceAmount)
+                        text = money(sourceBudget.allocatedMinor)
                         textSize = 14f
                         setTextColor(context.getColor(R.color.muted))
                         textDirection = View.TEXT_DIRECTION_LTR
@@ -99,7 +117,7 @@ class BudgetHomeUi(
                 })
             }
         }
-        setExpanded(state.breakdownExpanded, animate = false)
+        setExpanded(expanded, animate = false)
     }
 
     fun setExpanded(expanded: Boolean, animate: Boolean = true) {
@@ -108,7 +126,7 @@ class BudgetHomeUi(
         animator = null
         pendingDraw?.removeListener()
         pendingDraw = null
-        state.breakdownExpanded = expanded
+        isExpanded = expanded
 
         chevron?.animate()?.cancel()
         val targetRotation = if (expanded) 180f else 0f
@@ -126,10 +144,10 @@ class BudgetHomeUi(
         ViewCompat.removeAccessibilityAction(area,
             if (expanded) AccessibilityNodeInfoCompat.ACTION_EXPAND else AccessibilityNodeInfoCompat.ACTION_COLLAPSE)
         ViewCompat.replaceAccessibilityAction(area, action, null) { _, _ ->
-            setExpanded(!state.breakdownExpanded)
+            onToggleExpanded()
             true
         }
-        onExpandedChanged()
+        onExpandedChanged(expanded)
 
         if (!expanded && (!animate || !ValueAnimator.areAnimatorsEnabled())) {
             panel.visibility = View.GONE
@@ -140,7 +158,7 @@ class BudgetHomeUi(
             panel.visibility = if (expanded) View.VISIBLE else View.GONE
             if (expanded) pendingDraw = root.doOnPreDraw {
                 pendingDraw = null
-                setExpanded(state.breakdownExpanded, animate = false)
+                setExpanded(isExpanded, animate = false)
             }
             return
         }
@@ -165,7 +183,7 @@ class BudgetHomeUi(
             addUpdateListener { panel.layoutParams = panel.layoutParams.apply { height = it.animatedValue as Int } }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    if (!state.breakdownExpanded) panel.visibility = View.GONE
+                    if (!isExpanded) panel.visibility = View.GONE
                     animator = null
                 }
             })

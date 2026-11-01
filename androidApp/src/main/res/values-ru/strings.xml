@@ -81,6 +81,9 @@
     <string name="edit_source">Изменить источник бюджета</string>
     <string name="source_name">Название источника бюджета</string>
     <string name="source_name_required">Введите название источника</string>
+    <string name="source_saving">Сохранение…</string>
+    <string name="source_save_error">Не удалось сохранить источник бюджета. Попробуйте еще раз.</string>
+    <string name="source_save_interrupted">Операция была прервана. Проверьте, сохранена ли она.</string>
     <string name="initial_budget">Начальный бюджет для выбранного месяца</string>
     <string name="budget_for_month">Бюджет на %1$s</string>
     <string name="current_budget">Текущий бюджет: %1$s</string>
@@ -91,4 +94,8 @@
     <string name="update_budget">Обновить бюджет</string>
     <string name="budget_plus_symbol">+</string>
     <string name="budget_minus_symbol">−</string>
+    <string name="sources_loading">Загрузка источников бюджета…</string>
+    <string name="sources_load_error">Не удалось загрузить источники. Нажмите, чтобы повторить.</string>
+    <string name="budget_loading">Загрузка бюджета…</string>
+    <string name="budget_load_error">Не удалось загрузить бюджет. Нажмите, чтобы повторить.</string>
 </resources>

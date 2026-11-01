@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
 
 /**
- * Persistent pipeline scoped to the initialized local calculator. No screen uses it yet.
+ * Persistent pipeline scoped to the initialized local calculator, consumed through the ViewModel.
  * Each operation reloads saved settings; no temporary data or permanently cached active period.
  */
 class ManyManagerRepository(

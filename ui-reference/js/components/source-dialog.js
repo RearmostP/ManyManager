@@ -1,7 +1,6 @@
 import {state} from "../state.js";
 import {previewModel,amountFor,parseAmount,previewAdjustment} from "../preview-model.js";
-import {monthName} from "../i18n.js";
-import {tr,money,escapeValue} from "../render-helpers.js";
+import {tr,money,periodLabel,escapeValue} from "../render-helpers.js";
 
 export function sourcePreview(){
   const sourceId=state.sourceDraft.sourceId;
@@ -11,8 +10,16 @@ export function sourcePreview(){
   const result=delta===null?null:previewAdjustment(state.dialogMonth,sourceId,delta);
   return result===null?tr("budget_invalid_amount"):tr("budget_after_change",money(result));
 }
+export function canConfirmSourceEdit(){
+  const raw=state.sourceDraft.adjustment;
+  const magnitude=raw.trim()===""?0:parseAmount(raw);
+  if(!state.sourceDraft.name.trim()||magnitude===null)return false;
+  const result=previewAdjustment(state.dialogMonth,state.sourceDraft.sourceId,
+    state.sourceDraft.operation==="add"?magnitude:-magnitude);
+  return result!==null&&result>=0;
+}
 export function sourceDialog(){
-  const month=tr("budget_for_month",monthName(state.language,state.dialogMonth));
+  const month=tr("budget_for_month",periodLabel(state.language,state.dialogMonth));
   const edit=state.overlay==="edit-source";
   const source=edit?previewModel.sources.find(item=>item.id===state.sourceDraft.sourceId):null;
   const title=tr(edit?"edit_source":"add_source");
@@ -30,6 +37,6 @@ export function sourceDialog(){
   return `<div class="scrim dialog-wrap" data-action="close-overlay"><div class="overlay-stage"><div class="dialog-panel" data-stop-close role="dialog" aria-modal="true" aria-labelledby="source-dialog-title">
     <h2 id="source-dialog-title">${title}</h2><p class="dialog-month">${month}</p>
     ${body}<p id="source-error" class="form-error" role="alert" hidden></p>
-    <div class="dialog-actions"><button data-action="close-overlay">${tr("cancel")}</button><button class="primary" data-action="${edit?"confirm-edit-source":"confirm-add-source"}">${tr(edit?"update_budget":"add_source")}</button></div>
+    <div class="dialog-actions"><button data-action="close-overlay">${tr("cancel")}</button><button class="primary" data-action="${edit?"confirm-edit-source":"confirm-add-source"}" ${edit&&!canConfirmSourceEdit()?"disabled":""}>${tr(edit?"update_budget":"add_source")}</button></div>
     </div></div></div>`;
 }

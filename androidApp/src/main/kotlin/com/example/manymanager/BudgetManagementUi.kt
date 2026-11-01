@@ -4,57 +4,86 @@ import android.view.LayoutInflater
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
-import java.time.YearMonth
-import java.time.format.DateTimeFormatter
+import com.example.manymanager.domain.BudgetPeriod
+import com.example.manymanager.domain.BudgetSnapshot
+import com.example.manymanager.domain.BudgetSource
 
-/** Displays the selected month's allocations; mutations live in MonthlyBudgetAllocations. */
+/** Displays the selected period's allocations from persistent storage. */
 class BudgetManagementUi(
     private val root: View,
-    private val state: BudgetViewModel,
-    onAddSource: (YearMonth) -> Unit,
-    private val onEditSource: (PaymentSource, YearMonth) -> Unit
+    private val onPreviousPeriod: () -> Unit,
+    private val onNextPeriod: () -> Unit,
+    private val onAddSource: (BudgetPeriod) -> Unit,
+    private val onEditSource: (BudgetSource, BudgetPeriod, Long) -> Unit,
 ) {
     private val context = root.context
     private val locale get() = context.resources.configuration.locales[0]
+    private var currentSnapshot: BudgetSnapshot? = null
 
     init {
         root.findViewById<View>(R.id.budgetPreviousMonth).setOnClickListener {
-            state.managementMonth = state.managementMonth.minusMonths(1)
-            render()
+            onPreviousPeriod()
         }
         root.findViewById<View>(R.id.budgetNextMonth).setOnClickListener {
-            state.managementMonth = state.managementMonth.plusMonths(1)
-            render()
+            onNextPeriod()
         }
         root.findViewById<View>(R.id.budgetAddSource).setOnClickListener {
-            onAddSource(state.managementMonth)
+            currentSnapshot?.let { onAddSource(it.period) }
         }
-        render()
     }
 
     private fun money(amount: Long) =
         context.getString(R.string.ils_amount, BudgetAmounts.number(amount, locale))
 
-    fun render() {
-        val month = state.managementMonth
+    fun renderState(state: PersistentDataState, onRetry: () -> Unit) {
+        listOf(R.id.budgetPreviousMonth, R.id.budgetNextMonth, R.id.budgetAddSource).forEach {
+            root.findViewById<View>(it).isEnabled = state is PersistentDataState.Ready
+        }
+        if (state is PersistentDataState.Ready) {
+            root.findViewById<View>(R.id.budgetNoSources).apply {
+                setOnClickListener(null)
+                isClickable = false
+                isFocusable = false
+            }
+            render(state.snapshot)
+            return
+        }
+        currentSnapshot = null
+        root.findViewById<LinearLayout>(R.id.budgetSourceRows).removeAllViews()
+        root.findViewById<TextView>(R.id.budgetAllocatedTotal).text = "—"
+        root.findViewById<TextView>(R.id.budgetNoSources).apply {
+            visibility = View.VISIBLE
+            setText(if (state is PersistentDataState.Failed) R.string.budget_load_error else R.string.budget_loading)
+            setOnClickListener { onRetry() }
+            isClickable = state is PersistentDataState.Failed
+            isFocusable = isClickable
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+    }
+
+    fun render(snapshot: BudgetSnapshot) {
+        root.findViewById<TextView>(R.id.budgetNoSources).setText(R.string.no_budget_sources_yet)
+        currentSnapshot = snapshot
+        val period = snapshot.period
         root.findViewById<TextView>(R.id.budgetMonth).text =
-            month.format(DateTimeFormatter.ofPattern("LLLL yyyy", locale))
+            BudgetPeriodFormatter.format(context, period)
         root.findViewById<TextView>(R.id.budgetAllocatedTotal).text =
-            money(state.allocations.total(month))
-        val sources = state.allocations.sources
+            money(snapshot.totalAllocatedMinor)
+        val sources = snapshot.sources
         root.findViewById<View>(R.id.budgetNoSources).visibility =
             if (sources.isEmpty()) View.VISIBLE else View.GONE
         val rows = root.findViewById<LinearLayout>(R.id.budgetSourceRows)
         rows.removeAllViews()
-        sources.forEach { source ->
+        sources.forEach { sourceBudget ->
+            val source = sourceBudget.source
+            val allocated = sourceBudget.allocatedMinor
             val row = LayoutInflater.from(context).inflate(R.layout.row_budget_source, rows, false)
             row.findViewById<TextView>(R.id.budgetSourceName).text = source.name
-            row.findViewById<TextView>(R.id.budgetSourceAmount).text =
-                money(state.allocations.amount(month, source.id))
+            row.findViewById<TextView>(R.id.budgetSourceAmount).text = money(allocated)
             row.contentDescription = context.getString(
                 R.string.budget_amount_for_source, source.name
-            ) + ": " + money(state.allocations.amount(month, source.id))
-            row.setOnClickListener { onEditSource(source, month) }
+            ) + ": " + money(allocated)
+            row.setOnClickListener { onEditSource(source, period, allocated) }
             rows.addView(row)
         }
     }

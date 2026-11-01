@@ -4,6 +4,8 @@ import android.app.Application
 import android.util.Log
 import com.example.manymanager.data.ManyManagerRepository
 import java.time.Clock
+import java.time.Instant
+import java.time.ZoneId
 import com.example.manymanager.data.local.CalculatorEntity
 import com.example.manymanager.data.local.ManyManagerDatabase
 import kotlinx.coroutines.CancellationException
@@ -13,14 +15,19 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 
-/** Owns storage for the process. Existing business screens still use their temporary ViewModel. */
+/** Owns the single persistent repository for this process. */
 class ManyManagerApplication : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val database: ManyManagerDatabase by lazy { ManyManagerDatabase.create(this) }
 
     val repository: ManyManagerRepository by lazy {
-        ManyManagerRepository(database, databaseInitialization, Clock.systemDefaultZone())
+        ManyManagerRepository(database, databaseInitialization, object : Clock() {
+            // Resolve the device zone at read time, including after a timezone change.
+            override fun getZone(): ZoneId = ZoneId.systemDefault()
+            override fun withZone(zone: ZoneId): Clock = Clock.system(zone)
+            override fun instant(): Instant = Instant.now()
+        })
     }
 
     lateinit var databaseInitialization: Deferred<Result<CalculatorEntity>>

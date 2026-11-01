@@ -1,7 +1,9 @@
+import {periodFor} from "./budget-period.js";
+
 export const state={
   page:0,tab:0,language:"he",theme:"light",overlay:null,
   history:[],expanded:new Set(),budgetExpanded:false,
-  currentDate:new Date(),budgetMonth:new Date(),
+  currentDate:new Date(),budgetMonth:periodFor(new Date()).start,
   expenseDraft:{amount:"",date:"",note:"",categoryId:null,sourceId:null},
   categoryDraft:"",categoryReturnOverlay:null,
   sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
@@ -9,7 +11,7 @@ export const state={
 };
 export function changePage(index,scrollElement){
   if(index===state.page)return;
-  if(index===3)state.budgetMonth=new Date(state.currentDate.getFullYear(),state.currentDate.getMonth(),1);
+  if(index===3)state.budgetMonth=periodFor(state.currentDate).start;
   if(index===0)state.history=[];
   else state.history.push({page:state.page,tab:state.tab,scroll:scrollElement.scrollTop});
   state.page=index;state.budgetExpanded=false;scrollElement.scrollTop=0;

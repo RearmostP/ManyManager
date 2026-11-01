@@ -2,7 +2,7 @@ export const state={
   page:0,tab:0,language:"he",theme:"light",overlay:null,
   history:[],expanded:new Set(),budgetExpanded:false,
   currentDate:new Date(),budgetMonth:new Date(),
-  expenseDraft:{amount:"",date:"",note:"",category:null,sourceId:null},
+  expenseDraft:{amount:"",date:"",note:"",categoryId:null,sourceId:null},
   categoryDraft:"",categoryReturnOverlay:null,
   sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
   dialogMonth:null

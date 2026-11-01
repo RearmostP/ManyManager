@@ -114,12 +114,12 @@ document.addEventListener("click",async event=>{
     case "operation":
       state.sourceDraft.operation=button.dataset.value;renderKeepScroll();break;
     case "expense-category":
-      state.expenseDraft.category=button.dataset.value;renderKeepScroll();break;
+      state.expenseDraft.categoryId=button.dataset.id;renderKeepScroll();break;
     case "expense-source":
       state.expenseDraft.sourceId=button.dataset.id;renderKeepScroll();break;
     case "expense":
       state.overlay="expense";
-      state.expenseDraft={amount:"",date:shortDate(state.language,state.currentDate),note:"",category:null,sourceId:null};
+      state.expenseDraft={amount:"",date:shortDate(state.language,state.currentDate),note:"",categoryId:null,sourceId:null};
       renderKeepScroll();break;
     case "budget-toggle":
       state.budgetExpanded=!state.budgetExpanded;renderKeepScroll();break;

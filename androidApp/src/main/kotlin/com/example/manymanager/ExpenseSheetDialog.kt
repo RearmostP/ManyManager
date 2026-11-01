@@ -31,14 +31,14 @@ class ExpenseDraft(
     var amount: String = "",
     var date: String? = null,
     var note: String = "",
-    var category: String? = null,
+    var categoryId: String? = null,
     var sourceId: String? = null,
 ) {
     fun toBundle() = Bundle().apply {
         putString("amount", amount)
         putString("date", date)
         putString("note", note)
-        putString("category", category)
+        putString("categoryId", categoryId)
         putString("sourceId", sourceId)
     }
 
@@ -47,7 +47,7 @@ class ExpenseDraft(
             bundle.getString("amount").orEmpty(),
             bundle.getString("date"),
             bundle.getString("note").orEmpty(),
-            bundle.getString("category"),
+            bundle.getString("categoryId"),
             bundle.getString("sourceId"),
         )
     }
@@ -56,8 +56,9 @@ class ExpenseDraft(
 /** Slides only the expense sheet away, leaving the Activity beneath it in place. */
 class ExpenseSheetDialog(
     activity: Activity, date: LocalDate,
-    categories: List<String>, sources: List<PaymentSource>,
+    categories: CategoryListState, sources: List<PaymentSource>,
     val draft: ExpenseDraft,
+    private val onRetryCategories: () -> Unit = {},
     onAddCategory: () -> Unit,
 ) : Dialog(activity) {
     private val resources get() = context.resources
@@ -134,18 +135,27 @@ class ExpenseSheetDialog(
     }
 
     /** Refreshes only category choices, leaving every other draft field and its view intact. */
-    fun renderCategories(categories: List<String>) {
+    fun renderCategories(state: CategoryListState) {
         val content = sheetView ?: return
-        content.findViewById<View>(R.id.expenseCategoriesEmpty).visibility =
-            if (categories.isEmpty()) View.VISIBLE else View.GONE
+        val status = content.findViewById<TextView>(R.id.expenseCategoriesEmpty)
+        val message = state.statusMessage()
+        status.visibility = if (message == null) View.GONE else View.VISIBLE
+        message?.let { status.setText(it) }
+        status.setOnClickListener { onRetryCategories() }
+        status.isClickable = state is CategoryListState.Failed
+        status.isFocusable = state is CategoryListState.Failed
+        status.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         val container = content.findViewById<LinearLayout>(R.id.expenseCategoryChoices)
         container.removeAllViews()
-        bindChoices(container, categories.map { it to it }, false)
+        if (state is CategoryListState.Ready) {
+            bindChoices(container, state.categories.map { it.id to it.name }, false)
+        }
     }
 
-    fun selectCategory(name: String, categories: List<String>) {
-        draft.category = name
-        renderCategories(categories)
+    fun selectCategory(id: String, state: CategoryListState) {
+        draft.categoryId = id
+        // The creation result may arrive before the list emission. Keep the ID in that race.
+        renderCategories(state)
     }
 
     private fun bindChoices(
@@ -154,20 +164,21 @@ class ExpenseSheetDialog(
         options.forEach { (id, name) ->
             container.addView(TextView(context, null, 0, R.style.Text).apply {
                 text = name
+                tag = id
                 textSize = 14f
                 minHeight = dp(48)
                 setPadding(dp(14), dp(14), dp(14), dp(14))
-                setBackgroundResource(if ((if (sourceChoices) draft.sourceId else draft.category) == id)
+                setBackgroundResource(if ((if (sourceChoices) draft.sourceId else draft.categoryId) == id)
                     R.drawable.chip_active else R.drawable.chip)
-                isSelected = (if (sourceChoices) draft.sourceId else draft.category) == id
+                isSelected = (if (sourceChoices) draft.sourceId else draft.categoryId) == id
                 setTextColor(context.getColor(if (isSelected) R.color.blue else R.color.text))
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
-                    if (sourceChoices) draft.sourceId = id else draft.category = id
+                    if (sourceChoices) draft.sourceId = id else draft.categoryId = id
                     for (index in 0 until container.childCount) {
                         (container.getChildAt(index) as TextView).apply {
-                            isSelected = text.toString() == name
+                            isSelected = tag == id
                             setBackgroundResource(if (isSelected) R.drawable.chip_active else R.drawable.chip)
                             setTextColor(context.getColor(if (isSelected) R.color.blue else R.color.text))
                         }

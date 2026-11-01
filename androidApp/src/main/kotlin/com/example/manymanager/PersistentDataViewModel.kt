@@ -25,7 +25,7 @@ sealed interface PersistentDataState {
     data class Failed(val error: DataError) : PersistentDataState
 }
 
-/** Prepared for staged migration. MainActivity still constructs the temporary BudgetViewModel. */
+/** Category screens use the focused stream; financial screens still use BudgetViewModel. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PersistentDataViewModel(private val repository: ManyManagerRepository) : ViewModel() {
     private data class Selection(val period: BudgetPeriod? = null, val refresh: Long = 0)
@@ -40,17 +40,61 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         }.onStart { emit(PersistentDataState.Loading) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PersistentDataState.Loading)
 
+    private val categoryRefresh = MutableStateFlow(0L)
+    val categories: StateFlow<CategoryListState> = categoryRefresh.flatMapLatest {
+        repository.observeCategories().map { result ->
+            when (result) {
+                is DataResult.Success -> CategoryListState.Ready(result.value)
+                is DataResult.Failure -> CategoryListState.Failed(result.error)
+            }
+        }.onStart { emit(CategoryListState.Loading) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CategoryListState.Loading)
+
+    private val creation = MutableStateFlow<CategoryCreationState?>(null)
+    val categoryCreation: StateFlow<CategoryCreationState?> = creation
+    fun retryCategories() { categoryRefresh.update { it + 1 } }
+
+    fun beginCategoryCreation(fromExpense: Boolean) {
+        if (creation.value == null) creation.value = CategoryCreationState(fromExpense)
+    }
+
+    fun restoreCategoryCreation(restored: CategoryCreationState) {
+        if (creation.value == null) creation.value = restored
+    }
+
+    fun updateCategoryName(name: String) {
+        creation.update { current ->
+            if (current == null || current.submitting || current.result is DataResult.Success || current.name == name) current
+            else current.copy(name = name, result = null)
+        }
+    }
+
+    fun cancelCategoryCreation() {
+        creation.update { current ->
+            if (current?.submitting == true || current?.result is DataResult.Success) current else null
+        }
+    }
+
+    fun acknowledgeCategoryCreation() {
+        if (creation.value?.result is DataResult.Success) creation.value = null
+    }
+
+    /** Synchronous busy guard prevents two taps, even before the dialog renders disabled buttons. */
+    fun submitCategoryCreation(): Job? {
+        val current = creation.value ?: return null
+        if (current.submitting || current.result is DataResult.Success) return null
+        creation.value = current.copy(submitting = true, result = null, interrupted = false)
+        return viewModelScope.launch {
+            val result = repository.createCategory(current.name)
+            currentCoroutineContext().ensureActive()
+            creation.value = current.copy(result = result, interrupted = false)
+        }
+    }
+
     /** Null follows today. Call refresh on resume/date changes when screens are migrated. */
     fun selectPeriod(period: BudgetPeriod?) { selection.update { it.copy(period = period) } }
     fun refresh() { selection.update { it.copy(refresh = it.refresh + 1) } }
 
-    /** One-time outcome is separate from observable data; no replaying success event in state. */
-    fun createCategory(name: String, onResult: (DataResult<Category>) -> Unit): Job =
-        viewModelScope.launch {
-            val result = repository.createCategory(name)
-            currentCoroutineContext().ensureActive()
-            onResult(result)
-        }
 }
 
 class PersistentDataViewModelFactory(

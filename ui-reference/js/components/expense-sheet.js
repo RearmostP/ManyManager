@@ -4,7 +4,7 @@ import {icon} from "../icons.js";
 import {tr,escapeValue} from "../render-helpers.js";
 
 export function expense(){
-  const categories=previewModel.categories.map(name=>`<button class="chip ${state.expenseDraft.category===name?"selected":""}" data-action="expense-category" data-value="${escapeValue(name)}">${escapeValue(name)}</button>`).join("");
+  const categories=previewModel.categories.map(category=>`<button class="chip ${state.expenseDraft.categoryId===category.id?"selected":""}" data-action="expense-category" data-id="${category.id}">${escapeValue(category.name)}</button>`).join("");
   const sources=previewModel.sources.map(source=>`<button class="chip ${state.expenseDraft.sourceId===source.id?"selected":""}" data-action="expense-source" data-id="${source.id}">${escapeValue(source.name)}</button>`).join("");
   return `<div class="scrim sheet-wrap" data-action="close-overlay"><div class="overlay-stage"><div class="sheet" data-stop-close><div class="drag-area" data-action="drag"><div class="drag-track"></div></div>
   <div class="sheet-head"><h2>${tr("new_expense")}</h2><button class="icon-button" data-action="close-overlay" aria-label="${tr("close")}">${icon("close")}</button></div>

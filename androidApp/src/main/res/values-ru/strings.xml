@@ -72,6 +72,11 @@
     <string name="category_name">Название категории</string>
     <string name="category_name_required">Введите название категории</string>
     <string name="categories_count">Категорий: %1$s</string>
+    <string name="categories_loading">Загрузка категорий…</string>
+    <string name="categories_load_error">Не удалось загрузить категории. Нажмите для повтора.</string>
+    <string name="category_saving">Сохранение…</string>
+    <string name="category_save_error">Не удалось сохранить категорию. Попробуйте еще раз.</string>
+    <string name="category_save_interrupted">Создание категории было прервано. Проверьте, создана ли она.</string>
     <string name="add_source">Добавить источник бюджета</string>
     <string name="edit_source">Изменить источник бюджета</string>
     <string name="source_name">Название источника бюджета</string>

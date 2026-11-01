@@ -24,6 +24,11 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.example.manymanager.domain.DataResult
+import kotlinx.coroutines.launch
 import java.time.YearMonth
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -37,6 +42,12 @@ class MainActivity : AppCompatActivity() {
         override fun handleOnBackPressed() { navigateBack() }
     }
     private val budgetState by lazy { ViewModelProvider(this)[BudgetViewModel::class.java] }
+    private val categoryState by lazy {
+        ViewModelProvider(this, PersistentDataViewModelFactory(
+            (application as ManyManagerApplication).repository
+        ))[PersistentDataViewModel::class.java]
+    }
+    private var categoryDialog: CategoryCreationDialog? = null
     private var homeBudgetUi: BudgetHomeUi? = null
     private var budgetManagementUi: BudgetManagementUi? = null
     private var categoryManagementUi: CategoryManagementUi? = null
@@ -65,6 +76,13 @@ class MainActivity : AppCompatActivity() {
         }
         onBackPressedDispatcher.addCallback(this, pageBackCallback)
         renderContent(savedInstanceState)
+        // Installed once per Activity, never once per renderContent/appearance change.
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch { categoryState.categories.collect(::renderCategoryState) }
+                launch { categoryState.categoryCreation.collect(::renderCategoryCreation) }
+            }
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -189,7 +207,8 @@ class MainActivity : AppCompatActivity() {
             ::showAddSource, ::showEditSource
         )
         categoryManagementUi = CategoryManagementUi(
-            findViewById(R.id.categoriesPage), budgetState, ::navigateBack, ::showAddCategory
+            findViewById(R.id.categoriesPage), ::navigateBack, ::showAddCategory,
+            categoryState::retryCategories
         )
         listOf(R.id.previousMonth, R.id.nextMonth).forEach { id ->
             findViewById<View>(id).apply {
@@ -210,8 +229,13 @@ class MainActivity : AppCompatActivity() {
                 section.requestRectangleOnScreen(Rect(0, 0, section.width, section.height), false)
             }
         }
+        savedInstanceState?.getBundle("categoryCreation")?.let {
+            categoryState.restoreCategoryCreation(CategoryCreationState.fromBundle(it))
+        }
         renderedConfiguration = Configuration(resources.configuration)
         contentReady = true
+        renderCategoryState(categoryState.categories.value)
+        renderCategoryCreation(categoryState.categoryCreation.value)
         finishAppearanceTransition(savedInstanceState)
     }
 
@@ -240,10 +264,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.summaryCount).text = getString(
             R.string.monthly_expense_count, numbers.format(ExpenseUiData.expenseCount)
         )
-        val count = budgetState.categories.size
-        findViewById<TextView>(R.id.categorySummaryEmpty).setText(
-            if (count == 0) R.string.no_categories else R.string.no_expenses
-        )
+        bindCategorySummary(categoryState.categories.value)
         findViewById<TextView>(R.id.sourceSummaryEmpty).setText(
             if (budgetState.allocations.sources.isEmpty()) R.string.no_payment_methods
             else R.string.no_expenses
@@ -284,7 +305,7 @@ class MainActivity : AppCompatActivity() {
                 pageBackCallback.isEnabled = index != 0 || budgetState.breakdownExpanded
                 if (index == 0) homeBudgetUi?.refresh()
                 if (index == 3) budgetManagementUi?.render()
-                if (index == 4) categoryManagementUi?.render()
+                if (index == 4) categoryManagementUi?.render(categoryState.categories.value)
                 listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage,
                     R.id.budgetPage, R.id.categoriesPage).forEachIndexed { i, id ->
                     findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
@@ -360,7 +381,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun refreshManagedData() {
         budgetManagementUi?.render()
-        categoryManagementUi?.render()
+        categoryManagementUi?.render(categoryState.categories.value)
         bindEmptyState()
         homeBudgetUi?.refresh()
     }
@@ -385,38 +406,58 @@ class MainActivity : AppCompatActivity() {
 
     private fun showAddCategory(fromExpense: ExpenseSheetDialog?) {
         if (fromExpense == null) dismissActiveDialogImmediately()
-        val input = EditText(this).apply {
-            hint = getString(R.string.category_name)
-            setSingleLine(true)
-            setPadding(dp(24), dp(14), dp(24), dp(14))
-            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text))
-            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.muted))
+        categoryState.beginCategoryCreation(fromExpense != null)
+        renderCategoryCreation(categoryState.categoryCreation.value)
+    }
+
+    private fun renderCategoryState(state: CategoryListState) {
+        if (!contentReady) return
+        categoryManagementUi?.render(state)
+        expenseDialog?.renderCategories(state)
+        bindCategorySummary(state)
+    }
+
+    private fun bindCategorySummary(state: CategoryListState) {
+        findViewById<TextView>(R.id.categorySummaryEmpty).apply {
+            setText(state.statusMessage() ?: R.string.no_expenses)
+            setOnClickListener { categoryState.retryCategories() }
+            isClickable = state is CategoryListState.Failed
+            isFocusable = state is CategoryListState.Failed
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.add_category_action)
-            .setView(input)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.add_category, null)
-            .create()
-        activeDialog = dialog
-        dialog.setOnDismissListener {
-            if (activeDialog === dialog) {
-                activeDialog = fromExpense?.takeIf { it.isShowing }
+    }
+
+    private fun renderCategoryCreation(state: CategoryCreationState?) {
+        if (!contentReady || isFinishing || isDestroyed) return
+        if (state == null) {
+            categoryDialog?.dispose()
+            if (activeDialog === categoryDialog?.dialog) {
+                activeDialog = expenseDialog?.takeIf { it.isShowing }
             }
+            categoryDialog = null
+            return
         }
-        dialog.setOnShowListener {
-            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                val name = input.text.toString().trim()
-                if (!budgetState.addCategory(name)) {
-                    input.error = getString(R.string.category_name_required)
-                    return@setOnClickListener
-                }
-                refreshManagedData()
-                fromExpense?.selectCategory(name, budgetState.categories)
-                dialog.dismiss()
+        val created = (state.result as? DataResult.Success)?.value
+        if (created != null) {
+            if (state.fromExpense) {
+                expenseDialog?.selectCategory(created.id, categoryState.categories.value)
             }
+            categoryDialog?.dispose()
+            categoryDialog = null
+            activeDialog = expenseDialog?.takeIf { it.isShowing }
+            categoryState.acknowledgeCategoryCreation()
+            return
         }
-        dialog.showWithRoundedSurface()
+        if (categoryDialog == null) {
+            val window = CategoryCreationDialog(this,
+                categoryState::updateCategoryName,
+                { categoryState.submitCategoryCreation() },
+                categoryState::cancelCategoryCreation)
+            categoryDialog = window
+            activeDialog = window.dialog
+            window.show()
+        }
+        categoryDialog?.render(state)
     }
 
     private fun showMenu() {
@@ -428,6 +469,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun dismissActiveDialogImmediately() {
+        categoryDialog?.dispose()
+        categoryDialog = null
         val dialog = activeDialog
         when (dialog) {
             is ExpenseSheetDialog -> dialog.dismissImmediately()
@@ -445,7 +488,8 @@ class MainActivity : AppCompatActivity() {
         dismissActiveDialogImmediately()
         lateinit var dialog: ExpenseSheetDialog
         dialog = ExpenseSheetDialog(this, currentDate,
-            budgetState.categories, budgetState.allocations.sources, draft
+            categoryState.categories.value, budgetState.allocations.sources, draft,
+            onRetryCategories = categoryState::retryCategories
         ) { showAddCategory(dialog) }
         expenseDialog = dialog
         activeDialog = dialog
@@ -462,6 +506,9 @@ class MainActivity : AppCompatActivity() {
         outState.putSparseParcelableArray("viewHierarchy", hierarchy)
         expenseDialog?.takeIf { it.isShowing }
             ?.let { outState.putBundle("expenseDraft", it.draft.toBundle()) }
+        categoryState.categoryCreation.value?.let {
+            outState.putBundle("categoryCreation", it.toBundle())
+        }
         outState.putInt("pageScrollY", findViewById<ScrollView>(R.id.pageScroll).scrollY)
         outState.putInt("page", page)
         outState.putIntArray("pageHistory", pageHistory.flatMap {

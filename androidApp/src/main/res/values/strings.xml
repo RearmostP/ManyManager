@@ -72,6 +72,11 @@
     <string name="category_name">שם הקטגוריה</string>
     <string name="category_name_required">יש להזין שם קטגוריה</string>
     <string name="categories_count">קטגוריות: %1$s</string>
+    <string name="categories_loading">טוען קטגוריות…</string>
+    <string name="categories_load_error">טעינת הקטגוריות נכשלה. לחץ לניסיון חוזר.</string>
+    <string name="category_saving">שומר…</string>
+    <string name="category_save_error">שמירת הקטגוריה נכשלה. יש לנסות שוב.</string>
+    <string name="category_save_interrupted">יצירת הקטגוריה הופרעה. יש לבדוק אם נוצרה לפני ניסיון נוסף.</string>
     <string name="add_source">הוספת מקור תקציב</string>
     <string name="edit_source">עריכת מקור תקציב</string>
     <string name="source_name">שם מקור התקציב</string>

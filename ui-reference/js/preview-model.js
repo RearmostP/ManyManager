@@ -4,6 +4,7 @@ export const previewModel={
   sources:[],
   allocations:new Map(),
   expenseTotal:0,
+  nextCategoryId:1,
   nextSourceId:1
 };
 export const monthKey=date=>`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;
@@ -21,9 +22,10 @@ export function parseAmount(text){
 }
 export function addCategory(name){
   const clean=name.trim();
-  if(!clean)return false;
-  previewModel.categories.push(clean);
-  return true;
+  if(!clean)return null;
+  const category={id:`category-${previewModel.nextCategoryId++}`,name:clean};
+  previewModel.categories.push(category);
+  return category;
 }
 export function addSource(name,month,initial){
   const clean=name.trim();

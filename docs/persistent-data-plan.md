@@ -782,3 +782,53 @@ BigInteger.longValueExact והחלפתה בבדיקת טווח המתאימה ל
 שמירת הוצאה עדיין מושבתת. הדפדפן נשאר preview בזיכרון.
 אין חסם מוצר קונקרטי לפני שלב 5; החלטות מחיקה/ארכוב ומדיניות סכומי הוצאה נשארות
 לפני חשיפת הפעולות הרלוונטיות בהמשך.
+
+## מימוש שלב 5 — קטגוריות מתמשכות וחיבור ממשק
+
+**שלב 5 הושלם.** כל קריאות הקטגוריות והיצירה ב־Android הועברו ל־Room-backed repository.
+הרשימה הזמנית ב־`BudgetViewModel` וב־`ExpenseUiData` הוסרה לחלוטין.
+
+### קבצים שנפתחו/שונו
+
+- **CategoryState.kt**: הוגדרו `CategoryListState` (`Loading`, `Ready`, `Failed`)
+  ואת `CategoryCreationState` בנפרד מזרם הרשימה, כולל המרת `toBundle()`/`fromBundle()`
+  והתקשרות שגיאות/טעינה בלוקליזציה.
+- **CategoryCreationDialog.kt**: דיאלוג יצירת קטגוריה בנפרד מ־View references, כולל
+  `showWithRoundedSurface()`, נעילת כפתורים בזמן כתיבה (`submitting`),
+  והצגת שגיאות ממוקדות.
+- **CategoryManagementUi.kt**: הציג את `CategoryListState`, טיפל במצבי `Loading`, `Failed` (כולל לחץ לניסיון חוזר)
+  ו־`Ready` (כולל `no_categories`), עם שמירת העיצוב הקיים והניווט.
+- **PersistentDataViewModel.kt**: הוסיף תצפית ממוקדת `categories` מתוך `observeCategories()`,
+  וניהול מצב דיאלוג היצירה (`beginCategoryCreation`, `updateCategoryName`, `submitCategoryCreation`,
+  `cancelCategoryCreation`, `acknowledgeCategoryCreation`). `submitCategoryCreation` כולל busy guard
+  סינכרוני המונע שתי לחיצות כפולות.
+- **ExpenseSheetDialog.kt & ExpenseDraft**: `ExpenseDraft` עודכן להחזיק `categoryId: String?` במקום שם.
+  בחירות הקטגוריות והמקורות במיכל הוסבו להשוואה לפי מזהים יציבים (`tag == id`).
+  עדכון הקטגוריות בגיליון מרענן רק את אזור הבחירות ושומר על כל שדות הטיוטה (`amount`, `date`, `note`, `sourceId`).
+- **MainActivity.kt**: איסוף `categories` ו־`categoryCreation` בעזרת `repeatOnLifecycle(Lifecycle.State.STARTED)`,
+  ניהול הדיאלוגים, ושמירה/שחזור `expenseDraft` ו־`categoryCreation` ב־`saveUiState`.
+- **BudgetViewModel.kt & ExpenseUiData.kt**: שדות ופעולות הקטגוריות הישנות הוסרו לחלוטין.
+- **res/values/ids.xml & strings.xml**: נוספו `categoryNameInput` ומחרוזות מתורגמות לכל השפות (עברית, אנגלית, רוסית)
+  עבור טעינה, שגיאות ושמירת קטגוריות.
+- **ui-reference/**: עודכנו `js/preview-model.js`, `js/state.js`, `js/components/category-dialog.js`,
+  `js/components/expense-sheet.js`, `js/screens/categories.js`, `js/app.js`, `README.md` ו־`UI_MAP.md`
+  לתמיכה במזהי קטגוריות יציבים (`category.id`), בחירת categoryId בטיוטה, ותיעוד ההבדל
+  בין אחסון Room מתמשך ב־Android לבין companion בזיכרון בלבד בדפדפן.
+
+### תוצאות אימות שלב 5
+
+הורצו בהצלחה הפקודות:
+
+```powershell
+.\gradlew.bat :androidApp:assembleDebug :androidApp:testDebugUnitTest :androidApp:connectedDebugAndroidTest :androidApp:lintDebug
+```
+
+- **assembleDebug**: עבר בהצלחה.
+- **testDebugUnitTest**: כל 39 בדיקות היחידה עברו בהצלחה (0 failures).
+- **connectedDebugAndroidTest**: כל 36 בדיקות המכשיר/אינסטרומנטציה עברו בהצלחה ב־SM-S928B עם Android 17.
+- **lintDebug**: עבר בהצלחה ללא שגיאות.
+
+### מסירה לשלב 6
+
+שלב 6 יחבר את מקורות התקציב (`BudgetSource`) ל־Repository ולמזהים יציבים בניהול ובגיליון,
+וישתמש בבלוקי העסקאות הקיימים מהשכבה של שלב 4.

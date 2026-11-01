@@ -6,7 +6,7 @@
 | Home/budget breakdown | `page_home.xml`, `BudgetHomeUi.kt` | `js/screens/home.js`, `css/screens/home.css` | Expand, remaining balance, expense sheet |
 | Summary | `page_summary.xml`, `panel_*.xml` | `js/screens/summary.js`, `css/screens/summary.css` | Three tabs; expense totals remain empty |
 | Settings | `page_settings.xml`, `MainActivity.kt` | `js/screens/settings.js`, `css/screens/settings.css` | Language and theme expansion |
-| Categories | `page_categories.xml`, `CategoryManagementUi.kt`, `BudgetViewModel.kt` | `js/screens/categories.js`, `css/screens/categories.css`, `js/components/category-dialog.js` | Side menu entry, previous-page back, shared list and add dialog |
+| Categories | `page_categories.xml`, `CategoryManagementUi.kt`, `PersistentDataViewModel.kt`, `ManyManagerRepository.kt` | `js/screens/categories.js`, `css/screens/categories.css`, `js/components/category-dialog.js` | Side menu entry, previous-page back, shared list and add dialog with stable IDs |
 | Budget/source list | `page_budget.xml`, `row_budget_source.xml`, `BudgetManagementUi.kt` | `js/screens/budget.js`, `css/screens/budget.css` | Month arrows, total, source rows, add |
 | Source forms/model | `dialog_add_source.xml`, `dialog_edit_source.xml`, `BudgetSourceDialogs.kt`, `MonthlyBudgetAllocations.kt`, `BudgetAmounts.kt` | `js/components/source-dialog.js`, `js/preview-model.js`, `css/components.css` | Add, rename, +/− preview, cancel, confirm |
 | Side menu | `dialog_menu.xml`, `SideMenuDialog.kt` | `js/components/drawer.js`, `css/components.css` | Five destinations including Expense Categories, close |
@@ -18,4 +18,4 @@ Translations are in Android `res/values/strings.xml`, `res/values-iw/strings.xml
 
 Maintenance: future Android UI changes should include corresponding `ui-reference/` and `UI_MAP.md` updates.
 
-Limits: category and source data remain in memory only. Android ViewModel data survives ordinary configuration changes but not process death; browser data resets on reload. The Android expense draft is restored across configuration changes, including while its category dialog is open. Expense saving is still disabled. Browser font metrics, native dialogs, IME, system bars, and ripple effects differ; pixel-level equivalence is unverified.
+Limits: Android categories persist in Room SQLite across process restarts; browser preview categories remain in JS memory and reset on reload. Source data remains in memory in both implementations. Android ViewModel data survives ordinary configuration changes but not process death; browser data resets on reload. The Android expense draft is restored across configuration changes, including while its category dialog is open. Expense saving is still disabled. Browser font metrics, native dialogs, IME, system bars, and ripple effects differ; pixel-level equivalence is unverified.

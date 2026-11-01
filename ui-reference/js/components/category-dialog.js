@@ -9,8 +9,9 @@ export function beginCategoryCreation(){
 }
 export function confirmCategoryCreation(){
   const name=state.categoryDraft.trim();
-  if(!addCategory(name))return false;
-  if(state.categoryReturnOverlay==="expense")state.expenseDraft.category=name;
+  const created=addCategory(name);
+  if(!created)return false;
+  if(state.categoryReturnOverlay==="expense")state.expenseDraft.categoryId=created.id;
   state.overlay=state.categoryReturnOverlay;
   state.categoryReturnOverlay=null;
   return true;

@@ -72,6 +72,11 @@
     <string name="category_name">Category name</string>
     <string name="category_name_required">Enter a category name</string>
     <string name="categories_count">Categories: %1$s</string>
+    <string name="categories_loading">Loading categories…</string>
+    <string name="categories_load_error">Failed to load categories. Tap to retry.</string>
+    <string name="category_saving">Saving…</string>
+    <string name="category_save_error">Failed to save category. Please try again.</string>
+    <string name="category_save_interrupted">Category creation was interrupted. Check if created before retrying.</string>
     <string name="add_source">Add budget source</string>
     <string name="edit_source">Edit budget source</string>
     <string name="source_name">Budget source name</string>

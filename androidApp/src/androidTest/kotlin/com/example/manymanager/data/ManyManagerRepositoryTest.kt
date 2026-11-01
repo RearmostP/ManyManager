@@ -8,9 +8,7 @@ import androidx.room.Room
 import androidx.room.withTransaction
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.manymanager.PersistentDataState
-import com.example.manymanager.PersistentDataViewModel
-import com.example.manymanager.PersistentDataViewModelFactory
+import com.example.manymanager.*
 import com.example.manymanager.data.local.*
 import com.example.manymanager.domain.*
 import java.time.Clock
@@ -22,6 +20,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import org.junit.After
 import org.junit.Assert.*
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -300,9 +300,12 @@ class ManyManagerRepositoryTest {
         val collection = model.state.onEach { states.send(it) }.launchIn(this)
         try {
             withTimeout(10_000) { model.state.first { it is PersistentDataState.Ready } }
-            val result = CompletableDeferred<DataResult<Category>>()
-            withContext(Dispatchers.Main) { model.createCategory("Food") { result.complete(it) } }
-            val category = withTimeout(10_000) { success(result.await()) }
+            withContext(Dispatchers.Main) {
+                model.beginCategoryCreation(false)
+                model.updateCategoryName("Food")
+                model.submitCategoryCreation()?.join()
+            }
+            val category = checkNotNull((model.categoryCreation.value?.result as? DataResult.Success)?.value)
             withTimeout(10_000) {
                 model.state.first {
                     it is PersistentDataState.Ready && it.snapshot.categories.any { row -> row.id == category.id }
@@ -314,18 +317,82 @@ class ManyManagerRepositoryTest {
                     ManyManagerRepository(database, waiting, clock)
                 ))["pending", PersistentDataViewModel::class.java]
             }
-            var callbackCalled = false
             val job = withContext(Dispatchers.Main) {
-                pendingModel.createCategory("Cancelled") { callbackCalled = true }
+                pendingModel.beginCategoryCreation(false)
+                pendingModel.updateCategoryName("Cancelled")
+                pendingModel.submitCategoryCreation()
             }
             withContext(Dispatchers.Main) { store.clear() }
-            job.join()
-            assertTrue(job.isCancelled)
-            assertFalse(callbackCalled)
+            job?.join()
+            assertTrue(job?.isCancelled == true)
         } finally {
             withContext(Dispatchers.Main) { store.clear() }
             collection.cancelAndJoin()
         }
+    }
+
+    @Test fun viewModelCategoryStateStreamCreationFlowAndBusyGuard() = runBlocking {
+        val store = ViewModelStore()
+        val factory = PersistentDataViewModelFactory(repository)
+        val model = withContext(Dispatchers.Main) {
+            ViewModelProvider(store, factory)[PersistentDataViewModel::class.java]
+        }
+        val categoriesChannel = Channel<CategoryListState>(Channel.UNLIMITED)
+        val collection = model.categories.onEach { categoriesChannel.send(it) }.launchIn(this)
+        try {
+            val initial = withTimeout(10_000) {
+                model.categories.first { it is CategoryListState.Ready }
+            } as CategoryListState.Ready
+            assertTrue(initial.categories.isEmpty())
+
+            withContext(Dispatchers.Main) {
+                model.beginCategoryCreation(fromExpense = true)
+                model.updateCategoryName("Shopping")
+            }
+            assertEquals("Shopping", model.categoryCreation.value?.name)
+            assertTrue(model.categoryCreation.value?.fromExpense == true)
+
+            val job = withContext(Dispatchers.Main) { model.submitCategoryCreation() }
+            assertNotNull(job)
+            // Synchronous busy guard prevents second submission
+            assertNull(withContext(Dispatchers.Main) { model.submitCategoryCreation() })
+
+            job?.join()
+            val createdState = model.categoryCreation.value
+            assertNotNull(createdState)
+            val createdCategory = (createdState?.result as? DataResult.Success)?.value
+            assertNotNull(createdCategory)
+            assertEquals("Shopping", createdCategory?.name)
+
+            val readyState = withTimeout(10_000) {
+                model.categories.first {
+                    it is CategoryListState.Ready && it.categories.any { c -> c.id == createdCategory?.id }
+                }
+            } as CategoryListState.Ready
+            assertEquals(1, readyState.categories.size)
+            assertEquals(createdCategory?.id, readyState.categories.single().id)
+        } finally {
+            withContext(Dispatchers.Main) { store.clear() }
+            collection.cancelAndJoin()
+        }
+    }
+
+    @Test fun expenseDraftAndCategoryCreationStateBundleSaveRestore() {
+        val draft = ExpenseDraft("150.00", "10/11/2026", "Groceries", "cat-123", "src-456")
+        val bundle = draft.toBundle()
+        val restoredDraft = ExpenseDraft.fromBundle(bundle)
+        assertEquals("150.00", restoredDraft.amount)
+        assertEquals("10/11/2026", restoredDraft.date)
+        assertEquals("Groceries", restoredDraft.note)
+        assertEquals("cat-123", restoredDraft.categoryId)
+        assertEquals("src-456", restoredDraft.sourceId)
+
+        val creation = CategoryCreationState(fromExpense = true, name = "Food", submitting = true)
+        val creationBundle = creation.toBundle()
+        val restoredCreation = CategoryCreationState.fromBundle(creationBundle)
+        assertTrue(restoredCreation.fromExpense)
+        assertEquals("Food", restoredCreation.name)
+        assertTrue(restoredCreation.interrupted)
     }
 
     @Test fun unsupportedSavedStartDayIsReportedAndNeverRewritten() = runBlocking {

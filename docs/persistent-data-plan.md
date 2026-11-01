@@ -1,6 +1,6 @@
 # תוכנית אחסון מתמשך — ManyManager
 
-תוכנית לעשרה שלבים, עם ממצאי הבסיס של שלב 1 ומעקב מימוש של שלב 2.
+תוכנית לעשרה שלבים, עם ממצאי הבסיס של שלב 1 ומעקב מימוש של שלבים 2–3.
 ממצאי הקוד בסעיף הבסיס מתארים את המצב לפני שלב 2; מצב התשתית העדכני מתועד בסוף המסמך.
 שמירת הוצאות וחיבור המסכים למסד עדיין אינם ממומשים.
 
@@ -524,7 +524,8 @@ git diff --check
   מניעת מחיקת הורים עם היסטוריה, שמות כפולים, סכומי הוצאה שלא הוכרעו,
   ופתיחת מסד שנוצר מה־JSON המיוצא באמצעות MigrationTestHelper.
 
-אין כעת Repository, חישוב יום 10, חיבור ViewModel למסד או שמירת הוצאות בממשק.
+בסיום שלב 2 לא היו Repository, חישוב יום 10, חיבור ViewModel למסד או שמירת הוצאות בממשק.
+רכיב חישוב התקופות נוסף בשלב 3, כמתועד להלן; יתר החיבורים נשארים לשלבים הבאים.
 אין יבוא אוטומטי של רשימות זמניות. מסכי Android, הגדרות שפה/מראה ו־ui-reference
 נשארים בהתנהגותם הקיימת. כלל איסור הקצאה שלילית עדיין נאכף רק במודל הזמני;
 בשלב 4/7 יועבר ל־business transaction. לא הוכנס CHECK ידני שאינו מיוצג ב־Room Entity.
@@ -559,3 +560,67 @@ $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
 לשלב 3 אין חסם מוצר שנותר משלב 2. יש לממש את BudgetPeriodCalculator המרכזי
 ובדיקות גבולות 10–9; אין להחליף זאת בחישוב מקומי במסכים.
 חיבור Repository, תצפיות ופעולות עסקיות למסד נשאר לשלבים הבאים.
+
+## מימוש שלב 3 — חישוב תקופות מרכזי
+
+### קבצים ו־API
+
+תחת androidApp/src/main/kotlin/com/example/manymanager/domain/ נוספו:
+
+- **BudgetPeriod.kt**: data class בלתי משתנה עם start: LocalDate ו־endExclusive: LocalDate.
+  הבנאי (וגם copy) מחייב start < endExclusive. ניתן לבדוק שייכות באמצעות
+  contains(date), או date in period. השדות startEpochDay ו־endExclusiveEpochDay הם
+  getters נגזרים; id הוא startEpochDay בהקשר של המחשבון. נשמרים רק שני התאריכים,
+  ללא שדות כסף, שם חודש, locale או נתונים כפולים.
+- **BudgetPeriodCalculator.kt**:
+  BudgetPeriodCalculator(periodStartDay: Int, clock: Clock).
+  שני הארגומנטים מפורשים, ללא קריאה למסד או ברירת מחדל מוסתרת ליום 10.
+  periodContaining(date) מוצא תקופה, currentPeriod() משתמש ב־LocalDate.now(clock)
+  בכל קריאה, ו־previous(period)/next(period) מנווטים לתקופה סמוכה.
+  הניווט דורש תקופה שזהה לתקופה הקנונית של תאריך תחילתה לפי הגדרת המחשבון;
+  יום התחלה אחר או סוף לא תואם נדחים עם IllegalArgumentException.
+
+הטווח הנתמך במפורש הוא **1..28**. ערכי 29–31, אפס, ערכים שליליים ומעל 31 נדחים;
+אין clamping, גלישה לסוף חודש או שינוי הגדרות והיסטוריה.
+החישוב משתמש ב־withDayOfMonth וב־plusMonths/minusMonths של LocalDate,
+ללא משכי זמן קבועים, UTC midnight או timestamps. טווח התאריכים כפוף לטווח
+java.time.LocalDate; ניסיון לחשב גבול מחוץ לו נכשל ב־DateTimeException.
+
+לדוגמה עבור day=10:
+
+- 2026-11-09 שייך ל־[2026-10-10, 2026-11-10).
+- 2026-11-10 ו־2026-12-09 שייכים ל־[2026-11-10, 2026-12-10).
+- 2026-12-10 אינו נכלל בתקופה הזאת ומתחיל את הבאה.
+- תקופות סמוכות נפגשות בדיוק ב־endExclusive של הראשונה וב־start של השנייה.
+
+זהו רכיב domain טהור, ללא Android, Room או localization.
+אין הקצאות, מקורות, יצירת נתוני תקופה, העתקת תקציבים או rollover ברכיב.
+CalculatorEntity.periodStartDay והאתחול נשארו ללא שינוי.
+YearMonth במסכים, מראה/ניווט, SQL, סכמה 1 ו־ui-reference נשארו ללא שינוי.
+בעת חיבור הנתונים בשלב 4, יועבר אליו יום ההתחלה של CalculatorEntity ושעון מתאים;
+המסכים וה־DAO לא יכילו חישוב מקביל של יום 10.
+
+### בדיקות ואימות שלב 3
+
+נוספו בדיקות JVM ב־androidApp/src/test/kotlin/com/example/manymanager/domain/:
+BudgetPeriodTest.kt ו־BudgetPeriodCalculatorTest.kt. הן מכסות הכללה/החרגה בגבולות,
+מזהים ו־epoch-day, intervals לא תקינים, נובמבר–דצמבר, מעבר שנה, פברואר מעובר ורגיל,
+עבר ועתיד, ניווט והיפוכו, רציפות תקופות, כל הימים 1–28, דחיית הגדרות ותקופות
+לא תואמות, fixed Clock ושני אזורי זמן באותו instant. שעון בדיקה ניתן לקידום מאמת
+ש־currentPeriod קורא שוב את השעון ואינו שומר את היום במשתנה גלובלי.
+
+**שלב 3 הושלם.** הורצה בהצלחה הפקודה:
+
+```powershell
+.\gradlew.bat :androidApp:assembleDebug :androidApp:testDebugUnitTest
+```
+
+ההרצה השתמשה ב־JAVA_HOME של Android Studio JBR וב־JDK daemon הקיים, כמו בשלב 2.
+assembleDebug עבר; כל 33 בדיקות ה־JVM באפליקציה עברו ללא דילוג:
+19 חדשות לתקופות (16 Calculator ו־3 Model), ו־14 בדיקות קיימות.
+נבדקו גם דוחות XML של הבדיקות ומצב Git, ו־diff נבדק לפני הקומיט.
+בדיקות Room במכשיר אינן נדרשות מחדש לשינוי domain זה; לא שונו אחסון או סכמה.
+לא בוצע אימות חזותי ולא חובר רכיב התקופות למסכים.
+
+אין חסם חדש לפני שלב 4. השלב הבא הוא שכבת הגישה המרכזית, שתעביר את הגדרת
+המחשבון ושעון מוזרק לרכיב הזה ותשתמש בגבולות epoch-day לשאילתות.

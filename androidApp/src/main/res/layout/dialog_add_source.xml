@@ -11,6 +11,7 @@
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="24dp" android:minHeight="48dp" android:padding="14dp"
         android:background="@drawable/chip" android:hint="@string/source_name"
+        android:textColorHint="@color/muted"
         android:inputType="textCapSentences" android:singleLine="true" android:textSize="14sp" />
     <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="20dp" android:text="@string/initial_budget" android:textSize="14sp" />
@@ -18,6 +19,7 @@
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="12dp" android:minHeight="48dp" android:padding="14dp"
         android:background="@drawable/chip" android:hint="@string/amount_zero"
+        android:textColorHint="@color/muted"
         android:inputType="numberDecimal" android:singleLine="true"
         android:textDirection="ltr" android:textSize="20sp" />
 </LinearLayout>

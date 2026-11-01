@@ -18,6 +18,7 @@ import androidx.appcompat.app.AlertDialog
 import android.content.DialogInterface
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.SystemBarStyle
@@ -375,7 +376,7 @@ class MainActivity : AppCompatActivity() {
         val dialog = BudgetSourceDialogs.add(this, budgetState, month, ::refreshManagedData)
         activeDialog = dialog
         dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
-        dialog.show()
+        dialog.showWithRoundedSurface()
     }
 
     private fun showEditSource(source: PaymentSource, month: YearMonth) {
@@ -383,7 +384,7 @@ class MainActivity : AppCompatActivity() {
         val dialog = BudgetSourceDialogs.edit(this, budgetState, source, month, ::refreshManagedData)
         activeDialog = dialog
         dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
-        dialog.show()
+        dialog.showWithRoundedSurface()
     }
 
     private fun showAddCategory() {
@@ -392,6 +393,8 @@ class MainActivity : AppCompatActivity() {
             hint = getString(R.string.category_name)
             setSingleLine(true)
             setPadding(dp(24), dp(14), dp(24), dp(14))
+            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text))
+            setHintTextColor(ContextCompat.getColor(this@MainActivity, R.color.muted))
         }
         val dialog = AlertDialog.Builder(this)
             .setTitle(R.string.add_category_action)
@@ -411,7 +414,7 @@ class MainActivity : AppCompatActivity() {
                 dialog.dismiss()
             }
         }
-        dialog.show()
+        dialog.showWithRoundedSurface()
     }
 
     private fun showMenu() {

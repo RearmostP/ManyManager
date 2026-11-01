@@ -13,7 +13,7 @@
     <string name="all_expenses">כל ההוצאות</string>
     <string name="category_breakdown_title">על מה הוצאנו?</string>
     <string name="category_breakdown_description">החלק של כל קטגוריה מתוך ההוצאות החודש</string>
-    <string name="category_breakdown_explanation">הסכומים מסודרים מהגדול לקטן. האחוזים מחושבים מתוך סך ההוצאות בחודש הנבחר.</string>
+    <string name="category_breakdown_explanation">הסכומים מסודרים מהגדול לקטן עבור תקופת התקציב הפעילה.</string>
     <string name="payment_breakdown_title">מאיפה שילמנו?</string>
     <string name="payment_breakdown_description">החלק מההוצאות ששולם מכל מקור תקציב</string>
     <string name="payment_breakdown_explanation">זהו אותו סכום הוצאות, מחולק לפי מקור תקציב. הסכומים מציגים כמה שולם מכל מקור, ולא את היתרה שנותרה בו.</string>
@@ -115,4 +115,5 @@
     <string name="expenses_load_error">טעינת ההוצאות נכשלה. לחץ לניסיון חוזר.</string>
     <string name="breakdown_pending">הפירוט אינו זמין עדיין</string>
     <string name="source_remaining">%1$s · נותר</string>
+    <string name="breakdown_expense_count">הוצאות: %1$s</string>
 </resources>

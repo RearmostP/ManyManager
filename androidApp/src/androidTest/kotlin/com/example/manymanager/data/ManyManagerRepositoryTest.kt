@@ -876,6 +876,45 @@ class ManyManagerRepositoryTest {
         assertTrue(snapshot().expenses.isEmpty())
     }
 
+    @Test fun breakdownsFollowCommittedCorrectionsRenamesAndBudgetAdjustments() = runBlocking {
+        val a = success(repository.createSourceWithInitialAllocation("Same", period, 500))
+        val b = success(repository.createSourceWithInitialAllocation("Same", period, 0))
+        val catA = success(repository.createCategory("Same"))
+        val catB = success(repository.createCategory("Same"))
+        success(repository.createCategory("Unused"))
+        val first = success(repository.createExpense(NewExpense(29, period.start, a.id, catA.id)))
+        success(repository.createExpense(NewExpense(11, period.start, b.id, catB.id)))
+        success(repository.createExpense(NewExpense(18, period.start, b.id)))
+        fun verify(value: BudgetSnapshot, spent: Long) {
+            assertEquals(spent, value.totalSpentMinor)
+            assertEquals(spent, BudgetCalculations.sum(value.categoryBreakdown.map { it.spentMinor }))
+            assertEquals(spent, BudgetCalculations.sum(value.sourceBreakdown.map { it.spentMinor }))
+            assertEquals(3, value.expenseCount)
+            assertEquals(3, value.categoryBreakdown.sumOf { it.expenseCount })
+            assertEquals(3, value.sourceBreakdown.sumOf { it.expenseCount })
+        }
+        verify(snapshot(), 58)
+        assertEquals(3, snapshot().categoryBreakdown.size)
+        assertEquals(2, snapshot().sourceBreakdown.size)
+        assertEquals(29L, snapshot().sourceBreakdown.single { it.source.id == b.id }.spentMinor)
+        success(repository.correctExpenseAmount(first.id, 30))
+        verify(snapshot(), 59)
+        val before = snapshot()
+        success(repository.renameSource(b.id, "Renamed"))
+        val renamed = snapshot()
+        verify(renamed, 59)
+        assertEquals(before.categoryBreakdown, renamed.categoryBreakdown)
+        assertEquals("Renamed", renamed.sourceBreakdown.single { it.source.id == b.id }.source.name)
+        assertEquals(before.sources.map { it.allocatedMinor }, renamed.sources.map { it.allocatedMinor })
+        success(repository.updateSourceAndAdjustAllocation(b.id, "Renamed", period, 100))
+        val adjusted = snapshot()
+        verify(adjusted, 59)
+        assertEquals(600L, adjusted.totalAllocatedMinor)
+        assertEquals(541L, adjusted.remainingMinor)
+        assertEquals(before.categoryBreakdown, adjusted.categoryBreakdown)
+        assertTrue(success(repository.snapshot(BudgetPeriodCalculator(10, clock).next(period))).categoryBreakdown.isEmpty())
+    }
+
     private suspend fun fixtureExpense(
         id: String, amount: Long, date: LocalDate, sourceId: String, categoryId: String? = null
     ) {

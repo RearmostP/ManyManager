@@ -13,7 +13,7 @@
   "all_expenses": "Все расходы",
   "category_breakdown_title": "На что потратили?",
   "category_breakdown_description": "Доля каждой категории в расходах за месяц",
-  "category_breakdown_explanation": "Суммы отсортированы по убыванию. Проценты рассчитаны от общей суммы расходов за выбранный месяц.",
+  "category_breakdown_explanation": "Суммы отсортированы по убыванию за текущий бюджетный период.",
   "payment_breakdown_title": "Как мы платили?",
   "payment_breakdown_description": "Доля расходов по каждому источнику бюджета",
   "payment_breakdown_explanation": "Та же сумма расходов с разбивкой по источникам бюджета. Суммы показывают, сколько потрачено из каждого источника, а не оставшийся в нём баланс.",
@@ -102,5 +102,6 @@
   "expenses_loading": "Загрузка расходов…",
   "expenses_load_error": "Не удалось загрузить расходы. Нажмите, чтобы повторить.",
   "breakdown_pending": "Разбивка пока недоступна",
-  "source_remaining": "%1$s · остаток"
+  "source_remaining": "%1$s · остаток",
+  "breakdown_expense_count": "Расходов: %1$s"
 }

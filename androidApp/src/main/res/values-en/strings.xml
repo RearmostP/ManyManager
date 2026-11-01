@@ -13,7 +13,7 @@
     <string name="all_expenses">All expenses</string>
     <string name="category_breakdown_title">What did we spend on?</string>
     <string name="category_breakdown_description">Each category’s share of this month’s expenses</string>
-    <string name="category_breakdown_explanation">Amounts are sorted from highest to lowest. Percentages are calculated from the total expenses for the selected month.</string>
+    <string name="category_breakdown_explanation">Amounts are sorted from highest to lowest for the active budget period.</string>
     <string name="payment_breakdown_title">How did we pay?</string>
     <string name="payment_breakdown_description">The share of expenses from each budget source</string>
     <string name="payment_breakdown_explanation">The same expense total, split by budget source. The amounts show how much was spent from each source, not its remaining balance.</string>
@@ -115,4 +115,5 @@
     <string name="expenses_load_error">Could not load expenses. Tap to retry.</string>
     <string name="breakdown_pending">Breakdown is not available yet</string>
     <string name="source_remaining">%1$s · remaining</string>
+    <string name="breakdown_expense_count">Expenses: %1$s</string>
 </resources>

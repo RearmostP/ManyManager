@@ -39,12 +39,18 @@ export function snapshotFor(date,expenses=previewModel.expenses){
   const allocated=totalFor(date);
   const sources=previewModel.sources.map(source=>{
     const sourceSpent=safe(selected.filter(item=>item.sourceId===source.id).reduce((sum,item)=>sum+BigInt(item.amountMinor),0n));
-    return {source,remaining:safe(BigInt(amountFor(date,source.id))-BigInt(sourceSpent))};
+    return {source,spent:sourceSpent,expenseCount:selected.filter(item=>item.sourceId===source.id).length,remaining:safe(BigInt(amountFor(date,source.id))-BigInt(sourceSpent))};
   });
-  for(const id of new Set(selected.map(item=>item.categoryId))){
-    safe(selected.filter(item=>item.categoryId===id).reduce((sum,item)=>sum+BigInt(item.amountMinor),0n));
-  }
-  return {expenses:selected,spent,allocated,remaining:safe(BigInt(allocated)-BigInt(spent)),sources};
+  const bySpending=(a,b)=>a.spent===b.spent?(a.id===b.id?0:a.id===null?-1:b.id===null?1:a.id<b.id?-1:1):a.spent>b.spent?-1:1;
+  const categoryBreakdown=[...new Set(selected.map(item=>item.categoryId))].map(id=>{
+    const rows=selected.filter(item=>item.categoryId===id);
+    return {id,name:previewModel.categories.find(item=>item.id===id)?.name??null,
+      spent:safe(rows.reduce((sum,item)=>sum+BigInt(item.amountMinor),0n)),expenseCount:rows.length};
+  }).sort(bySpending);
+  const sourceBreakdown=sources.filter(item=>item.expenseCount>0).map(item=>({
+    id:item.source.id,name:item.source.name,spent:item.spent,expenseCount:item.expenseCount
+  })).sort(bySpending);
+  return {expenses:selected,spent,allocated,remaining:safe(BigInt(allocated)-BigInt(spent)),sources,categoryBreakdown,sourceBreakdown};
 }
 export function createExpense(input){
   const date=parseCivilDate(input.date);

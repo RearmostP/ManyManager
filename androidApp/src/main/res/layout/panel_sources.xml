@@ -33,6 +33,8 @@
         android:text="@string/no_payment_methods"
         android:textSize="13sp"
         android:textColor="@color/muted" />
+    <LinearLayout android:id="@+id/sourceSummaryRows"
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
     <Space
         android:layout_width="1dp"
         android:layout_height="19dp" />

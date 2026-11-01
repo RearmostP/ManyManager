@@ -26,7 +26,7 @@ object BudgetCalculations {
         val spent = exactSum(expenses.map { it.amountMinor })
         val breakdown = expenses.groupBy { it.categoryId }.map { (id, rows) ->
             CategorySummary(id, sum(rows.map { it.amountMinor }), rows.size)
-        }
+        }.sortedWith(compareByDescending<CategorySummary> { it.spentMinor }.thenBy { it.categoryId })
         return BudgetSnapshot(calculator, period, categories.toList(), sourceBudgets,
             expenses.toList(), allocated.checkedLong(), spent.checkedLong(),
             allocated.subtract(spent).checkedLong(), expenses.size, breakdown)

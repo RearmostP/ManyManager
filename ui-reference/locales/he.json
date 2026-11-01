@@ -13,7 +13,7 @@
   "all_expenses": "כל ההוצאות",
   "category_breakdown_title": "על מה הוצאנו?",
   "category_breakdown_description": "החלק של כל קטגוריה מתוך ההוצאות החודש",
-  "category_breakdown_explanation": "הסכומים מסודרים מהגדול לקטן. האחוזים מחושבים מתוך סך ההוצאות בחודש הנבחר.",
+  "category_breakdown_explanation": "הסכומים מסודרים מהגדול לקטן עבור תקופת התקציב הפעילה.",
   "payment_breakdown_title": "מאיפה שילמנו?",
   "payment_breakdown_description": "החלק מההוצאות ששולם מכל מקור תקציב",
   "payment_breakdown_explanation": "זהו אותו סכום הוצאות, מחולק לפי מקור תקציב. הסכומים מציגים כמה שולם מכל מקור, ולא את היתרה שנותרה בו.",
@@ -102,5 +102,6 @@
   "expenses_loading": "טוען הוצאות…",
   "expenses_load_error": "טעינת ההוצאות נכשלה. לחץ לניסיון חוזר.",
   "breakdown_pending": "הפירוט אינו זמין עדיין",
-  "source_remaining": "%1$s · נותר"
+  "source_remaining": "%1$s · נותר",
+  "breakdown_expense_count": "הוצאות: %1$s"
 }

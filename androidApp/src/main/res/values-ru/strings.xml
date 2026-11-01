@@ -13,7 +13,7 @@
     <string name="all_expenses">Все расходы</string>
     <string name="category_breakdown_title">На что потратили?</string>
     <string name="category_breakdown_description">Доля каждой категории в расходах за месяц</string>
-    <string name="category_breakdown_explanation">Суммы отсортированы по убыванию. Проценты рассчитаны от общей суммы расходов за выбранный месяц.</string>
+    <string name="category_breakdown_explanation">Суммы отсортированы по убыванию за текущий бюджетный период.</string>
     <string name="payment_breakdown_title">Как мы платили?</string>
     <string name="payment_breakdown_description">Доля расходов по каждому источнику бюджета</string>
     <string name="payment_breakdown_explanation">Та же сумма расходов с разбивкой по источникам бюджета. Суммы показывают, сколько потрачено из каждого источника, а не оставшийся в нём баланс.</string>
@@ -115,4 +115,5 @@
     <string name="expenses_load_error">Не удалось загрузить расходы. Нажмите, чтобы повторить.</string>
     <string name="breakdown_pending">Разбивка пока недоступна</string>
     <string name="source_remaining">%1$s · остаток</string>
+    <string name="breakdown_expense_count">Расходов: %1$s</string>
 </resources>

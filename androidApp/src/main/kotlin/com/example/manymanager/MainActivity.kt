@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     }
     private var correctionDialog: ExpenseCorrectionDialog? = null
     private var allExpensesUi: AllExpensesUi? = null
+    private var summaryBreakdownUi: SummaryBreakdownUi? = null
     private var categoryDialog: CategoryCreationDialog? = null
     private var sourceCreationDialog: SourceCreationDialog? = null
     private var sourceEditingDialog: SourceEditingDialog? = null
@@ -261,6 +262,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         allExpensesUi = AllExpensesUi(findViewById(R.id.allPanel), ::showExpenseCorrection, persistentViewModel::refresh)
+        summaryBreakdownUi = SummaryBreakdownUi(findViewById(R.id.summaryPage), persistentViewModel::refresh)
         selectPage(page)
         selectTab(tab)
         savedInstanceState?.getBundle("expenseCreation")?.let {
@@ -319,7 +321,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun bindEmptyState() {
         renderActiveBudget(persistentViewModel.activeBudget.value)
-        bindCategorySummary(persistentViewModel.categories.value)
     }
 
     private fun navigateBack() {
@@ -435,8 +436,7 @@ class MainActivity : AppCompatActivity() {
         if (!contentReady) return
         homeBudgetUi?.renderState(state, budgetState.breakdownExpanded, persistentViewModel::refresh)
         allExpensesUi?.render(state)
-        bindCategorySummary(persistentViewModel.categories.value)
-        renderSources(persistentViewModel.sources.value)
+        summaryBreakdownUi?.render(state)
         val snapshot = (state as? PersistentDataState.Ready)?.snapshot
         val total = snapshot?.let { BudgetAmounts.number(it.totalSpentMinor, resources.configuration.locales[0]) } ?: "—"
         findViewById<TextView>(R.id.homeTotal).text = total
@@ -460,13 +460,7 @@ class MainActivity : AppCompatActivity() {
         if (!contentReady) return
         expenseDialog?.renderSources(state)
         renderExpenseCreation(persistentViewModel.expenseCreationState.value)
-        findViewById<TextView>(R.id.sourceSummaryEmpty).apply {
-            setText(state.statusMessage() ?: if ((persistentViewModel.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.expenseCount?.let { it > 0 } == true) R.string.breakdown_pending else R.string.no_expenses)
-            setOnClickListener { persistentViewModel.retrySources() }
-            isClickable = state is SourceListState.Failed
-            isFocusable = isClickable
-            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        }
+
     }
 
     private fun showAddSource(period: BudgetPeriod) {
@@ -558,17 +552,6 @@ class MainActivity : AppCompatActivity() {
         categoryManagementUi?.render(state)
         expenseDialog?.renderCategories(state)
         renderExpenseCreation(persistentViewModel.expenseCreationState.value)
-        bindCategorySummary(state)
-    }
-
-    private fun bindCategorySummary(state: CategoryListState) {
-        findViewById<TextView>(R.id.categorySummaryEmpty).apply {
-            setText(state.statusMessage() ?: if ((persistentViewModel.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.expenseCount?.let { it > 0 } == true) R.string.breakdown_pending else R.string.no_expenses)
-            setOnClickListener { persistentViewModel.retryCategories() }
-            isClickable = state is CategoryListState.Failed
-            isFocusable = state is CategoryListState.Failed
-            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        }
     }
 
     private fun renderCategoryCreation(state: CategoryCreationState?) {

@@ -1,3 +1,7 @@
+.summary-breakdown-row {display:block;width:100%;text-align:start;margin-top:12px;white-space:normal;overflow-wrap:anywhere}
+.summary-breakdown-row div:first-child {font-weight:700}
+.summary-breakdown-row div+div {margin-top:6px}
+.summary-breakdown-row div:last-child {font-size:12px;color:var(--muted)}
 .summary-month {
   margin-top:28px}
 .summary-amount {

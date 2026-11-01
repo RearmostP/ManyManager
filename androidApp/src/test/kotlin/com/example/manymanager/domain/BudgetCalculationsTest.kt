@@ -70,6 +70,29 @@ class BudgetCalculationsTest {
         }
     }
 
+    @Test fun breakdownsHaveStableSpendingOrderAndEachIndependentlyMatchesOverallFacts() {
+        val categories = listOf(Category("local", "a", "Same"), Category("local", "b", "Same"),
+            Category("local", "unused", "Unused"))
+        val expenses = listOf(expense("1", 29, "b", "b"), expense("2", 11, "a", "a"),
+            expense("3", 18, "a", "a"), expense("4", 29, "b"))
+        val result = BudgetCalculations.snapshot(calculator, period, categories, sources,
+            emptyMap(), expenses)
+        assertEquals(listOf(null, "a", "b"), result.categoryBreakdown.map { it.categoryId })
+        assertEquals(listOf("b", "a"), result.sourceBreakdown.map { it.source.id })
+        assertEquals(result.totalSpentMinor, BudgetCalculations.sum(result.categoryBreakdown.map { it.spentMinor }))
+        assertEquals(result.totalSpentMinor, BudgetCalculations.sum(result.sourceBreakdown.map { it.spentMinor }))
+        assertEquals(result.expenseCount, result.categoryBreakdown.sumOf { it.expenseCount })
+        assertEquals(result.expenseCount, result.sourceBreakdown.sumOf { it.expenseCount })
+        assertEquals(0L, result.sourceBreakdown.first().allocatedMinor)
+        val reversed = BudgetCalculations.snapshot(calculator, period, categories.reversed(),
+            sources.reversed(), emptyMap(), expenses.reversed())
+        assertEquals(result.categoryBreakdown, reversed.categoryBreakdown)
+        assertEquals(result.sourceBreakdown, reversed.sourceBreakdown)
+        val empty = snapshot(emptyList())
+        assertTrue(empty.categoryBreakdown.isEmpty())
+        assertTrue(empty.sourceBreakdown.isEmpty())
+    }
+
     private fun snapshot(expenses: List<Expense>, allocations: Map<String, Long> = emptyMap()) =
         BudgetCalculations.snapshot(calculator, period, emptyList(), sources, allocations, expenses)
 }

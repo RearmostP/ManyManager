@@ -593,6 +593,173 @@ class BudgetLifecycleTest {
         assertEquals(1, success(app.repository.snapshot(success(app.repository.periodContaining(draft.date!!)))).expenseCount)
     }
 
+    @Test fun summaryHomeManagementAndDraftConvergeOnSameCommittedFacts(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val a = success(app.repository.createSourceWithInitialAllocation("Same", period, 500))
+        val b = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
+        val catA = success(app.repository.createCategory("Same"))
+        val catB = success(app.repository.createCategory("Same"))
+        val first = success(app.repository.createExpense(NewExpense(100, period.start, a.id, catA.id)))
+        success(app.repository.createExpense(NewExpense(200, period.start, b.id, catB.id)))
+        success(app.repository.createExpense(NewExpense(300, period.start, a.id)))
+        val screen = launch()
+        val controller = model(screen)
+        fun rows(activity: MainActivity, id: Int) = activity.findViewById<android.widget.LinearLayout>(id)
+        fun money(activity: MainActivity, value: Long) = activity.getString(R.string.ils_amount,
+            BudgetAmounts.number(value, activity.resources.configuration.locales[0]))
+        fun rowAmount(activity: MainActivity, container: Int, key: String?): String =
+            (0 until rows(activity, container).childCount).map { rows(activity, container).getChildAt(it) }
+                .single { it.tag == key }.findViewById<TextView>(R.id.breakdownAmount).text.toString()
+        awaitUi(screen) { rows(it, R.id.categorySummaryRows).childCount == 3 && rows(it, R.id.sourceSummaryRows).childCount == 2 }
+        screen.onActivity {
+            assertEquals(money(it, 300), rowAmount(it, R.id.categorySummaryRows, null))
+            assertEquals(money(it, 100), rowAmount(it, R.id.categorySummaryRows, catA.id))
+            assertEquals(money(it, 200), rowAmount(it, R.id.categorySummaryRows, catB.id))
+            assertEquals(money(it, 400), rowAmount(it, R.id.sourceSummaryRows, a.id))
+            assertEquals(money(it, 200), rowAmount(it, R.id.sourceSummaryRows, b.id))
+            assertEquals(3, rows(it, R.id.expenseRows).childCount)
+            assertFalse(it.findViewById<View>(R.id.previousMonth).isEnabled)
+            assertFalse(it.findViewById<View>(R.id.nextMonth).isEnabled)
+        }
+        success(app.repository.correctExpenseAmount(first.id, 400))
+        awaitUi(screen) { rowAmount(it, R.id.categorySummaryRows, catA.id) == money(it, 400) }
+        screen.onActivity {
+            assertEquals(BudgetAmounts.number(900, it.resources.configuration.locales[0]), it.findViewById<TextView>(R.id.homeTotal).text.toString())
+            assertEquals(money(it, 700), rowAmount(it, R.id.sourceSummaryRows, a.id))
+            assertEquals(money(it, -400), it.findViewById<TextView>(R.id.homeBudgetRemaining).text.toString())
+            assertEquals(3, rows(it, R.id.expenseRows).childCount)
+        }
+        success(app.repository.updateSourceAndAdjustAllocation(a.id, "Renamed", period, 100))
+        awaitUi(screen) {
+            val group = rows(it, R.id.sourceSummaryRows).getChildAt(0)
+            group.findViewById<TextView>(R.id.breakdownName).text.toString() == "Renamed" &&
+                (controller.state.value as? PersistentDataState.Ready)?.snapshot?.totalAllocatedMinor == 600L
+        }
+        screen.onActivity {
+            assertEquals(money(it, 700), rowAmount(it, R.id.sourceSummaryRows, a.id))
+            assertEquals(money(it, -300), it.findViewById<TextView>(R.id.homeBudgetRemaining).text.toString())
+            assertEquals(money(it, 600), it.findViewById<TextView>(R.id.budgetAllocatedTotal).text.toString())
+            val homeRows = rows(it, R.id.budgetBreakdownRows)
+            assertTrue((homeRows.getChildAt(0) as android.widget.LinearLayout).getChildAt(0).let { view -> (view as TextView).text.contains("Renamed") })
+            assertEquals(money(it, -100), ((homeRows.getChildAt(0) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
+            assertEquals(money(it, -200), ((homeRows.getChildAt(1) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
+            val list = rows(it, R.id.expenseRows)
+            val correctedRow = (0 until list.childCount).map(list::getChildAt).single { view -> view.tag == first.id } as TextView
+            assertTrue(correctedRow.text.contains(money(it, 400)))
+            assertTrue(correctedRow.text.contains("Renamed"))
+            it.findViewById<View>(R.id.addExpense).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        screen.onActivity {
+            val root = rootWith(R.id.amount)!!
+            root.findViewById<EditText>(R.id.amount).setText("1.23")
+            root.findViewById<EditText>(R.id.expenseNote).setText("Keep")
+            root.findViewById<android.widget.LinearLayout>(R.id.expenseSourceChoices).getChildAt(0).performClick()
+        }
+        val draft = controller.expenseCreationState.value!!.draft
+        success(app.repository.renameSource(a.id, "Renamed again"))
+        success(app.repository.createCategory("New choice"))
+        screen.onActivity { controller.selectNextPeriod() }
+        awaitUi(screen) {
+            (controller.state.value as? PersistentDataState.Ready)?.snapshot?.period != period &&
+                controller.state.value is PersistentDataState.Ready &&
+                (controller.sources.value as? SourceListState.Ready)?.sources?.any { source -> source.name == "Renamed again" } == true
+        }
+        screen.onActivity {
+            assertEquals(draft, controller.expenseCreationState.value!!.draft)
+            assertEquals(money(it, 0), it.findViewById<TextView>(R.id.budgetAllocatedTotal).text.toString())
+            assertEquals(money(it, 700), rowAmount(it, R.id.sourceSummaryRows, a.id))
+            assertEquals(period, (controller.activeBudget.value as PersistentDataState.Ready).snapshot.period)
+            val choices = rootWith(R.id.amount)!!.findViewById<android.widget.LinearLayout>(R.id.expenseSourceChoices)
+            assertTrue((0 until choices.childCount).any { index -> (choices.getChildAt(index) as TextView).text.toString() == "Renamed again" })
+        }
+    }
+
+    @Test fun financialPanelsOwnLoadingEmptyErrorAndIgnoreChoiceListFailures(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 0))
+        val category = success(app.repository.createCategory("Category"))
+        val screen = launch()
+        val controller = model(screen)
+        awaitUi(screen) { controller.activeBudget.value is PersistentDataState.Ready }
+        val empty = success(app.repository.snapshot())
+        success(app.repository.createExpense(NewExpense(29, period.start, source.id, category.id)))
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows).childCount == 1 }
+        val populated = success(app.repository.snapshot())
+        screen.onActivity {
+            var retries = 0
+            val renderer = SummaryBreakdownUi(it.findViewById(R.id.summaryPage)) { retries++ }
+            renderer.render(PersistentDataState.Loading)
+            assertEquals(it.getString(R.string.expenses_loading), it.findViewById<TextView>(R.id.categorySummaryEmpty).text)
+            assertEquals(0, it.findViewById<android.widget.LinearLayout>(R.id.sourceSummaryRows).childCount)
+            renderer.render(PersistentDataState.Failed(DataError.StorageFailure(IllegalStateException("fixture"))))
+            assertEquals(it.getString(R.string.expenses_load_error), it.findViewById<TextView>(R.id.sourceSummaryEmpty).text)
+            it.findViewById<View>(R.id.sourceSummaryEmpty).performClick()
+            assertEquals(1, retries)
+            renderer.render(PersistentDataState.Ready(empty))
+            assertEquals(it.getString(R.string.no_expenses), it.findViewById<TextView>(R.id.categorySummaryEmpty).text)
+            renderer.render(PersistentDataState.Ready(populated))
+            val categoryCallback = MainActivity::class.java.getDeclaredMethod("renderCategoryState", CategoryListState::class.java).apply { isAccessible = true }
+            categoryCallback.invoke(it, CategoryListState.Failed(DataError.StorageFailure(IllegalStateException("choice fixture"))))
+            val sourceCallback = MainActivity::class.java.getDeclaredMethod("renderSources", SourceListState::class.java).apply { isAccessible = true }
+            sourceCallback.invoke(it, SourceListState.Failed(DataError.StorageFailure(IllegalStateException("choice fixture"))))
+            assertEquals(View.GONE, it.findViewById<View>(R.id.categorySummaryEmpty).visibility)
+            assertEquals(View.GONE, it.findViewById<View>(R.id.sourceSummaryEmpty).visibility)
+            assertEquals(1, it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows).childCount)
+        }
+    }
+
+    @Test fun breakdownRowsWrapLongNamesAtPhoneWidthInAllLocalesAndThemes() = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 0))
+        val category = success(app.repository.createCategory("Category"))
+        success(app.repository.createExpense(NewExpense(12345, period.start, source.id, category.id)))
+        val snapshot = success(app.repository.snapshot())
+        val screen = launch()
+        for (language in listOf("he", "ru", "en")) for (night in listOf(false, true)) {
+            app.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE).edit().putBoolean("dark", night).commit()
+            screen.recreate()
+            awaitUi(screen) { (it.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO }
+            lateinit var dialog: androidx.appcompat.app.AlertDialog
+            lateinit var content: android.widget.LinearLayout
+            val longName = when (language) { "he" -> "שם ארוך במיוחד ".repeat(12); "ru" -> "Очень длинное название ".repeat(12); else -> "Very long name ".repeat(12) }
+            screen.onActivity { activity ->
+                val config = Configuration(activity.resources.configuration).apply {
+                    val locale = java.util.Locale.forLanguageTag(language)
+                    setLocale(locale); setLayoutDirection(locale)
+                }
+                val themed = androidx.appcompat.view.ContextThemeWrapper(activity, R.style.AppTheme).apply { applyOverrideConfiguration(config) }
+                content = android.widget.LinearLayout(themed).apply {
+                    orientation = android.widget.LinearLayout.VERTICAL
+                    addView(android.view.LayoutInflater.from(themed).inflate(R.layout.panel_categories, this, false))
+                    addView(android.view.LayoutInflater.from(themed).inflate(R.layout.panel_sources, this, false))
+                }
+                dialog = androidx.appcompat.app.AlertDialog.Builder(themed).setView(android.widget.ScrollView(themed).apply { addView(content) }).create()
+                dialog.showWithRoundedSurface()
+                dialog.window!!.setLayout((320 * activity.resources.displayMetrics.density).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+                SummaryBreakdownUi(content) {}.render(PersistentDataState.Ready(snapshot.copy(
+                    categories = listOf(category.copy(name = longName)),
+                    sources = snapshot.sources.map { it.copy(source = it.source.copy(name = longName)) })))
+            }
+            awaitUi(screen) { content.findViewById<TextView>(R.id.breakdownName)?.layout != null }
+            screen.onActivity {
+                for (container in listOf(R.id.categorySummaryRows, R.id.sourceSummaryRows)) {
+                    val row = content.findViewById<android.widget.LinearLayout>(container).getChildAt(0)
+                    assertFalse(row.isClickable)
+                    assertTrue(row.contentDescription.contains(longName))
+                    for (id in listOf(R.id.breakdownName, R.id.breakdownAmount, R.id.breakdownCount)) {
+                        val text = row.findViewById<TextView>(id)
+                        assertTrue(text.layout.height <= text.height - text.compoundPaddingTop - text.compoundPaddingBottom)
+                        for (line in 0 until text.lineCount) assertTrue(text.layout.getLineWidth(line) <= text.width - text.compoundPaddingLeft - text.compoundPaddingRight + 1)
+                    }
+                    assertEquals(if (language == "he") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR, row.layoutDirection)
+                }
+                dialog.dismiss()
+            }
+        }
+    }
+
     /** Protected system broadcasts cannot be sent by an app. Invoke the registered receiver's
      * callback with a simulated event; never change the user's device clock/zone. */
     private fun dispatchDate(screen: ActivityScenario<MainActivity>, action: String) {

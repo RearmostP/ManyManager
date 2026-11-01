@@ -5,8 +5,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Upsert
 
-/** Storage primitives only. Business operations and screen observation belong to later stages. */
+/** Storage primitives for the repository and isolated fixtures; never injected into screens. */
 @Dao
 abstract class ManyManagerDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -38,6 +39,38 @@ abstract class ManyManagerDao {
     abstract suspend fun allocation(
         calculatorId: String, sourceId: String, periodStartEpochDay: Long
     ): BudgetAllocationEntity?
+
+    @Query("SELECT * FROM categories WHERE calculatorId = :calculatorId ORDER BY rowid")
+    abstract suspend fun categories(calculatorId: String): List<CategoryEntity>
+
+    @Query("SELECT * FROM budget_sources WHERE calculatorId = :calculatorId ORDER BY rowid")
+    abstract suspend fun sources(calculatorId: String): List<BudgetSourceEntity>
+
+    @Query("SELECT * FROM budget_sources WHERE calculatorId = :calculatorId AND id = :id")
+    abstract suspend fun source(calculatorId: String, id: String): BudgetSourceEntity?
+
+    @Query("""
+        SELECT * FROM budget_allocations
+        WHERE calculatorId = :calculatorId AND periodStartEpochDay = :periodStartEpochDay
+    """)
+    abstract suspend fun allocations(
+        calculatorId: String, periodStartEpochDay: Long
+    ): List<BudgetAllocationEntity>
+
+    @Query("""
+        SELECT * FROM expenses WHERE calculatorId = :calculatorId
+        AND dateEpochDay >= :startEpochDay AND dateEpochDay < :endExclusiveEpochDay
+        ORDER BY dateEpochDay, id
+    """)
+    abstract suspend fun expenses(
+        calculatorId: String, startEpochDay: Long, endExclusiveEpochDay: Long
+    ): List<ExpenseEntity>
+
+    @Query("UPDATE budget_sources SET name = :name WHERE calculatorId = :calculatorId AND id = :id")
+    abstract suspend fun renameSource(calculatorId: String, id: String, name: String): Int
+
+    @Upsert
+    abstract suspend fun putAllocation(allocation: BudgetAllocationEntity)
 
     companion object {
         /** Internal identity of the initial local calculator; never derived from a translated label. */

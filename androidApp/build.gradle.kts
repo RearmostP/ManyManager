@@ -19,6 +19,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     testImplementation(libs.junit)
 
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.room.runtime)
     // Align app/test serialization: Room's schema test helper requires JSON/core 1.8.1.
     implementation(platform(libs.kotlinx.serialization.bom))

@@ -1,6 +1,6 @@
 # תוכנית אחסון מתמשך — ManyManager
 
-תוכנית לעשרה שלבים, עם ממצאי הבסיס של שלב 1 ומעקב מימוש של שלבים 2–3.
+תוכנית לעשרה שלבים, עם ממצאי הבסיס של שלב 1 ומעקב מימוש של שלבים 2–4.
 ממצאי הקוד בסעיף הבסיס מתארים את המצב לפני שלב 2; מצב התשתית העדכני מתועד בסוף המסמך.
 שמירת הוצאות וחיבור המסכים למסד עדיין אינם ממומשים.
 
@@ -624,3 +624,161 @@ assembleDebug עבר; כל 33 בדיקות ה־JVM באפליקציה עברו �
 
 אין חסם חדש לפני שלב 4. השלב הבא הוא שכבת הגישה המרכזית, שתעביר את הגדרת
 המחשבון ושעון מוזרק לרכיב הזה ותשתמש בגבולות epoch-day לשאילתות.
+
+## מימוש שלב 4 — שכבת נתונים וגבול ViewModel
+
+**שלב 4 הושלם.** נוסף צינור נתונים מתמשך נפרד, שעדיין אינו מחובר למסכים.
+אין העתקה דו־כיוונית בין המסד לבין BudgetViewModel הזמני, ואין fallback אליו בכשל מסד.
+
+### קבצים ואחריות
+
+נתיבי Kotlin להלן יחסיים ל־androidApp/src/main/kotlin/com/example/manymanager/:
+
+- **data/ManyManagerRepository.kt**: שכבת העסקים מעל Room, קשורה למחשבון המקומי
+  שמתקבל מתוצאת האתחול. אין פרמטר calculatorId חופשי בפעולות שמאפשר למסך לבחור בעלים אחרים.
+  בכל פעולה נקראות מחדש הגדרות המחשבון השמורות בתוך עסקה. IDs של מקורות נבדקים
+  עם calculatorId; שם אינו מפתח יחסים. אין API למחיקה/ארכוב או לשינוי הוצאות.
+- **domain/Models.kt**: Calculator, Category, BudgetSource, Expense (LocalDate וקטגוריה nullable),
+  SourceBudget, CategorySummary, BudgetSnapshot, BudgetAdjustmentPreview,
+  DataResult ו־DataError. אלו אינם Room entities ואין בהם מחרוזות מתורגמות.
+  BudgetSnapshot כולל קטגוריות, מקורות עם allocated/spent/remaining, הוצאות,
+  סכומי התקופה, ספירה וקיבוץ לפי categoryId, כולל null ללא רשומת seed.
+- **domain/BudgetCalculations.kt**: חישוב מקור/סכום/יתרה וקבוצות מתוך העובדות בלבד.
+  צבירה ב־BigInteger מונעת גלישה בתוצאות ביניים, כולל סכומים חתומים שמתקזזים.
+  רק ערכים סופיים שמוחזרים ב־state מומרים ל־Long אחרי בדיקת טווח מפורשת.
+  הבדיקה תואמת minSdk 30 ואינה קוראת ל־BigInteger.longValueExact,
+  הזמין רק מ־[API 31](https://developer.android.com/reference/java/math/BigInteger#longValueExact()).
+  גלישה בערך קבוצה או יתרה מדווחת, גם אם סכום כולל אחר עדיין נכנס ב־Long.
+  אין SQL TOTAL, Double, או טבלת totals/balances.
+- **data/local/ManyManagerDao.kt**: נוספו קריאות scoped לקטגוריות, מקורות, הקצאות
+  והוצאות בטווח; renameSource ו־putAllocation באמצעות Upsert.
+  טווח הוצאות הוא startEpochDay <= dateEpochDay < endExclusiveEpochDay.
+  ה־DAO מקבל גבולות מוכנים; אין בו חישוב תקופה או יום 10.
+  insertExpense הקיים נשאר primitive של אחסון לצורכי fixtures, ולא נחשף ב־Repository.
+- **ManyManagerApplication.kt**: בעלות lazy על Repository יחיד מעל המסד הקיים,
+  עם אותו databaseInitialization ו־Clock.systemDefaultZone() בגבול האפליקציה.
+  לא נוסף service locator, DI framework או שינוי לאתחול/ברירות המחדל של CalculatorEntity.
+- **PersistentDataViewModel.kt**: ViewModel חדש וממוקד ו־PersistentDataViewModelFactory
+  המוזרק בבנאי. state הוא Loading/Ready(snapshot)/Failed(error), ולא הצלחה ריקה בכשל.
+  זהו גבול מוכן לצריכת הנתונים בעתיד; MainActivity עדיין יוצר את BudgetViewModel המקורי.
+- Gradle ו־version catalog מוסיפים תלות Android מפורשת ב־lifecycle-viewmodel-ktx **2.11.0**,
+  גרסת lifecycle הקיימת. לא שונו גרסאות כלי בנייה, Room, entities או סכמה 1.
+
+### פעולות ציבוריות
+
+- currentPeriod(), periodContaining(LocalDate): גבולות דרך BudgetPeriodCalculator,
+  לפי ההגדרה השמורה ו־Clock מוזרק. הגדרה לא נתמכת או BudgetPeriod לא קנוני נדחים.
+- observeCategories(), createCategory(name): רשימת קטגוריות ויצירה שמחזירה מזהה/מודל יציב.
+- observeSources(), createSourceWithInitialAllocation(name, period, initialMinor),
+  renameSource(sourceId, name): מקורות קבועים, גם בתקופה שבה אין להם הקצאה.
+- previewBudgetAdjustment(sourceId, period, deltaMinor): תצוגה מקדימה ללא כתיבה.
+  תוצאה חתומה שלילית מותרת ב־preview, כמו בעורך הקיים; היא אינה אישור להקצאה שלילית.
+- updateSourceAndAdjustAllocation(sourceId, name, period, deltaMinor): אישור שינוי שם
+  והפרש תקציב ביחד; נקרא תמיד הערך השמור העדכני ולא ה־preview הישן.
+- snapshot(period?), observeSnapshot(period?): תמונת מצב מלאה. null בוחר את התקופה
+  של היום בכל קריאה/רענון; תקופה מפורשת נשארת הבחירה ההיסטורית של הצרכן.
+  מקורות ללא שורת הקצאה מקבלים אפס, והוצאותיהם עדיין נספרות. כל הוצאה תורמת פעם אחת
+  לסכום הכללי; קבוצות לפי מקור/קטגוריה נגזרות מאותן רשומות.
+
+כל פעולה מחכה להצלחת databaseInitialization של שלב 2, בלי לשכתב הגדרות או לזרוע נתונים.
+שגיאות האתחול שומרות את הסיבה המקורית; אין החלפה ברשימות זמניות או ריקות.
+עבודת האחסון והצבירה רצה על dispatcher מוזרק, כברירת מחדל Dispatchers.IO.
+
+### עסקאות ושגיאות
+
+כל קריאת snapshot או פעולה עסקית מתבצעת ב־Room.withTransaction.
+יצירת מקור + הקצאה ושינוי שם + adjustment הן יחידות אטומיות.
+שמות עוברים trim, ריק נדחה וכפילויות נשארות מותרות.
+סכום הקצאה שלילי, גלישת current+delta או סכום ההקצאות נדחים לפני commit.
+בדיקת סכום ההקצאות נמצאת באותה עסקה שקוראת את המצב העדכני וכותבת אותו,
+ולכן פעולות מקבילות אינן מאבדות הפרשים.
+כשל בכתיבה השנייה מבטל את הראשונה, גם אם rename או insert source כבר בוצעו.
+שינוי תקציב אינו יוצר הוצאה ואינו משנה סכומי תקופות אחרות.
+יתרה שלילית אינה מגבלת כתיבה; לא הוכרעה כאן מדיניות הוצאות שליליות/אפס/החזרים.
+
+DataError מבדיל BlankName, MissingEntity (כולל מזהה זר לאותו מחשבון),
+InvalidPeriod, NegativeAllocatedBudget, AmountOverflow, InitializationFailure ו־StorageFailure.
+הסיבות נשמרות לאבחון, ללא logging של רשומות כספיות. CancellationException תמיד נזרק מחדש,
+גם בהמתנה לאתחול או בזמן פעולה, ולא הופך ל־Failed או להצלחה.
+
+### עקביות ותצפיות
+
+תצפיות ה־Repository הן cold Flow. משתמשים ב־InvalidationTracker.createFlow עם פליטה
+ראשונית ורישום לטבלאות הרלוונטיות לפני קריאה; כל invalidation מפעיל קריאה שלמה בעסקה.
+observeSnapshot מאזין לכל חמש הטבלאות. אין combine בין פליטות נפרדות של שמות,
+הוצאות והקצאות. Room יכול לאחד invalidations, ולכן אין התחייבות לפליטה לכל קליק,
+אבל כל תמונה שנפלטת עקבית פנימית ומייצגת מצב מחויב.
+distinctUntilChanged מסנן תמונות זהות. שגיאת חישוב בתמונה היא Failure מפורש;
+שינוי נתונים תקין יכול להחזיר את אותה תצפית ל־Success.
+כשל שסוגר את זרם האחסון או כשל אתחול דורש רענון/איסוף מחדש, ולא הצלחה מדומה.
+
+StateFlow של ה־ViewModel משתמש ב־flatMapLatest וב־stateIn בתוך viewModelScope,
+עם WhileSubscribed(5000). אין collector פנימי תמידי ללא צרכן ואין collector חדש לכל render.
+selectPeriod(period?) ו־refresh() מפסיקים את התצפית הקודמת ומתחילים אחת חדשה.
+פעולת createCategory מחזירה Job ב־viewModelScope ותוצאה חד־פעמית ב־callback,
+בנפרד מ־state מתמשך; ניקוי ה־ViewModel מבטל פעולות ממתינות ולא קורא callback הצלחה.
+בשלבים הבאים פעולות המקורות יחוברו באותה דרך כשממשק המקורות יועבר.
+
+התקופה הפעילה אינה נשמרת לצמיתות. קריאה/רענון נעזרים ב־Clock שסופק; אין scheduler.
+בעת חיבור המסכים, הצרכן אחראי ל־repeatOnLifecycle, ל־refresh ב־resume/מעבר תאריך
+ולטיפול בשינוי אזור זמן בגבול שעון האפליקציה. השעון הראשוני משתמש באזור המקומי,
+ללא UTC לתאריכי חשבונאות. מעברי יום ללא invalidation במסד אינם יוצרים פליטה מעצמם.
+מקורות תכנון: [Room invalidations](https://developer.android.com/reference/kotlin/androidx/room/InvalidationTracker),
+[ViewModel factory](https://developer.android.com/topic/libraries/architecture/viewmodel/viewmodel-factories).
+
+### מסירה מדויקת לשלב 5
+
+1. ליצור PersistentDataViewModel דרך ה־factory עם Application.repository,
+   ולא לתת DAO/Room למסכי התצוגה. לאסוף state באופן תלוי lifecycle.
+   אפשר להוסיף state ממוקד של observeCategories לגבול ה־ViewModel עבור מסכי הקטגוריות,
+   כדי שכשל חישוב כספי לא ימנע הצגת רשימת קטגוריות תקינה.
+2. להעביר באותו שינוי את כל קריאות הקטגוריות ואת שתי כתיבות היצירה:
+   מסך קטגוריות ו־„＋ New category” בגיליון. להוציא את BudgetViewModel.categories/addCategory
+   ואת ExpenseUiData.categories ממסלול הקטגוריות; אין שיקוף חזרה למפה זמנית או fallback.
+3. CategoryManagementUi ו־ExpenseSheetDialog יקבלו מודלי Category/בחירה לפי id.
+   להחליף גם השוואות הדגשה לפי text ולהחזיק categoryId בטיוטה וב־Bundle.
+   עדכוני אפשרויות ייעשו בלי לבנות מחדש amount/date/source/note.
+4. אישור יצירה מחכה לתוצאת createCategory; רק בהצלחה בוחרים את ה־id שחזר וסוגרים
+   את דיאלוג הקטגוריה. אם emission הרשימה מגיע אחר כך, שומרים את הבחירה ומרנדרים
+   אותה כשהרשימה מתעדכנת. אין אובדן טיוטה בזמן loading/failure.
+   Cancel/Back ושינוי locale/theme שומרים את חוזה הטיוטה הקיים.
+5. לעדכן רק את קריאות נוכחות הקטגוריות בסיכום. המקורות, ההקצאות וכל הוצאות ה־UI
+   נשארים זמניים עד שלבי ההעברה שלהם; אין להזין אותם מה־snapshot המתמשך בשלב 5.
+   לעדכן אז את קטגוריות preview-model בדפדפן וה־overlay לפי מזהים, כמתוכנן.
+
+### בדיקות שלב 4 ותוצאות
+
+- androidApp/src/test/kotlin/com/example/manymanager/domain/BudgetCalculationsTest.kt:
+  6 בדיקות JVM לצבירה מדויקת, קיבוץ לפי IDs/null, ספירה ללא כפל, אפס הקצאה,
+  יתרה שלילית וגלישה בקבוצות/יתרה/סכום, כולל ביטול גלישת ביניים.
+- androidApp/src/androidTest/kotlin/com/example/manymanager/data/ManyManagerRepositoryTest.kt:
+  22 בדיקות מול Room/SQLite אמיתי ובדיקות גבול ViewModel. מכוסות יצירה ותצפית,
+  duplicate names, rollback בעזרת triggers של fixtures שנכשלים בכתיבה השנייה,
+  בידוד מחשבון, גבולות 10–9, preview ללא כתיבה, אישור מול ערך עדכני,
+  30 adjustments מקבילים, תקופות אחרות, תמונות עקביות תחת כתיבות מרובות,
+  null category, יתרה שלילית ללא חסימת adjustment, overflow והתאוששות מתצפית Failure,
+  המתנה/כשל אתחול וביטול coroutine, loading/data/error ב־ViewModel,
+  ביטול ב־clear, בחירת תקופה ורענון מהשעון.
+- רשומות fixtures של הוצאות מוכנסות באמצעות DAO/SQL רק בתוך androidTest. לא נוספה
+  פעולת שמירת/עריכת/מחיקת הוצאה ל־Repository או ל־UI.
+
+הורצה בהצלחה הפקודה (עם JDK/launcher כפי שתועדו בשלב 2):
+
+```powershell
+.\gradlew.bat :androidApp:assembleDebug :androidApp:testDebugUnitTest :androidApp:connectedDebugAndroidTest :androidApp:lintDebug
+```
+
+**תוצאות:** בניית Android עברה; כל 39 בדיקות ה־JVM עברו (33 קודמות ו־6 חדשות);
+כל 34 בדיקות המכשיר עברו ב־SM-S928B עם Android 17 (22 חדשות ו־12 בדיקות סכמה/מסד קודמות).
+אין failures, errors או skipped בדוחות הבדיקות שנבדקו. גם lintDebug עבר ללא errors;
+דוח lint כולל 54 אזהרות בפרויקט. הבדיקה נוספה לאחר איתור דרישת API 31 של
+BigInteger.longValueExact והחלפתה בבדיקת טווח המתאימה ל־API 30.
+לא הורצו בדיקות במכשיר API 30, ולכן אימות התאימות אליו בשלב זה הוא סטטי.
+בדיקות shared לא הורצו מחדש בשלב זה.
+נבדק שאין diff ב־Entities, בסכמה המיוצאת, ב־MainActivity/BudgetViewModel או ב־ui-reference.
+אין אימות חזותי או end-to-end של המסכים במסגרת שלב תשתית זה.
+
+המסכים עדיין פועלים עם המודלים הזמניים, כולל טיוטת הוצאה ופעולות הדיאלוגים.
+שמירת הוצאה עדיין מושבתת. הדפדפן נשאר preview בזיכרון.
+אין חסם מוצר קונקרטי לפני שלב 5; החלטות מחיקה/ארכוב ומדיניות סכומי הוצאה נשארות
+לפני חשיפת הפעולות הרלוונטיות בהמשך.

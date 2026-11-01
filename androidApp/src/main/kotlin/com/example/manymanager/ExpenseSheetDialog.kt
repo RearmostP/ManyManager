@@ -26,42 +26,22 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import kotlin.math.min
 
-/** Form values and choices are independent of rendered views and survive configuration changes. */
-class ExpenseDraft(
-    var amount: String = "",
-    var date: String? = null,
-    var note: String = "",
-    var categoryId: String? = null,
-    var sourceId: String? = null,
-) {
-    fun toBundle() = Bundle().apply {
-        putString("amount", amount)
-        putString("date", date)
-        putString("note", note)
-        putString("categoryId", categoryId)
-        putString("sourceId", sourceId)
-    }
-
-    companion object {
-        fun fromBundle(bundle: Bundle) = ExpenseDraft(
-            bundle.getString("amount").orEmpty(),
-            bundle.getString("date"),
-            bundle.getString("note").orEmpty(),
-            bundle.getString("categoryId"),
-            bundle.getString("sourceId"),
-        )
-    }
-}
-
 /** Slides only the expense sheet away, leaving the Activity beneath it in place. */
 class ExpenseSheetDialog(
     activity: Activity, date: LocalDate,
     categories: CategoryListState, sources: SourceListState,
-    val draft: ExpenseDraft,
+    draft: ExpenseDraft,
+    private val onDraftChanged: (ExpenseDraft) -> Unit = {},
+    private val onSubmit: () -> Unit = {},
     private val onRetryCategories: () -> Unit = {},
     private val onRetrySources: () -> Unit = {},
     onAddCategory: () -> Unit,
 ) : Dialog(activity) {
+    var draft: ExpenseDraft = draft
+        private set
+    private var operation = ExpenseCreationState(draft)
+    private var rendering = false
+    private var datePicker: android.app.DatePickerDialog? = null
     private val resources get() = context.resources
     private val host: FrameLayout
     private var sheetView: View? = null
@@ -109,27 +89,83 @@ class ExpenseSheetDialog(
             setDecorFitsSystemWindows(false)
         }
 
-        if (draft.date == null) {
-            draft.date = date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
-                .withLocale(resources.configuration.locales[0]))
-        }
+
         content.findViewById<EditText>(R.id.amount).apply {
             setText(draft.amount)
-            doAfterTextChanged { draft.amount = it.toString() }
+            doAfterTextChanged { if (!rendering) changeDraft(this@ExpenseSheetDialog.draft.copy(amount = it.toString())) }
         }
         content.findViewById<EditText>(R.id.expenseDate).apply {
-            setText(draft.date)
-            doAfterTextChanged { draft.date = it.toString() }
+            keyListener = null
+            isFocusable = true
+            setOnClickListener {
+                if (operation.submitting || operation.interrupted) return@setOnClickListener
+                val selected = this@ExpenseSheetDialog.draft.date ?: date
+                datePicker = android.app.DatePickerDialog(context, { _, year, month, day ->
+                    changeDraft(this@ExpenseSheetDialog.draft.copy(date = LocalDate.of(year, month + 1, day)))
+                }, selected.year, selected.monthValue - 1, selected.dayOfMonth).also { it.show() }
+            }
         }
         content.findViewById<EditText>(R.id.expenseNote).apply {
             setText(draft.note)
-            doAfterTextChanged { draft.note = it.toString() }
+            doAfterTextChanged { if (!rendering) changeDraft(this@ExpenseSheetDialog.draft.copy(note = it.toString())) }
         }
-        // Expense saving is not implemented.
-        content.findViewById<View>(R.id.saveExpense).isEnabled = false
+        content.findViewById<View>(R.id.saveExpense).setOnClickListener { if (!isDismissing) onSubmit() }
         renderCategories(categories)
         renderSources(sources)
         content.findViewById<View>(R.id.expenseNewCategory).setOnClickListener { onAddCategory() }
+    }
+
+    private fun changeDraft(value: ExpenseDraft) {
+        draft = value
+        onDraftChanged(value)
+    }
+
+    fun renderOperation(state: ExpenseCreationState, canSave: Boolean) {
+        operation = state
+        draft = state.draft
+        val content = sheetView ?: return
+        rendering = true
+        content.findViewById<EditText>(R.id.amount).apply {
+            if (text.toString() != draft.amount) setText(draft.amount)
+        }
+        content.findViewById<EditText>(R.id.expenseNote).apply {
+            if (text.toString() != draft.note) setText(draft.note)
+        }
+        content.findViewById<EditText>(R.id.expenseDate).apply {
+            setText(draft.date?.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
+                .withLocale(resources.configuration.locales[0])).orEmpty())
+            contentDescription = context.getString(R.string.expense_date) + ": " + text
+        }
+        rendering = false
+        val parsed = BudgetAmounts.positive(draft.amount)
+        val locked = state.submitting || state.interrupted
+        listOf(R.id.amount, R.id.expenseNote, R.id.expenseDate, R.id.expenseNewCategory).forEach {
+            content.findViewById<View>(it).isEnabled = !locked
+        }
+        for (id in listOf(R.id.expenseSourceChoices, R.id.expenseCategoryChoices)) {
+            val choices = content.findViewById<LinearLayout>(id)
+            for (index in 0 until choices.childCount) choices.getChildAt(index).isEnabled = !locked
+        }
+        content.findViewById<View>(R.id.closeDialog).isEnabled = !state.submitting
+        setCancelable(!state.submitting)
+        setCanceledOnTouchOutside(!state.submitting)
+        content.findViewById<TextView>(R.id.saveExpense).apply {
+            isEnabled = canSave
+            alpha = if (canSave) 1f else 0.45f
+            setText(if (state.submitting) R.string.expense_saving else R.string.save_expense)
+        }
+        content.findViewById<TextView>(R.id.expenseOperationStatus).apply {
+            val message = when {
+                state.interrupted -> R.string.expense_save_interrupted
+                state.error != null -> expenseErrorMessage(state.error)
+                draft.date == null -> R.string.expense_invalid_date
+                draft.amount.isNotEmpty() && parsed is com.example.manymanager.domain.DataResult.Failure ->
+                    expenseErrorMessage(parsed.error)
+                else -> null
+            }
+            visibility = if (message == null) View.GONE else View.VISIBLE
+            message?.let { setText(it) }
+        }
     }
 
     /** Refreshes only category choices, leaving every other draft field and its view intact. */
@@ -146,7 +182,7 @@ class ExpenseSheetDialog(
         val container = content.findViewById<LinearLayout>(R.id.expenseCategoryChoices)
         container.removeAllViews()
         if (state is CategoryListState.Ready) {
-            bindChoices(container, state.categories.map { it.id to it.name }, false)
+            bindChoices(container, listOf(null to context.getString(R.string.uncategorized)) + state.categories.map { it.id to it.name }, false)
         }
     }
 
@@ -171,13 +207,13 @@ class ExpenseSheetDialog(
     }
 
     fun selectCategory(id: String, state: CategoryListState) {
-        draft.categoryId = id
+        changeDraft(this@ExpenseSheetDialog.draft.copy(categoryId = id))
         // The creation result may arrive before the list emission. Keep the ID in that race.
         renderCategories(state)
     }
 
     private fun bindChoices(
-        container: LinearLayout, options: List<Pair<String, String>>, sourceChoices: Boolean
+        container: LinearLayout, options: List<Pair<String?, String>>, sourceChoices: Boolean
     ) {
         options.forEach { (id, name) ->
             container.addView(TextView(context, null, 0, R.style.Text).apply {
@@ -193,7 +229,8 @@ class ExpenseSheetDialog(
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
-                    if (sourceChoices) draft.sourceId = id else draft.categoryId = id
+                    if (operation.submitting || operation.interrupted) return@setOnClickListener
+                    changeDraft(if (sourceChoices) draft.copy(sourceId = id) else draft.copy(categoryId = id))
                     for (index in 0 until container.childCount) {
                         (container.getChildAt(index) as TextView).apply {
                             val selected = tag == id
@@ -213,7 +250,7 @@ class ExpenseSheetDialog(
         var startY = 0f
         var dragging = false
         handle.setOnTouchListener { view, event ->
-            if (isDismissing) return@setOnTouchListener true
+            if (isDismissing || operation.submitting) return@setOnTouchListener true
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     content.animate().cancel()
@@ -269,6 +306,7 @@ class ExpenseSheetDialog(
     }
 
     override fun dismiss() {
+        if (operation.submitting) return
         if (isDismissing) return
         val sheet = sheetView
         if (!isShowing || sheet == null || !sheet.isAttachedToWindow ||
@@ -292,6 +330,8 @@ class ExpenseSheetDialog(
 
     /** Used when the Activity replaces its UI or is destroyed; never leave a window behind. */
     fun dismissImmediately() {
+        datePicker?.dismiss()
+        datePicker = null
         openingDraw?.removeListener()
         openingDraw = null
         sheetView?.animate()?.cancel()

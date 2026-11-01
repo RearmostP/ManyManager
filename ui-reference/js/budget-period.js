@@ -1,5 +1,16 @@
 // Civil dates only. Never convert accounting boundaries through UTC timestamps.
 export const PERIOD_START_DAY=10;
+export function civilDate(date){
+  return `${String(date.getFullYear()).padStart(4,"0")}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
+export function parseCivilDate(text){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(text))return null;
+  const [year,month,day]=text.split("-").map(Number);
+  if(year<1)return null;
+  const date=new Date(year,month-1,day);
+  date.setFullYear(year);
+  return civilDate(date)===text?date:null;
+}
 export function periodFor(date){
   const start=new Date(date.getFullYear(),date.getMonth()-(date.getDate()<PERIOD_START_DAY?1:0),PERIOD_START_DAY);
   return {start,endExclusive:new Date(start.getFullYear(),start.getMonth()+1,PERIOD_START_DAY)};

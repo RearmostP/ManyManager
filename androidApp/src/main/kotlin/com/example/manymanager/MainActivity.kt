@@ -49,6 +49,8 @@ class MainActivity : AppCompatActivity() {
             (application as ManyManagerApplication).repository
         ))[PersistentDataViewModel::class.java]
     }
+    private var correctionDialog: ExpenseCorrectionDialog? = null
+    private var allExpensesUi: AllExpensesUi? = null
     private var categoryDialog: CategoryCreationDialog? = null
     private var sourceCreationDialog: SourceCreationDialog? = null
     private var sourceEditingDialog: SourceEditingDialog? = null
@@ -89,6 +91,8 @@ class MainActivity : AppCompatActivity() {
                 launch { persistentViewModel.categoryCreation.collect(::renderCategoryCreation) }
                 launch { persistentViewModel.sourceCreationState.collect(::renderSourceCreation) }
                 launch { persistentViewModel.sourceEditingState.collect(::renderSourceEditing) }
+                launch { persistentViewModel.expenseCreationState.collect(::renderExpenseCreation) }
+                launch { persistentViewModel.expenseCorrectionState.collect(::renderExpenseCorrection) }
             }
         }
     }
@@ -256,10 +260,14 @@ class MainActivity : AppCompatActivity() {
                 alpha = 0.45f
             }
         }
+        allExpensesUi = AllExpensesUi(findViewById(R.id.allPanel), ::showExpenseCorrection, persistentViewModel::refresh)
         selectPage(page)
         selectTab(tab)
-        savedInstanceState?.getBundle("expenseDraft")?.let { draft ->
-            showExpense(ExpenseDraft.fromBundle(draft))
+        savedInstanceState?.getBundle("expenseCreation")?.let {
+            persistentViewModel.restoreExpenseCreation(ExpenseCreationState.fromBundle(it))
+        }
+        savedInstanceState?.getBundle("expenseCorrection")?.let {
+            ExpenseCorrectionState.fromBundle(it)?.let(persistentViewModel::restoreExpenseCorrection)
         }
         if (savedInstanceState?.containsKey("pageScrollY") != true &&
             page == 2 && R.id.languageDetails in expanded
@@ -284,6 +292,8 @@ class MainActivity : AppCompatActivity() {
         renderActiveBudget(persistentViewModel.activeBudget.value)
         renderSources(persistentViewModel.sources.value)
         renderCategoryState(persistentViewModel.categories.value)
+        renderExpenseCreation(persistentViewModel.expenseCreationState.value)
+        renderExpenseCorrection(persistentViewModel.expenseCorrectionState.value)
         renderCategoryCreation(persistentViewModel.categoryCreation.value)
         renderSourceCreation(persistentViewModel.sourceCreationState.value)
         renderSourceEditing(persistentViewModel.sourceEditingState.value)
@@ -424,6 +434,9 @@ class MainActivity : AppCompatActivity() {
     private fun renderActiveBudget(state: PersistentDataState) {
         if (!contentReady) return
         homeBudgetUi?.renderState(state, budgetState.breakdownExpanded, persistentViewModel::refresh)
+        allExpensesUi?.render(state)
+        bindCategorySummary(persistentViewModel.categories.value)
+        renderSources(persistentViewModel.sources.value)
         val snapshot = (state as? PersistentDataState.Ready)?.snapshot
         val total = snapshot?.let { BudgetAmounts.number(it.totalSpentMinor, resources.configuration.locales[0]) } ?: "—"
         findViewById<TextView>(R.id.homeTotal).text = total
@@ -446,8 +459,9 @@ class MainActivity : AppCompatActivity() {
     private fun renderSources(state: SourceListState) {
         if (!contentReady) return
         expenseDialog?.renderSources(state)
+        renderExpenseCreation(persistentViewModel.expenseCreationState.value)
         findViewById<TextView>(R.id.sourceSummaryEmpty).apply {
-            setText(state.statusMessage() ?: R.string.no_expenses)
+            setText(state.statusMessage() ?: if ((persistentViewModel.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.expenseCount?.let { it > 0 } == true) R.string.breakdown_pending else R.string.no_expenses)
             setOnClickListener { persistentViewModel.retrySources() }
             isClickable = state is SourceListState.Failed
             isFocusable = isClickable
@@ -543,12 +557,13 @@ class MainActivity : AppCompatActivity() {
         if (!contentReady) return
         categoryManagementUi?.render(state)
         expenseDialog?.renderCategories(state)
+        renderExpenseCreation(persistentViewModel.expenseCreationState.value)
         bindCategorySummary(state)
     }
 
     private fun bindCategorySummary(state: CategoryListState) {
         findViewById<TextView>(R.id.categorySummaryEmpty).apply {
-            setText(state.statusMessage() ?: R.string.no_expenses)
+            setText(state.statusMessage() ?: if ((persistentViewModel.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.expenseCount?.let { it > 0 } == true) R.string.breakdown_pending else R.string.no_expenses)
             setOnClickListener { persistentViewModel.retryCategories() }
             isClickable = state is CategoryListState.Failed
             isFocusable = state is CategoryListState.Failed
@@ -569,6 +584,7 @@ class MainActivity : AppCompatActivity() {
         val created = (state.result as? DataResult.Success)?.value
         if (created != null) {
             if (state.fromExpense) {
+                persistentViewModel.selectExpenseCategory(created.id)
                 expenseDialog?.selectCategory(created.id, persistentViewModel.categories.value)
             }
             categoryDialog?.dispose()
@@ -598,6 +614,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun dismissActiveDialogImmediately() {
+        expenseDialog?.setOnDismissListener(null)
+        correctionDialog?.dispose()
+        correctionDialog = null
         categoryDialog?.dispose()
         categoryDialog = null
         sourceCreationDialog?.dispose()
@@ -615,31 +634,92 @@ class MainActivity : AppCompatActivity() {
         activeDialog = null
     }
 
-    private fun showExpense() = showExpense(ExpenseDraft())
-
-    private fun showExpense(draft: ExpenseDraft) {
+    private fun showExpense() {
         dismissActiveDialogImmediately()
-        lateinit var dialog: ExpenseSheetDialog
-        dialog = ExpenseSheetDialog(this, currentDate,
-            persistentViewModel.categories.value, persistentViewModel.sources.value, draft,
-            onRetryCategories = persistentViewModel::retryCategories,
-            onRetrySources = persistentViewModel::retrySources
-        ) { showAddCategory(dialog) }
-        expenseDialog = dialog
-        activeDialog = dialog
-        dialog.setOnDismissListener {
-            if (activeDialog === dialog) activeDialog = null
-            if (expenseDialog === dialog) expenseDialog = null
+        persistentViewModel.beginExpenseCreation(LocalDate.now())
+        renderExpenseCreation(persistentViewModel.expenseCreationState.value)
+    }
+
+    private fun inspectExpenses() {
+        persistentViewModel.refresh()
+        navigateToPage(1)
+        selectTab(2)
+    }
+
+    private fun renderExpenseCreation(state: ExpenseCreationState?) {
+        if (!contentReady || isFinishing || isDestroyed) return
+        if (state == null || state.saved) {
+            expenseDialog?.setOnDismissListener(null)
+            expenseDialog?.dismissImmediately()
+            if (activeDialog === expenseDialog) activeDialog = null
+            expenseDialog = null
+            if (state?.saved == true) persistentViewModel.acknowledgeExpenseCreation()
+            return
         }
-        dialog.show()
+        if (expenseDialog == null) {
+            lateinit var dialog: ExpenseSheetDialog
+            dialog = ExpenseSheetDialog(this, currentDate,
+                persistentViewModel.categories.value, persistentViewModel.sources.value, state.draft,
+                onDraftChanged = persistentViewModel::updateExpenseDraft,
+                onSubmit = { persistentViewModel.submitExpenseCreation() },
+                onRetryCategories = persistentViewModel::retryCategories,
+                onRetrySources = persistentViewModel::retrySources
+            ) { showAddCategory(dialog) }
+            expenseDialog = dialog
+            activeDialog = dialog
+            dialog.setOnDismissListener {
+                val unknown = persistentViewModel.expenseCreationState.value?.interrupted == true
+                if (activeDialog === dialog) activeDialog = null
+                if (expenseDialog === dialog) expenseDialog = null
+                persistentViewModel.cancelExpenseCreation()
+                if (unknown) inspectExpenses()
+            }
+            dialog.show()
+        }
+        expenseDialog?.renderOperation(state, persistentViewModel.canSaveExpense())
+    }
+
+    private fun showExpenseCorrection(expense: com.example.manymanager.domain.Expense) {
+        dismissActiveDialogImmediately()
+        persistentViewModel.beginExpenseCorrection(expense)
+        renderExpenseCorrection(persistentViewModel.expenseCorrectionState.value)
+    }
+
+    private fun renderExpenseCorrection(state: ExpenseCorrectionState?) {
+        if (!contentReady || isFinishing || isDestroyed) return
+        if (state == null || state.saved) {
+            correctionDialog?.dispose()
+            if (activeDialog === correctionDialog?.dialog) activeDialog = null
+            correctionDialog = null
+            if (state?.saved == true) persistentViewModel.acknowledgeExpenseCorrection()
+            return
+        }
+        if (correctionDialog == null) {
+            val window = ExpenseCorrectionDialog(this,
+                persistentViewModel::updateExpenseCorrectionAmount,
+                { persistentViewModel.submitExpenseCorrection() },
+                {
+                    val unknown = persistentViewModel.expenseCorrectionState.value?.interrupted == true
+                    persistentViewModel.cancelExpenseCorrection()
+                    if (unknown) inspectExpenses()
+                })
+            correctionDialog = window
+            activeDialog = window.dialog
+            window.show()
+        }
+        correctionDialog?.render(state)
     }
 
     private fun saveUiState(outState: Bundle) {
         val hierarchy = SparseArray<Parcelable>()
         findViewById<View>(R.id.windowRoot).saveHierarchyState(hierarchy)
         outState.putSparseParcelableArray("viewHierarchy", hierarchy)
-        expenseDialog?.takeIf { it.isShowing }
-            ?.let { outState.putBundle("expenseDraft", it.draft.toBundle()) }
+        persistentViewModel.expenseCreationState.value?.let {
+            outState.putBundle("expenseCreation", it.toBundle())
+        }
+        persistentViewModel.expenseCorrectionState.value?.let {
+            outState.putBundle("expenseCorrection", it.toBundle())
+        }
         persistentViewModel.categoryCreation.value?.let {
             outState.putBundle("categoryCreation", it.toBundle())
         }

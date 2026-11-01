@@ -220,7 +220,7 @@ class BudgetLifecycleTest {
         dispatchDate(screen, Intent.ACTION_DATE_CHANGED)
         awaitUi(screen) {
             val home = controller.activeBudget.value as? PersistentDataState.Ready
-            home?.snapshot?.period?.start != old.start
+            home != null && home.snapshot.period.start != old.start
         }
         val home = (controller.activeBudget.value as PersistentDataState.Ready).snapshot
         assertEquals(0L, home.totalAllocatedMinor)
@@ -428,6 +428,169 @@ class BudgetLifecycleTest {
         awaitUi(screen) {
             (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.totalSpentMinor == 0L
         }
+    }
+
+    @Test fun expenseSaveRecreationCategoryDraftAndAmountCorrection() = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createSourceWithInitialAllocation("Cash", period, 0))
+        val screen = launch()
+        val controller = model(screen)
+        awaitUi(screen) { controller.sources.value is SourceListState.Ready && controller.categories.value is CategoryListState.Ready }
+        screen.onActivity { it.findViewById<View>(R.id.addExpense).performClick() }
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        screen.onActivity {
+            val root = rootWith(R.id.amount)!!
+            root.findViewById<EditText>(R.id.amount).setText("12.34")
+            root.findViewById<EditText>(R.id.expenseNote).setText("Keep note")
+            root.findViewById<android.widget.LinearLayout>(R.id.expenseSourceChoices).getChildAt(0).performClick()
+            root.findViewById<View>(R.id.expenseNewCategory).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.categoryNameInput) != null }
+        screen.onActivity {
+            rootWith(R.id.categoryNameInput)!!.findViewById<EditText>(R.id.categoryNameInput).setText("Food")
+            controller.submitCategoryCreation()
+        }
+        awaitUi(screen) { controller.expenseCreationState.value?.draft?.categoryId != null && rootWith(R.id.categoryNameInput) == null }
+        val draft = controller.expenseCreationState.value!!.draft
+        assertEquals("12.34", draft.amount)
+        assertEquals("Keep note", draft.note)
+        assertEquals(source.id, draft.sourceId)
+        assertNotNull(draft.date)
+        screen.recreate()
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        assertEquals(draft, controller.expenseCreationState.value!!.draft)
+        val (release, held) = gate()
+        screen.onActivity {
+            val save = rootWith(R.id.amount)!!.findViewById<View>(R.id.saveExpense)
+            assertTrue(save.isEnabled)
+            save.performClick(); save.performClick()
+        }
+        awaitUi(screen) { controller.expenseCreationState.value?.submitting == true }
+        screen.recreate()
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        screen.onActivity {
+            assertFalse(rootWith(R.id.amount)!!.findViewById<View>(R.id.saveExpense).isEnabled)
+            assertNull(controller.submitExpenseCreation())
+            controller.cancelExpenseCreation()
+            assertTrue(controller.expenseCreationState.value!!.submitting)
+        }
+        screen.onActivity {
+            val config = Configuration(it.resources.configuration)
+            config.uiMode = config.uiMode xor Configuration.UI_MODE_NIGHT_MASK
+            it.onConfigurationChanged(config)
+        }
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        assertEquals(draft, controller.expenseCreationState.value!!.draft)
+        release.complete(Unit); held.join()
+        awaitUi(screen) { controller.expenseCreationState.value == null && rootWith(R.id.amount) == null }
+        // New draft follows the actual current civil date, not the injected accounting clock.
+        val savedPeriod = success(app.repository.periodContaining(draft.date!!))
+        val saved = success(app.repository.snapshot(savedPeriod)).expenses.single()
+        assertEquals(1234L, saved.amountMinor)
+        assertEquals(draft.categoryId, saved.categoryId)
+        // Render the real active list using the same date through the test application's boundary clock.
+        app.clock.now = draft.date.atTime(12, 0).atZone(app.clock.zone).toInstant()
+        screen.onActivity { controller.refresh() }
+        awaitUi(screen) { (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.expenseCount == 1 }
+        screen.onActivity {
+            it.findViewById<View>(R.id.menuButton).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.nav1) != null }
+        screen.onActivity { rootWith(R.id.nav1)!!.findViewById<View>(R.id.nav1).performClick() }
+        awaitUi(screen) { it.findViewById<View>(R.id.summaryPage).isShown }
+        screen.onActivity { it.findViewById<View>(R.id.allTab).performClick() }
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).childCount == 1 }
+        screen.onActivity { it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).getChildAt(0).performClick() }
+        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
+        screen.onActivity {
+            rootWith(R.id.expenseCorrectionAmount)!!.findViewById<EditText>(R.id.expenseCorrectionAmount).setText("9.87")
+            controller.cancelExpenseCorrection()
+        }
+        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) == null }
+        assertEquals(saved, success(app.repository.snapshot(savedPeriod)).expenses.single())
+        screen.onActivity { it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).getChildAt(0).performClick() }
+        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
+        screen.onActivity { rootWith(R.id.expenseCorrectionAmount)!!.findViewById<EditText>(R.id.expenseCorrectionAmount).setText("9.87") }
+        screen.recreate()
+        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
+        app.database.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_correction BEFORE UPDATE ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
+        screen.onActivity {
+            assertEquals("9.87", rootWith(R.id.expenseCorrectionAmount)!!.findViewById<EditText>(R.id.expenseCorrectionAmount).text.toString())
+            controller.submitExpenseCorrection()
+            assertNull(controller.submitExpenseCorrection())
+        }
+        awaitUi(screen) { controller.expenseCorrectionState.value?.error is DataError.StorageFailure }
+        assertEquals(saved, success(app.repository.snapshot(savedPeriod)).expenses.single())
+        assertEquals("9.87", controller.expenseCorrectionState.value!!.amountText)
+        app.database.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_correction")
+        val (releaseCorrection, heldCorrection) = gate()
+        try {
+            screen.onActivity { controller.submitExpenseCorrection() }
+            screen.recreate()
+            awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
+            screen.onActivity {
+                assertFalse(rootWith(R.id.expenseCorrectionAmount)!!.findViewById<View>(android.R.id.button1).isEnabled)
+                assertNull(controller.submitExpenseCorrection())
+            }
+        } finally { releaseCorrection.complete(Unit); heldCorrection.join() }
+        awaitUi(screen) { controller.expenseCorrectionState.value == null }
+        val corrected = saved.copy(amountMinor = 987)
+        assertEquals(corrected, success(app.repository.snapshot(savedPeriod)).expenses.single())
+        screen.onActivity {
+            controller.restoreExpenseCorrection(ExpenseCorrectionState.fromBundle(
+                ExpenseCorrectionState(corrected, "2", submitting = true).toBundle())!!)
+        }
+        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
+        screen.onActivity {
+            assertFalse(rootWith(R.id.expenseCorrectionAmount)!!.findViewById<View>(android.R.id.button1).isEnabled)
+            assertNull(controller.submitExpenseCorrection())
+        }
+        assertEquals(corrected, success(app.repository.snapshot(savedPeriod)).expenses.single())
+    }
+
+    @Test fun failedExpenseWritePreservesInputAndUnknownRestoreCannotSubmit() = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        success(app.repository.createSourceWithInitialAllocation("Cash", period, 0))
+        val screen = launch()
+        val controller = model(screen)
+        awaitUi(screen) { controller.sources.value is SourceListState.Ready }
+        screen.onActivity { it.findViewById<View>(R.id.addExpense).performClick() }
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        screen.onActivity {
+            val root = rootWith(R.id.amount)!!
+            root.findViewById<EditText>(R.id.amount).setText("1.01")
+            root.findViewById<EditText>(R.id.expenseNote).setText("retry")
+            root.findViewById<android.widget.LinearLayout>(R.id.expenseSourceChoices).getChildAt(0).performClick()
+        }
+        val draft = controller.expenseCreationState.value!!.draft
+        app.database.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_expense BEFORE INSERT ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
+        screen.onActivity { controller.submitExpenseCreation() }
+        awaitUi(screen) { controller.expenseCreationState.value?.error is DataError.StorageFailure }
+        assertEquals(draft, controller.expenseCreationState.value!!.draft)
+        screen.recreate()
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        assertEquals(draft, controller.expenseCreationState.value!!.draft)
+        app.database.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_expense")
+        screen.onActivity { controller.submitExpenseCreation() }
+        awaitUi(screen) { controller.expenseCreationState.value == null && rootWith(R.id.amount) == null }
+        app.clock.now = draft.date!!.atTime(12, 0).atZone(app.clock.zone).toInstant()
+        screen.onActivity { controller.refresh() }
+        awaitUi(screen) { (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.expenseCount == 1 }
+        screen.onActivity {
+            val row = it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).getChildAt(0) as TextView
+            assertTrue(row.text.contains(it.getString(R.string.uncategorized)))
+            assertEquals("1.01", it.findViewById<TextView>(R.id.homeTotal).text.toString())
+        }
+        screen.onActivity {
+            controller.restoreExpenseCreation(ExpenseCreationState.fromBundle(ExpenseCreationState(draft, submitting = true).toBundle()))
+        }
+        awaitUi(screen) { rootWith(R.id.expenseOperationStatus) != null }
+        screen.onActivity {
+            assertFalse(rootWith(R.id.amount)!!.findViewById<View>(R.id.saveExpense).isEnabled)
+            assertNull(controller.submitExpenseCreation())
+            assertTrue(rootWith(R.id.expenseOperationStatus)!!.findViewById<TextView>(R.id.expenseOperationStatus).text.isNotBlank())
+        }
+        assertEquals(1, success(app.repository.snapshot(success(app.repository.periodContaining(draft.date!!)))).expenseCount)
     }
 
     /** Protected system broadcasts cannot be sent by an app. Invoke the registered receiver's

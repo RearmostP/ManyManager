@@ -104,14 +104,14 @@ class BudgetHomeUi(
                     )
 
                     addView(TextView(context, null, 0, R.style.Text).apply {
-                        text = sourceBudget.source.name
+                        text = context.getString(R.string.source_remaining, sourceBudget.source.name)
                         textSize = 14f
                         setTextColor(context.getColor(R.color.text))
                         layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                     })
 
                     addView(TextView(context, null, 0, R.style.Text).apply {
-                        text = money(sourceBudget.allocatedMinor)
+                        text = money(sourceBudget.remainingMinor)
                         textSize = 14f
                         setTextColor(context.getColor(R.color.muted))
                         textDirection = View.TEXT_DIRECTION_LTR

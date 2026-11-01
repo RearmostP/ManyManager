@@ -88,5 +88,19 @@
   "update_budget": "עדכון תקציב",
   "budget_plus_symbol": "+",
   "budget_minus_symbol": "−",
-  "budget_period_description": "מ־%1$s עד %2$s"
+  "budget_period_description": "מ־%1$s עד %2$s",
+  "uncategorized": "ללא קטגוריה",
+  "expense_positive_amount": "יש להזין סכום גדול מאפס, עם עד שתי ספרות אחרי הנקודה",
+  "expense_amount_overflow": "הסכום או הסכומים המצטברים גדולים מדי",
+  "expense_invalid_date": "יש לבחור תאריך תקין",
+  "expense_missing_choice": "יש לבחור מקור תקציב קיים וקטגוריה קיימת או ללא קטגוריה",
+  "expense_save_error": "שמירת ההוצאה נכשלה. הערכים נשמרו בטופס; אפשר לנסות שוב.",
+  "expense_saving": "שומר…",
+  "expense_save_interrupted": "תוצאת השמירה הקודמת אינה ידועה. אי אפשר לשלוח שוב מטופס זה. יש לסגור ולבדוק את כל ההוצאות לפני התחלת פעולה חדשה.",
+  "correct_expense_amount": "תיקון סכום הוצאה",
+  "confirm_amount_correction": "עדכון סכום",
+  "expenses_loading": "טוען הוצאות…",
+  "expenses_load_error": "טעינת ההוצאות נכשלה. לחץ לניסיון חוזר.",
+  "breakdown_pending": "הפירוט אינו זמין עדיין",
+  "source_remaining": "%1$s · נותר"
 }

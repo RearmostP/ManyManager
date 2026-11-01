@@ -1,0 +1,82 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="google" content="notranslate">
+<base href="../">
+<title>Expense companion checks — stage 8</title>
+<h1>Expense companion checks — stage 8</h1><pre id="results">Running…</pre>
+<script type="module">
+import {civilDate,parseCivilDate,periodKey} from "../js/budget-period.js";
+import {previewModel,addCategory,addSource,createExpense,correctExpenseAmount,snapshotFor,parseAmount} from "../js/preview-model.js";
+import {state,closeOverlay} from "../js/state.js";
+import {beginCategoryCreation,confirmCategoryCreation} from "../js/components/category-dialog.js";
+import {expense,canSaveExpense} from "../js/components/expense-sheet.js";
+import {expenseCorrection} from "../js/components/expense-correction.js";
+import {summary} from "../js/screens/summary.js";
+import {home} from "../js/screens/home.js";
+import {loadLanguage} from "../js/i18n.js";
+const results=[];
+function check(value,label){if(!value)throw Error(label);results.push("PASS "+label)}
+try {
+ await loadLanguage("en");state.language="en";
+ const today=new Date(2026,10,10);state.currentDate=today;
+ const source=addSource("Same",today,0),second=addSource("Same",today,0),category=addCategory("Food");
+ check(parseAmount("0.29")===29&&parseAmount("1,23")===123,"exact minor units");
+ check(parseCivilDate("2026-02-30")===null&&civilDate(today)==="2026-11-10","strict civil dates");
+ const original=createExpense({amountMinor:123,date:"2026-11-10",sourceId:source.id,categoryId:category.id,note:"keep"});
+ check(original&&snapshotFor(today).remaining===-123,"positive expense permits overspending zero allocation");
+ const nullable=createExpense({amountMinor:7,date:"2026-11-10",sourceId:second.id,categoryId:null});
+ check(nullable&&nullable.categoryId===null,"uncategorized expense accepted");
+ check(!createExpense({amountMinor:0,date:"2026-11-10",sourceId:source.id})&&!createExpense({amountMinor:-1,date:"2026-11-10",sourceId:source.id}),"zero and negative rejected");
+ check(!createExpense({amountMinor:1,date:"2026-11-10",sourceId:"missing"})&&!createExpense({amountMinor:1,date:"2026-11-10",sourceId:source.id,categoryId:"missing"}),"relationships required");
+ check(!createExpense({amountMinor:1,date:"2026-02-30",sourceId:source.id}),"invalid date rejected");
+ const historical=createExpense({amountMinor:99,date:"2026-11-09",sourceId:source.id});
+ check(snapshotFor(today).expenses.length===2&&snapshotFor(new Date(2026,10,9)).expenses[0].id===historical.id,"9/10 date period isolation");
+ const before={...original};
+ check(correctExpenseAmount(original.id,456)&&JSON.stringify(original)===JSON.stringify({...before,amountMinor:456}),"correction changes only amount and keeps identity");
+ check(snapshotFor(today).spent===463&&snapshotFor(today).expenses.length===2,"derived totals no double counting");
+ check(!correctExpenseAmount(original.id,0)&&original.amountMinor===456,"failed correction unchanged");
+ const size=previewModel.expenses.length;
+ check(!createExpense({amountMinor:Number.MAX_SAFE_INTEGER,date:"2026-11-10",sourceId:source.id})&&previewModel.expenses.length===size,"creation overflow atomic");
+ check(!correctExpenseAmount(original.id,Number.MAX_SAFE_INTEGER)&&original.amountMinor===456,"correction overflow atomic");
+ state.expenseDraft={amount:"1.01",date:"2026-11-10",note:"draft",sourceId:second.id,categoryId:null};state.overlay="expense";
+ check(canSaveExpense(),"save availability with nullable category");
+ beginCategoryCreation();state.categoryDraft="New";check(confirmCategoryCreation(),"category inside draft");
+ check(state.expenseDraft.amount==="1.01"&&state.expenseDraft.date==="2026-11-10"&&state.expenseDraft.note==="draft"&&state.expenseDraft.sourceId===second.id,"complete draft retained");
+ const host=document.createElement("div");host.innerHTML=expense();
+ check(host.querySelector("#expense-date").type==="date"&&!host.querySelector('[data-action="save-expense"]').disabled,"date picker and enabled save");
+ state.tab=2;host.innerHTML=summary();
+ check(host.querySelectorAll('[data-action="correct-expense"]').length===2&&host.textContent.includes("Uncategorized")&&host.textContent.includes("keep"),"recognizable all-expense rows");
+ check(home().includes("remaining")&&home().includes("4.63"),"home shares derived facts");
+ state.correctionDraft={id:original.id,amount:"3.21"};state.overlay="correct-expense";host.innerHTML=expenseCorrection();
+ check(host.querySelectorAll("input").length===1&&!host.querySelector('[data-action="confirm-expense-correction"]').disabled,"only amount editable");
+ closeOverlay();check(original.amountMinor===456,"cancel does not mutate");
+ state.expenseDraft.amount="0";check(!canSaveExpense(),"zero disables save");
+ state.expenseDraft.amount="1";state.expenseDraft.sourceId=null;check(!canSaveExpense(),"source required");
+ for(const language of ["he","ru","en"]){await loadLanguage(language);state.language=language;check(!summary().includes(">uncategorized<"),language+" translation")}
+ // Exercise the real app.js event handlers in an independent in-memory frame.
+ const frame=document.createElement("iframe");frame.src="index.html";frame.style="width:390px;height:850px";document.body.append(frame);
+ const wait=async condition=>{const until=performance.now()+10000;while(!condition()){if(performance.now()>until)throw Error("app event timeout");await new Promise(resolve=>setTimeout(resolve,20))}};
+ await wait(()=>frame.contentDocument?.querySelector('[data-action="expense"]'));
+ const doc=frame.contentDocument;
+ const click=selector=>{const element=doc.querySelector(selector);if(!element)throw Error("Missing "+selector);element.click()};
+ const type=(selector,value)=>{const element=doc.querySelector(selector);element.value=value;element.dispatchEvent(new frame.contentWindow.Event("input",{bubbles:true}))};
+ click("#menu-button");click('[data-action="navigate"][data-index="3"]');click('[data-action="add-source"]');
+ type("#source-name","Event cash");type("#source-initial","0");click('[data-action="confirm-add-source"]');
+ click("#menu-button");click('[data-action="navigate"][data-index="0"]');click('[data-action="expense"]');
+ type("#amount","12.34");type("#expense-note","event note");click('[data-action="expense-source"]');
+ const date=doc.querySelector("#expense-date").value;
+ click('[data-action="add-category"]');type("#category-name","Event category");click('[data-action="confirm-category"]');
+ check(doc.querySelector("#amount").value==="12.34"&&doc.querySelector("#expense-note").value==="event note"&&doc.querySelector("#expense-date").value===date,"app events preserve category draft");
+ check(!doc.querySelector('[data-action="save-expense"]').disabled,"app events enable save");
+ click('[data-action="save-expense"]');
+ check(!doc.querySelector("#amount")&&doc.querySelector(".amount-display").textContent.includes("12.34"),"app events commit and refresh home");
+ click("#menu-button");click('[data-action="navigate"][data-index="1"]');click('[data-action="tab"][data-index="2"]');
+ check(doc.querySelectorAll('[data-action="correct-expense"]').length===1,"app events populate expense list once");
+ click('[data-action="correct-expense"]');type("#correction-amount","2.01");click('.dialog-actions [data-action="close-overlay"]');
+ check(doc.querySelector('[data-action="correct-expense"]').textContent.includes("12.34"),"app correction cancel");
+ click('[data-action="correct-expense"]');type("#correction-amount","2.01");click('[data-action="confirm-expense-correction"]');
+ check(doc.querySelector('[data-action="correct-expense"]').textContent.includes("2.01")&&doc.querySelectorAll('[data-action="correct-expense"]').length===1,"app correction confirm updates same row");
+ frame.remove();
+ document.getElementById("results").textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
+}catch(error){document.getElementById("results").textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}
+</script>

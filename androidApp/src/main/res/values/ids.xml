@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="categoryNameInput" type="id" />
+    <item name="expenseCorrectionAmount" type="id" />
+    <item name="expenseCorrectionStatus" type="id" />
 </resources>

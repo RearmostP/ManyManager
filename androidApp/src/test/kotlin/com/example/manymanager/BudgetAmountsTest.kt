@@ -5,6 +5,15 @@ import org.junit.Test
 import java.util.Locale
 
 class BudgetAmountsTest {
+    @Test fun expenseAmountErrorsDistinguishInvalidNonpositiveAndOverflow() {
+        fun error(value: String) = (BudgetAmounts.positive(value) as com.example.manymanager.domain.DataResult.Failure).error
+        assertEquals(com.example.manymanager.domain.DataError.NonPositiveAmount, error("0"))
+        assertEquals(com.example.manymanager.domain.DataError.NonPositiveAmount, error("-1"))
+        assertEquals(com.example.manymanager.domain.DataError.InvalidAmount, error("1.234"))
+        assertEquals(com.example.manymanager.domain.DataError.AmountOverflow, error("92233720368547758.08"))
+        assertEquals(com.example.manymanager.domain.DataResult.Success(29L), BudgetAmounts.positive("0.29"))
+    }
+
     @Test fun acceptsZeroAndExactDecimalAmounts() {
         assertEquals(0L, BudgetAmounts.parse("0"))
         assertEquals(12345L, BudgetAmounts.parse("123.45"))

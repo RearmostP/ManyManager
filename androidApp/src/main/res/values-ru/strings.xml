@@ -101,4 +101,18 @@
     <string name="review_saved_budget">Закрыть и проверить данные</string>
     <string name="budget_preview_error">Не удалось загрузить предпросмотр. Нажмите, чтобы повторить.</string>
     <string name="budget_period_description">С %1$s по %2$s</string>
+    <string name="uncategorized">Без категории</string>
+    <string name="expense_positive_amount">Введите сумму больше нуля, не более двух знаков после запятой</string>
+    <string name="expense_amount_overflow">Сумма или итоговые значения слишком велики</string>
+    <string name="expense_invalid_date">Выберите корректную дату</string>
+    <string name="expense_missing_choice">Выберите существующий источник и категорию или «Без категории»</string>
+    <string name="expense_save_error">Не удалось сохранить расход. Введённые данные сохранены; можно повторить.</string>
+    <string name="expense_saving">Сохранение…</string>
+    <string name="expense_save_interrupted">Результат предыдущего сохранения неизвестен. Повторная отправка недоступна. Закройте форму и проверьте все расходы перед новой операцией.</string>
+    <string name="correct_expense_amount">Исправить сумму расхода</string>
+    <string name="confirm_amount_correction">Обновить сумму</string>
+    <string name="expenses_loading">Загрузка расходов…</string>
+    <string name="expenses_load_error">Не удалось загрузить расходы. Нажмите, чтобы повторить.</string>
+    <string name="breakdown_pending">Разбивка пока недоступна</string>
+    <string name="source_remaining">%1$s · остаток</string>
 </resources>

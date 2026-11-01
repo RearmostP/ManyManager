@@ -88,5 +88,19 @@
   "update_budget": "Update budget",
   "budget_plus_symbol": "+",
   "budget_minus_symbol": "−",
-  "budget_period_description": "From %1$s through %2$s"
+  "budget_period_description": "From %1$s through %2$s",
+  "uncategorized": "Uncategorized",
+  "expense_positive_amount": "Enter an amount greater than zero with up to two decimal places",
+  "expense_amount_overflow": "The amount or resulting totals are too large",
+  "expense_invalid_date": "Choose a valid date",
+  "expense_missing_choice": "Choose an existing budget source and an existing category or Uncategorized",
+  "expense_save_error": "Could not save expense. Your input is preserved; you can retry.",
+  "expense_saving": "Saving…",
+  "expense_save_interrupted": "The previous save outcome is unknown. This form cannot be submitted again. Close it and inspect All expenses before starting a new operation.",
+  "correct_expense_amount": "Correct expense amount",
+  "confirm_amount_correction": "Update amount",
+  "expenses_loading": "Loading expenses…",
+  "expenses_load_error": "Could not load expenses. Tap to retry.",
+  "breakdown_pending": "Breakdown is not available yet",
+  "source_remaining": "%1$s · remaining"
 }

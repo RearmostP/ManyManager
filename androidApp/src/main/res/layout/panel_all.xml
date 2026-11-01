@@ -33,4 +33,5 @@
         android:textSize="13sp"
         android:textColor="@color/muted"
         android:id="@+id/expensesEmpty" />
+    <LinearLayout android:id="@+id/expenseRows" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" />
 </LinearLayout>

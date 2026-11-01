@@ -88,5 +88,19 @@
   "update_budget": "Обновить бюджет",
   "budget_plus_symbol": "+",
   "budget_minus_symbol": "−",
-  "budget_period_description": "С %1$s по %2$s"
+  "budget_period_description": "С %1$s по %2$s",
+  "uncategorized": "Без категории",
+  "expense_positive_amount": "Введите сумму больше нуля, не более двух знаков после запятой",
+  "expense_amount_overflow": "Сумма или итоговые значения слишком велики",
+  "expense_invalid_date": "Выберите корректную дату",
+  "expense_missing_choice": "Выберите существующий источник и категорию или «Без категории»",
+  "expense_save_error": "Не удалось сохранить расход. Введённые данные сохранены; можно повторить.",
+  "expense_saving": "Сохранение…",
+  "expense_save_interrupted": "Результат предыдущего сохранения неизвестен. Повторная отправка недоступна. Закройте форму и проверьте все расходы перед новой операцией.",
+  "correct_expense_amount": "Исправить сумму расхода",
+  "confirm_amount_correction": "Обновить сумму",
+  "expenses_loading": "Загрузка расходов…",
+  "expenses_load_error": "Не удалось загрузить расходы. Нажмите, чтобы повторить.",
+  "breakdown_pending": "Разбивка пока недоступна",
+  "source_remaining": "%1$s · остаток"
 }

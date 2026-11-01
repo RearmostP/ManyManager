@@ -31,9 +31,17 @@ data class BudgetAdjustmentPreview(
     val deltaMinor: Long, val resultingAllocatedMinor: Long,
 )
 
-enum class EntityKind { CALCULATOR, CATEGORY, SOURCE }
+data class NewExpense(
+    val amountMinor: Long, val date: LocalDate, val sourceId: String,
+    val categoryId: String? = null, val note: String? = null,
+)
+
+enum class EntityKind { CALCULATOR, CATEGORY, SOURCE, EXPENSE }
 
 sealed interface DataError {
+    data object InvalidAmount : DataError
+    data object NonPositiveAmount : DataError
+    data object InvalidDate : DataError
     data object BlankName : DataError
     data class MissingEntity(val kind: EntityKind, val id: String) : DataError
     data object InvalidPeriod : DataError

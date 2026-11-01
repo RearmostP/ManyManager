@@ -5,6 +5,7 @@ export const state={
   history:[],expanded:new Set(),budgetExpanded:false,
   currentDate:new Date(),budgetMonth:periodFor(new Date()).start,
   expenseDraft:{amount:"",date:"",note:"",categoryId:null,sourceId:null},
+  correctionDraft:null,
   categoryDraft:"",categoryReturnOverlay:null,
   sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
   dialogMonth:null

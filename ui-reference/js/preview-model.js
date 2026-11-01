@@ -1,14 +1,15 @@
-// Temporary companion to the Android ViewModel. No disk storage or expense mutation.
+// Isolated in-memory companion. All preview data resets on reload.
 export const previewModel={
   categories:[],
   sources:[],
   allocations:new Map(),
-  expenseTotal:0,
+  expenses:[],
+  nextExpenseId:1,
   nextCategoryId:1,
   nextSourceId:1
 };
 
-import {periodKey} from "./budget-period.js";
+import {periodKey,parseCivilDate} from "./budget-period.js";
 
 export function amountFor(date,sourceId){
   return previewModel.allocations.get(periodKey(date))?.get(sourceId)??0;
@@ -21,8 +22,48 @@ export function totalFor(date){
 export function parseAmount(text){
   const value=text.trim().replace(",",".");
   if(!/^(?:\d+(?:\.\d{1,2})?|\.\d{1,2})$/.test(value))return null;
-  const cents=Math.round(Number(value)*100);
-  return Number.isSafeInteger(cents)?cents:null;
+  const [whole,fraction=""]=value.split(".");
+  const cents=BigInt(whole||"0")*100n+BigInt(fraction.padEnd(2,"0"));
+  return cents<=BigInt(Number.MAX_SAFE_INTEGER)?Number(cents):null;
+}
+
+function safe(value){
+  if(value>BigInt(Number.MAX_SAFE_INTEGER)||value<BigInt(Number.MIN_SAFE_INTEGER))throw new RangeError("overflow");
+  return Number(value);
+}
+export function snapshotFor(date,expenses=previewModel.expenses){
+  const key=periodKey(date);
+  const selected=expenses.filter(item=>periodKey(parseCivilDate(item.date))===key)
+    .sort((a,b)=>b.date.localeCompare(a.date)||a.id.localeCompare(b.id));
+  const spent=safe(selected.reduce((sum,item)=>sum+BigInt(item.amountMinor),0n));
+  const allocated=totalFor(date);
+  const sources=previewModel.sources.map(source=>{
+    const sourceSpent=safe(selected.filter(item=>item.sourceId===source.id).reduce((sum,item)=>sum+BigInt(item.amountMinor),0n));
+    return {source,remaining:safe(BigInt(amountFor(date,source.id))-BigInt(sourceSpent))};
+  });
+  for(const id of new Set(selected.map(item=>item.categoryId))){
+    safe(selected.filter(item=>item.categoryId===id).reduce((sum,item)=>sum+BigInt(item.amountMinor),0n));
+  }
+  return {expenses:selected,spent,allocated,remaining:safe(BigInt(allocated)-BigInt(spent)),sources};
+}
+export function createExpense(input){
+  const date=parseCivilDate(input.date);
+  if(!Number.isSafeInteger(input.amountMinor)||input.amountMinor<=0||!date||
+    !previewModel.sources.some(item=>item.id===input.sourceId)||
+    (input.categoryId!=null&&!previewModel.categories.some(item=>item.id===input.categoryId)))return null;
+  const expense={id:`expense-${previewModel.nextExpenseId}`,amountMinor:input.amountMinor,
+    date:input.date,sourceId:input.sourceId,categoryId:input.categoryId??null,note:input.note||null};
+  try{snapshotFor(date,[...previewModel.expenses,expense])}catch{return null}
+  previewModel.expenses.push(expense);previewModel.nextExpenseId++;
+  return expense;
+}
+export function correctExpenseAmount(id,amountMinor){
+  const original=previewModel.expenses.find(item=>item.id===id);
+  if(!original||!Number.isSafeInteger(amountMinor)||amountMinor<=0)return false;
+  const candidate=previewModel.expenses.map(item=>item.id===id?{...item,amountMinor}:item);
+  try{snapshotFor(parseCivilDate(original.date),candidate)}catch{return false}
+  original.amountMinor=amountMinor;
+  return true;
 }
 
 export function addCategory(name){

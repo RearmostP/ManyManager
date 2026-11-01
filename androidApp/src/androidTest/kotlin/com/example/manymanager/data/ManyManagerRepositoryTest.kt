@@ -378,11 +378,11 @@ class ManyManagerRepositoryTest {
     }
 
     @Test fun expenseDraftAndCategoryCreationStateBundleSaveRestore() {
-        val draft = ExpenseDraft("150.00", "10/11/2026", "Groceries", "cat-123", "src-456")
+        val draft = ExpenseDraft("150.00", LocalDate.of(2026, 11, 10), "Groceries", "cat-123", "src-456")
         val bundle = draft.toBundle()
         val restoredDraft = ExpenseDraft.fromBundle(bundle)
         assertEquals("150.00", restoredDraft.amount)
-        assertEquals("10/11/2026", restoredDraft.date)
+        assertEquals(LocalDate.of(2026, 11, 10), restoredDraft.date)
         assertEquals("Groceries", restoredDraft.note)
         assertEquals("cat-123", restoredDraft.categoryId)
         assertEquals("src-456", restoredDraft.sourceId)
@@ -766,6 +766,114 @@ class ManyManagerRepositoryTest {
             disk.close()
             context.deleteDatabase(file)
         }
+    }
+
+    @Test fun positiveExpensesWithAndWithoutCategoryUseDatePeriodAndAllowOverspending() = runBlocking {
+        val source = success(repository.createSourceWithInitialAllocation("Cash", period, 0))
+        val category = success(repository.createCategory("Food"))
+        val before = success(repository.createExpense(NewExpense(123, period.start.minusDays(1), source.id, category.id, "note")))
+        val current = success(repository.createExpense(NewExpense(7, period.start, source.id)))
+        val currentSnapshot = snapshot()
+        assertEquals(listOf(current), currentSnapshot.expenses)
+        assertEquals(7L, currentSnapshot.totalSpentMinor)
+        assertEquals(-7L, currentSnapshot.remainingMinor)
+        assertEquals(-7L, currentSnapshot.sources.single().remainingMinor)
+        assertEquals(0L, currentSnapshot.totalAllocatedMinor)
+        val previous = success(repository.snapshot(BudgetPeriodCalculator(10, clock).previous(period)))
+        assertEquals(listOf(before), previous.expenses)
+        assertEquals(123L, previous.categoryBreakdown.single().spentMinor)
+    }
+
+    @Test fun expenseValidationRejectsNonpositiveMissingAndForeignRelationships() = runBlocking {
+        val source = success(repository.createSourceWithInitialAllocation("Cash", period, 0))
+        assertEquals(DataError.NonPositiveAmount, error(repository.createExpense(NewExpense(0, period.start, source.id))))
+        assertEquals(DataError.NonPositiveAmount, error(repository.createExpense(NewExpense(-1, period.start, source.id))))
+        assertEquals(DataError.MissingEntity(EntityKind.SOURCE, "missing"),
+            error(repository.createExpense(NewExpense(1, period.start, "missing"))))
+        database.openHelper.writableDatabase.execSQL("INSERT INTO calculators (id, periodStartDay, currencyCode) VALUES ('foreign', 10, 'ILS')")
+        database.dao().insertSource(BudgetSourceEntity("foreign", "foreign-source", "Cash"))
+        database.dao().insertCategory(CategoryEntity("foreign", "foreign-category", "Food"))
+        assertEquals(DataError.MissingEntity(EntityKind.SOURCE, "foreign-source"),
+            error(repository.createExpense(NewExpense(1, period.start, "foreign-source"))))
+        assertEquals(DataError.MissingEntity(EntityKind.CATEGORY, "foreign-category"),
+            error(repository.createExpense(NewExpense(1, period.start, source.id, "foreign-category"))))
+        database.dao().insertExpense(ExpenseEntity("foreign", "foreign-expense", 1, period.startEpochDay, null, "foreign-source"))
+        assertEquals(DataError.MissingEntity(EntityKind.EXPENSE, "foreign-expense"),
+            error(repository.correctExpenseAmount("foreign-expense", 2)))
+        assertTrue(snapshot().expenses.isEmpty())
+    }
+
+    @Test fun correctionUpdatesOnlySameRecordAndObservationNeverDoubleCounts() = runBlocking {
+        val source = success(repository.createSourceWithInitialAllocation("Cash", period, 1000))
+        val category = success(repository.createCategory("Food"))
+        val original = success(repository.createExpense(NewExpense(123, period.start, source.id, category.id, "keep")))
+        val emissions = Channel<BudgetSnapshot>(Channel.UNLIMITED)
+        val observer = launch { repository.observeSnapshot(period).collect { if (it is DataResult.Success) emissions.send(it.value) } }
+        assertEquals(123L, withTimeout(10000) { emissions.receive() }.totalSpentMinor)
+        val corrected = success(repository.correctExpenseAmount(original.id, 456))
+        assertEquals(original.copy(amountMinor = 456), corrected)
+        val updated = withTimeout(10000) {
+            var value = emissions.receive()
+            while (value.totalSpentMinor != 456L) value = emissions.receive()
+            value
+        }
+        assertEquals(listOf(corrected), updated.expenses)
+        assertEquals(1, updated.expenseCount)
+        assertEquals(1000L, updated.totalAllocatedMinor)
+        assertEquals(544L, updated.remainingMinor)
+        observer.cancelAndJoin()
+        assertEquals(DataError.NonPositiveAmount, error(repository.correctExpenseAmount(original.id, 0)))
+        assertEquals(corrected, snapshot().expenses.single())
+    }
+
+    @Test fun expenseOverflowAndStorageFailuresRollbackCreationAndCorrection() = runBlocking {
+        val source = success(repository.createSourceWithInitialAllocation("Cash", period, 0))
+        val first = success(repository.createExpense(NewExpense(Long.MAX_VALUE - 1, period.start, source.id)))
+        val second = success(repository.createExpense(NewExpense(1, period.start, source.id)))
+        assertEquals(DataError.AmountOverflow, error(repository.createExpense(NewExpense(1, period.start, source.id))))
+        assertEquals(DataError.AmountOverflow, error(repository.correctExpenseAmount(second.id, 2)))
+        assertEquals(setOf(first, second), snapshot().expenses.toSet())
+        database.openHelper.writableDatabase.execSQL("CREATE TRIGGER reject_expense BEFORE UPDATE ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
+        assertTrue(error(repository.correctExpenseAmount(second.id, 3)) is DataError.StorageFailure)
+        assertEquals(second, snapshot().expenses.single { it.id == second.id })
+        database.openHelper.writableDatabase.execSQL("CREATE TRIGGER reject_insert BEFORE INSERT ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
+        assertTrue(error(repository.createExpense(NewExpense(1, period.start.minusDays(1), source.id))) is DataError.StorageFailure)
+        assertEquals(2, snapshot().expenseCount)
+    }
+
+    @Test fun savedExpenseAndCorrectionSurviveIsolatedFileDatabaseReopen() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = "expense-reopen-${java.util.UUID.randomUUID()}.db"
+        var disk = Room.databaseBuilder(context, ManyManagerDatabase::class.java, file).build()
+        try {
+            fun repo(db: ManyManagerDatabase) = ManyManagerRepository(db, initialization, clock)
+            disk.dao().initializeLocalCalculator()
+            val source = success(repo(disk).createSourceWithInitialAllocation("Cash", period, 0))
+            val expense = success(repo(disk).createExpense(NewExpense(999, period.start, source.id, note = "durable")))
+            success(repo(disk).correctExpenseAmount(expense.id, 1001))
+            disk.close()
+            disk = Room.databaseBuilder(context, ManyManagerDatabase::class.java, file).build()
+            assertEquals(listOf(expense.copy(amountMinor = 1001)), success(repo(disk).snapshot(period)).expenses)
+        } finally { disk.close(); context.deleteDatabase(file) }
+    }
+
+    @Test fun expenseOperationBundleNeverReplaysUnknownSubmission() = runBlocking {
+        val draft = ExpenseDraft("1.23", period.start, "keep", null, "source")
+        val restored = ExpenseCreationState.fromBundle(ExpenseCreationState(draft, submitting = true).toBundle())
+        assertEquals(draft, restored.draft)
+        assertTrue(restored.interrupted)
+        val store = ViewModelStore()
+        try {
+            withContext(Dispatchers.Main) {
+                val vm = ViewModelProvider(store, PersistentDataViewModelFactory(repository))[PersistentDataViewModel::class.java]
+                vm.restoreExpenseCreation(restored)
+                assertNull(vm.submitExpenseCreation())
+                assertFalse(vm.canSaveExpense())
+                vm.updateExpenseDraft(draft.copy(amount = "9"))
+                assertEquals(draft, vm.expenseCreationState.value!!.draft)
+            }
+        } finally { withContext(Dispatchers.Main) { store.clear() } }
+        assertTrue(snapshot().expenses.isEmpty())
     }
 
     private suspend fun fixtureExpense(

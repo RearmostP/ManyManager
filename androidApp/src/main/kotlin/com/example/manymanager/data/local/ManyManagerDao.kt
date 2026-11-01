@@ -60,7 +60,7 @@ abstract class ManyManagerDao {
     @Query("""
         SELECT * FROM expenses WHERE calculatorId = :calculatorId
         AND dateEpochDay >= :startEpochDay AND dateEpochDay < :endExclusiveEpochDay
-        ORDER BY dateEpochDay, id
+        ORDER BY dateEpochDay DESC, id
     """)
     abstract suspend fun expenses(
         calculatorId: String, startEpochDay: Long, endExclusiveEpochDay: Long
@@ -68,6 +68,9 @@ abstract class ManyManagerDao {
 
     @Query("UPDATE budget_sources SET name = :name WHERE calculatorId = :calculatorId AND id = :id")
     abstract suspend fun renameSource(calculatorId: String, id: String, name: String): Int
+
+    @Query("UPDATE expenses SET amountMinor = :amountMinor WHERE calculatorId = :calculatorId AND id = :id")
+    abstract suspend fun correctExpenseAmount(calculatorId: String, id: String, amountMinor: Long): Int
 
     @Upsert
     abstract suspend fun putAllocation(allocation: BudgetAllocationEntity)

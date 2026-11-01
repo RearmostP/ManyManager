@@ -101,4 +101,18 @@
     <string name="review_saved_budget">Close and check saved data</string>
     <string name="budget_preview_error">Failed to load preview. Tap to retry.</string>
     <string name="budget_period_description">From %1$s through %2$s</string>
+    <string name="uncategorized">Uncategorized</string>
+    <string name="expense_positive_amount">Enter an amount greater than zero with up to two decimal places</string>
+    <string name="expense_amount_overflow">The amount or resulting totals are too large</string>
+    <string name="expense_invalid_date">Choose a valid date</string>
+    <string name="expense_missing_choice">Choose an existing budget source and an existing category or Uncategorized</string>
+    <string name="expense_save_error">Could not save expense. Your input is preserved; you can retry.</string>
+    <string name="expense_saving">Saving…</string>
+    <string name="expense_save_interrupted">The previous save outcome is unknown. This form cannot be submitted again. Close it and inspect All expenses before starting a new operation.</string>
+    <string name="correct_expense_amount">Correct expense amount</string>
+    <string name="confirm_amount_correction">Update amount</string>
+    <string name="expenses_loading">Loading expenses…</string>
+    <string name="expenses_load_error">Could not load expenses. Tap to retry.</string>
+    <string name="breakdown_pending">Breakdown is not available yet</string>
+    <string name="source_remaining">%1$s · remaining</string>
 </resources>

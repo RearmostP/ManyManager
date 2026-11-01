@@ -58,9 +58,13 @@ class ManyManagerRepository(
     suspend fun snapshot(period: BudgetPeriod? = null): DataResult<BudgetSnapshot> =
         execute { calculator ->
             val selected = resolvePeriod(calculator, period)
+            readSnapshot(calculator, selected)
+        }
+
+    private suspend fun readSnapshot(calculator: CalculatorEntity, selected: BudgetPeriod): BudgetSnapshot {
             val allocations = dao.allocations(calculator.id, selected.startEpochDay)
             if (allocations.any { it.allocatedMinor < 0 }) reject(DataError.NegativeAllocatedBudget)
-            BudgetCalculations.snapshot(
+            return BudgetCalculations.snapshot(
                 calculator.domain(), selected,
                 dao.categories(calculator.id).map { it.domain() },
                 dao.sources(calculator.id).map { it.domain() },
@@ -69,6 +73,37 @@ class ManyManagerRepository(
                     .map { it.domain() },
             )
         }
+
+    /** Date determines the period; validation of all exposed totals happens before commit. */
+    suspend fun createExpense(input: NewExpense): DataResult<Expense> = execute { calculator ->
+        if (input.amountMinor <= 0) reject(DataError.NonPositiveAmount)
+        val period = expensePeriod(calculator, input.date)
+        requireSource(calculator.id, input.sourceId)
+        input.categoryId?.let { id ->
+            if (dao.categories(calculator.id).none { it.id == id })
+                reject(DataError.MissingEntity(EntityKind.CATEGORY, id))
+        }
+        val expense = ExpenseEntity(calculator.id, UUID.randomUUID().toString(), input.amountMinor,
+            input.date.toEpochDay(), input.categoryId, input.sourceId, input.note?.takeIf { it.isNotBlank() })
+        dao.insertExpense(expense)
+        readSnapshot(calculator, period) // Includes per-source/category sums and remaining overflow.
+        expense.domain()
+    }
+
+    /** An UPDATE of one column on the same row, never a replacement/second expense. */
+    suspend fun correctExpenseAmount(expenseId: String, amountMinor: Long): DataResult<Expense> = execute { calculator ->
+        if (amountMinor <= 0) reject(DataError.NonPositiveAmount)
+        val expense = dao.expense(calculator.id, expenseId)
+            ?: reject(DataError.MissingEntity(EntityKind.EXPENSE, expenseId))
+        val period = expensePeriod(calculator, LocalDate.ofEpochDay(expense.dateEpochDay))
+        check(dao.correctExpenseAmount(calculator.id, expenseId, amountMinor) == 1)
+        readSnapshot(calculator, period)
+        expense.copy(amountMinor = amountMinor).domain()
+    }
+
+    private fun expensePeriod(calculator: CalculatorEntity, date: LocalDate): BudgetPeriod =
+        try { configuredCalculator(calculator).periodContaining(date) }
+        catch (_: DateTimeException) { reject(DataError.InvalidDate) }
 
     suspend fun createCategory(name: String): DataResult<Category> = execute { calculator ->
         val category = CategoryEntity(calculator.id, UUID.randomUUID().toString(), cleanName(name))

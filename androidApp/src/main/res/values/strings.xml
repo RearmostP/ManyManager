@@ -101,4 +101,18 @@
     <string name="review_saved_budget">סגירה ובדיקת הנתונים</string>
     <string name="budget_preview_error">טעינת התצוגה המקדימה נכשלה. לחץ לניסיון חוזר.</string>
     <string name="budget_period_description">מ־%1$s עד %2$s</string>
+    <string name="uncategorized">ללא קטגוריה</string>
+    <string name="expense_positive_amount">יש להזין סכום גדול מאפס, עם עד שתי ספרות אחרי הנקודה</string>
+    <string name="expense_amount_overflow">הסכום או הסכומים המצטברים גדולים מדי</string>
+    <string name="expense_invalid_date">יש לבחור תאריך תקין</string>
+    <string name="expense_missing_choice">יש לבחור מקור תקציב קיים וקטגוריה קיימת או ללא קטגוריה</string>
+    <string name="expense_save_error">שמירת ההוצאה נכשלה. הערכים נשמרו בטופס; אפשר לנסות שוב.</string>
+    <string name="expense_saving">שומר…</string>
+    <string name="expense_save_interrupted">תוצאת השמירה הקודמת אינה ידועה. אי אפשר לשלוח שוב מטופס זה. יש לסגור ולבדוק את כל ההוצאות לפני התחלת פעולה חדשה.</string>
+    <string name="correct_expense_amount">תיקון סכום הוצאה</string>
+    <string name="confirm_amount_correction">עדכון סכום</string>
+    <string name="expenses_loading">טוען הוצאות…</string>
+    <string name="expenses_load_error">טעינת ההוצאות נכשלה. לחץ לניסיון חוזר.</string>
+    <string name="breakdown_pending">הפירוט אינו זמין עדיין</string>
+    <string name="source_remaining">%1$s · נותר</string>
 </resources>

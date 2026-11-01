@@ -1,0 +1,27 @@
+.budget-page .month-row {
+  margin-top:28px}
+.budget-card {
+  margin-top:24px;
+  padding:24px}
+.budget-card .caption {
+  font-size:13px;
+  color:var(--muted)}
+.budget-card .total {
+  font-size:40px;
+  font-weight:700;
+  direction:ltr;
+  text-align:start;
+  margin-top:12px}
+.budget-no-sources {
+  font-size:14px;
+  color:var(--muted);
+  margin-top:24px}
+.manage-sources {
+  display:block;
+  width:100%;
+  min-height:48px;
+  margin-top:16px;
+  padding:14px;
+  text-align:start;
+  font-size:14px;
+  color:var(--blue)}

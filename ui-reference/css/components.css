@@ -1,0 +1,155 @@
+.card {
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--card-radius)}
+.chip {
+  background:var(--field);
+  border:1px solid transparent;
+  border-radius:var(--chip-radius);
+  padding:11px;
+  font-size:13px;
+  min-height:48px}
+.chip.selected {
+  background:var(--selected);
+  border-color:var(--chip-border);
+  color:var(--blue)}
+.primary {
+  background:var(--button);
+  color:#fff;
+  border-radius:20px;
+  font-weight:700}
+.primary:disabled,.disabled {
+  opacity:.45}
+.month-row {
+  display:flex;
+  align-items:center;
+  justify-content:center}
+.month-label {
+  flex:1;
+  text-align:center;
+  font-size:15px;
+  font-weight:700}
+.scrim {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.38);
+  z-index:5;
+  display:flex}
+.overlay-stage {
+  width:min(100%,440px);
+  height:100%;
+  margin-inline:auto;
+  display:flex}
+.drawer {
+  width:min(320px,85%);
+  height:100%;
+  background:var(--surface);
+  overflow:auto;
+  padding:25px;
+  animation:drawer-in .28s ease}
+.drawer.from-right {
+  margin-inline-start:0;
+  border-radius:30px 0 0 30px}
+.drawer.from-left {
+  border-radius:0 30px 30px 0}
+.drawer-head,.sheet-head {
+  display:flex;
+  align-items:center;
+  margin-bottom:23px}
+.drawer-head h2,.sheet-head h2 {
+  flex:1;
+  font-size:23px}
+.drawer-nav {
+  display:block;
+  width:100%;
+  font-size:17px;
+  padding:20px 8px}
+.sheet-wrap .overlay-stage {
+  align-items:flex-end;
+  justify-content:center}
+.sheet {
+  width:100%;
+  max-height:92dvh;
+  background:var(--surface);
+  border-radius:30px 30px 0 0;
+  overflow:auto;
+  padding:25px;
+  animation:sheet-in .32s ease-out}
+.drag-area {
+  height:48px;
+  touch-action:none}
+.drag-track {
+  width:36px;
+  height:5px;
+  background:var(--line);
+  border-radius:10px;
+  margin:auto}
+.field-label {
+  display:block;
+  font-size:14px;
+  font-weight:700;
+  margin-bottom:12px}
+.sheet-field {
+  display:block;
+  width:100%;
+  background:var(--field);
+  border:0;
+  border-radius:12px;
+  padding:14px;
+  min-height:48px;
+  font-size:14px;
+  color:var(--text)}
+.sheet-field::placeholder {
+  color:var(--muted)}
+.form-row {
+  display:flex;
+  gap:12px}
+.form-row>div {
+  flex:1;
+  min-width:0}
+@keyframes sheet-in {
+  from {
+  transform:translateY(100%)}
+to {
+  transform:translateY(0)}
+}
+@keyframes drawer-in {
+  from {
+  opacity:.5}
+to {
+  opacity:1}
+}
+
+.intro {
+  font-size:13px;
+  color:var(--muted);
+  margin-bottom:10px}
+
+.amount-input {
+  width:100%;
+  font-size:44px;
+  color:var(--text);
+  border:0;
+  border-bottom:1px solid var(--line);
+  background:transparent;
+  padding:8px 0;
+  direction:ltr;
+  text-align:start}
+.amount-input::placeholder {
+  color:var(--muted)}
+.sheet .section {
+  margin-top:23px}
+.sheet .empty {
+  font-size:13px;
+  color:var(--muted)}
+.sheet .form-row {
+  margin-top:15px}
+.sheet .save {
+  width:100%;
+  min-height:58px;
+  margin-top:23px;
+  font-size:17px;
+  background:var(--blue)}
+
+[dir=rtl] .month-row .icon {
+  transform:scaleX(-1)}

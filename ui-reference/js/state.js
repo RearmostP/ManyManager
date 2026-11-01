@@ -1,0 +1,23 @@
+export const state={
+  page:0,tab:0,language:"he",theme:"light",overlay:null,
+  history:[],expanded:new Set(),budgetExpanded:false,
+  currentDate:new Date(),budgetMonth:new Date(),
+  settingsDrafts:{category:"",source:""},
+  expenseDraft:{amount:"",date:"",note:""}
+};
+export function changePage(index,scrollElement){
+  if(index===state.page)return;
+  if(index===3)state.budgetMonth=new Date(state.currentDate.getFullYear(),state.currentDate.getMonth(),1);
+  if(index===0)state.history=[];
+  else state.history.push({page:state.page,tab:state.tab,scroll:scrollElement.scrollTop});
+  state.page=index;state.budgetExpanded=false;scrollElement.scrollTop=0;
+}
+export function goBack(scrollElement){
+  if(state.overlay){state.overlay=null;return true}
+  if(state.page===0&&state.budgetExpanded){state.budgetExpanded=false;return true}
+  if(state.page===0)return false;
+  const previous=state.history.pop()||{page:0,tab:0,scroll:0};
+  state.page=previous.page;state.tab=previous.tab;
+  requestAnimationFrame(()=>scrollElement.scrollTop=previous.scroll);
+  return true;
+}

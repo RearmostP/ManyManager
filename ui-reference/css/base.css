@@ -1,0 +1,93 @@
+* {
+  box-sizing:border-box}
+html,body {
+  margin:0;
+  min-height:100%;
+  font-family:Roboto,"Noto Sans Hebrew","Arial",sans-serif;
+  color:var(--text);
+  background:var(--outer)}
+button,input,textarea {
+  font:inherit}
+button {
+  cursor:pointer}
+button:disabled {
+  cursor:default}
+.app {
+  width:min(100%,440px);
+  height:100dvh;
+  margin:auto;
+  background:var(--background);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden}
+.topbar {
+  height:66px;
+  flex:none;
+  padding:18px 20px 4px;
+  display:flex;
+  align-items:center}
+.page-scroll {
+  flex:1;
+  min-height:0;
+  overflow:auto;
+  overscroll-behavior:contain}
+.page {
+  padding:24px 25px 32px}
+.muted {
+  color:var(--muted)}
+.blue {
+  color:var(--blue)}
+.divider {
+  height:1px;
+  background:var(--line)}
+.spacer {
+  flex:1}
+h1,h2,p {
+  margin:0}
+h1 {
+  font-size:34px;
+  line-height:1.2;
+  letter-spacing:-.03em}
+h2 {
+  font-size:19px;
+  line-height:1.25}
+button {
+  border:0;
+  background:none;
+  color:inherit;
+  text-align:inherit}
+.icon-button {
+  width:44px;
+  height:44px;
+  display:grid;
+  place-items:center;
+  padding:10px;
+  flex:none}
+.icon {
+  width:23px;
+  height:23px;
+  display:block;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.7;
+  stroke-linecap:round;
+  stroke-linejoin:round}
+.icon.small {
+  width:20px;
+  height:20px}
+.icon.muted {
+  color:var(--muted)}
+input,textarea {
+  outline:none}
+.fade-in {
+  animation:appear .18s ease}
+@keyframes appear {
+  from {
+  opacity:.6}
+to {
+  opacity:1}
+}
+@media(max-width:440px) {
+  html,body {
+  background:var(--background)}
+}

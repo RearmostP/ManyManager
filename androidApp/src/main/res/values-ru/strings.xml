@@ -67,6 +67,7 @@
     <string name="budget_collapsed">Разбивка бюджета закрыта</string>
     <string name="back">Назад</string>
     <string name="cancel">Отмена</string>
+    <string name="new_category">＋ Новая категория</string>
     <string name="add_category_action">Добавить категорию</string>
     <string name="category_name">Название категории</string>
     <string name="category_name_required">Введите название категории</string>

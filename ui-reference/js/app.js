@@ -1,7 +1,7 @@
-import {state,changePage,goBack} from "./state.js";
-import {loadLanguage,t} from "./i18n.js";
+import {state,changePage,goBack,closeOverlay} from "./state.js";
+import {loadLanguage,t,shortDate} from "./i18n.js";
 import {icon} from "./icons.js";
-import {previewModel,addCategory,addSource,updateSource,parseAmount} from "./preview-model.js";
+import {previewModel,addSource,updateSource,parseAmount} from "./preview-model.js";
 import {home} from "./screens/home.js";
 import {summary} from "./screens/summary.js";
 import {budget} from "./screens/budget.js";
@@ -9,7 +9,7 @@ import {settings} from "./screens/settings.js";
 import {categories} from "./screens/categories.js";
 import {drawer} from "./components/drawer.js";
 import {expense} from "./components/expense-sheet.js";
-import {categoryDialog} from "./components/category-dialog.js";
+import {categoryDialog,beginCategoryCreation,confirmCategoryCreation} from "./components/category-dialog.js";
 import {sourceDialog,sourcePreview} from "./components/source-dialog.js";
 
 const app=document.getElementById("app");
@@ -71,18 +71,16 @@ document.addEventListener("click",async event=>{
   if(button.classList.contains("scrim")&&event.target.closest("[data-stop-close]"))return;
   switch(button.dataset.action){
     case "close-overlay":
-      state.overlay=null;renderKeepScroll();break;
+      closeOverlay();renderKeepScroll();break;
     case "navigate":
       changePage(Number(button.dataset.index),scroll);state.overlay=null;render();break;
     case "back":
       if(goBack(scroll))renderKeepScroll();break;
-    case "categories":
-      changePage(4,scroll);render();break;
     case "add-category":
-      state.categoryDraft="";state.overlay="add-category";renderKeepScroll();break;
+      beginCategoryCreation();renderKeepScroll();break;
     case "confirm-category":
-      if(!addCategory(state.categoryDraft)){showError("category-error","category_name_required");break}
-      state.overlay=null;renderKeepScroll();break;
+      if(!confirmCategoryCreation()){showError("category-error","category_name_required");break}
+      renderKeepScroll();break;
     case "add-source":
       state.dialogMonth=new Date(state.budgetMonth);
       state.sourceDraft={name:"",initial:"0",adjustment:"",operation:"add",sourceId:null};
@@ -100,7 +98,7 @@ document.addEventListener("click",async event=>{
       if(initial===null||!addSource(state.sourceDraft.name,state.dialogMonth,initial)){
         showError("source-error","budget_invalid_amount");break;
       }
-      state.overlay=null;renderKeepScroll();break;
+      closeOverlay();renderKeepScroll();break;
     }
     case "confirm-edit-source":{
       const raw=state.sourceDraft.adjustment;
@@ -111,7 +109,7 @@ document.addEventListener("click",async event=>{
       if(!updateSource(state.sourceDraft.sourceId,state.sourceDraft.name,state.dialogMonth,delta)){
         showError("source-error","budget_invalid_amount");break;
       }
-      state.overlay=null;renderKeepScroll();break;
+      closeOverlay();renderKeepScroll();break;
     }
     case "operation":
       state.sourceDraft.operation=button.dataset.value;renderKeepScroll();break;
@@ -121,7 +119,7 @@ document.addEventListener("click",async event=>{
       state.expenseDraft.sourceId=button.dataset.id;renderKeepScroll();break;
     case "expense":
       state.overlay="expense";
-      state.expenseDraft={amount:"",date:"",note:"",category:null,sourceId:null};
+      state.expenseDraft={amount:"",date:shortDate(state.language,state.currentDate),note:"",category:null,sourceId:null};
       renderKeepScroll();break;
     case "budget-toggle":
       state.budgetExpanded=!state.budgetExpanded;renderKeepScroll();break;

@@ -9,6 +9,8 @@ This is a Kotlin Multiplatform project targeting Android.
     Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./shared/src/jvmMain/kotlin)
     folder is the appropriate location.
 
+The Android app and [`ui-reference/`](./ui-reference/) companion provide five side-menu destinations, including Expense Categories. Settings contains only Language and Appearance. Add Expense can create a category in place and returns to the preserved draft with the new category selected. Categories and budget sources remain in memory only; expense saving is not implemented.
+
 ### Running the apps
 
 Use the run configurations provided by the run widget in your IDE's toolbar. You can also use these commands and options:

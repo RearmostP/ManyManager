@@ -67,6 +67,7 @@
     <string name="budget_collapsed">פירוט התקציב סגור</string>
     <string name="back">חזרה</string>
     <string name="cancel">ביטול</string>
+    <string name="new_category">＋ קטגוריה חדשה</string>
     <string name="add_category_action">הוספת קטגוריה</string>
     <string name="category_name">שם הקטגוריה</string>
     <string name="category_name_required">יש להזין שם קטגוריה</string>

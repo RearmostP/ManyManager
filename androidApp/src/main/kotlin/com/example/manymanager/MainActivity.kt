@@ -49,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     private var contentReady = false
     private var renderedConfiguration: Configuration? = null
     private var activeDialog: Dialog? = null
+    private var expenseDialog: ExpenseSheetDialog? = null
     private val expanded = mutableSetOf<Int>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -139,7 +140,6 @@ class MainActivity : AppCompatActivity() {
         listOf(R.id.categoryTab, R.id.sourceTab, R.id.allTab).forEachIndexed { index, id ->
             findViewById<View>(id).setOnClickListener { selectTab(index) }
         }
-        findViewById<View>(R.id.categoriesToggle).setOnClickListener { navigateToPage(4) }
         val toggles = listOf(
             R.id.languageToggle to R.id.languageDetails,
             R.id.themeToggle to R.id.themeDetails
@@ -199,11 +199,8 @@ class MainActivity : AppCompatActivity() {
         }
         selectPage(page)
         selectTab(tab)
-        if (savedInstanceState?.getBoolean("expenseOpen") == true) {
-            showExpense()
-            savedInstanceState?.getBundle("expenseDialogState")?.let { state ->
-                activeDialog?.onRestoreInstanceState(state)
-            }
+        savedInstanceState?.getBundle("expenseDraft")?.let { draft ->
+            showExpense(ExpenseDraft.fromBundle(draft))
         }
         if (savedInstanceState?.containsKey("pageScrollY") != true &&
             page == 2 && R.id.languageDetails in expanded
@@ -244,9 +241,6 @@ class MainActivity : AppCompatActivity() {
             R.string.monthly_expense_count, numbers.format(ExpenseUiData.expenseCount)
         )
         val count = budgetState.categories.size
-        findViewById<TextView>(R.id.settingsCategoriesSummary).text =
-            if (count == 0) getString(R.string.no_categories)
-            else getString(R.string.categories_count, numbers.format(count))
         findViewById<TextView>(R.id.categorySummaryEmpty).setText(
             if (count == 0) R.string.no_categories else R.string.no_expenses
         )
@@ -387,8 +381,10 @@ class MainActivity : AppCompatActivity() {
         dialog.showWithRoundedSurface()
     }
 
-    private fun showAddCategory() {
-        dismissActiveDialogImmediately()
+    private fun showAddCategory() = showAddCategory(null)
+
+    private fun showAddCategory(fromExpense: ExpenseSheetDialog?) {
+        if (fromExpense == null) dismissActiveDialogImmediately()
         val input = EditText(this).apply {
             hint = getString(R.string.category_name)
             setSingleLine(true)
@@ -403,14 +399,20 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton(R.string.add_category, null)
             .create()
         activeDialog = dialog
-        dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
+        dialog.setOnDismissListener {
+            if (activeDialog === dialog) {
+                activeDialog = fromExpense?.takeIf { it.isShowing }
+            }
+        }
         dialog.setOnShowListener {
             dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
-                if (!budgetState.addCategory(input.text.toString())) {
+                val name = input.text.toString().trim()
+                if (!budgetState.addCategory(name)) {
                     input.error = getString(R.string.category_name_required)
                     return@setOnClickListener
                 }
                 refreshManagedData()
+                fromExpense?.selectCategory(name, budgetState.categories)
                 dialog.dismiss()
             }
         }
@@ -432,15 +434,25 @@ class MainActivity : AppCompatActivity() {
             is SideMenuDialog -> dialog.dismissImmediately()
             else -> dialog?.dismiss()
         }
+        expenseDialog?.takeIf { it !== dialog }?.dismissImmediately()
+        expenseDialog = null
         activeDialog = null
     }
 
-    private fun showExpense() {
+    private fun showExpense() = showExpense(ExpenseDraft())
+
+    private fun showExpense(draft: ExpenseDraft) {
         dismissActiveDialogImmediately()
-        val dialog = ExpenseSheetDialog(this, currentDate,
-            budgetState.categories, budgetState.allocations.sources)
+        lateinit var dialog: ExpenseSheetDialog
+        dialog = ExpenseSheetDialog(this, currentDate,
+            budgetState.categories, budgetState.allocations.sources, draft
+        ) { showAddCategory(dialog) }
+        expenseDialog = dialog
         activeDialog = dialog
-        dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
+        dialog.setOnDismissListener {
+            if (activeDialog === dialog) activeDialog = null
+            if (expenseDialog === dialog) expenseDialog = null
+        }
         dialog.show()
     }
 
@@ -448,11 +460,8 @@ class MainActivity : AppCompatActivity() {
         val hierarchy = SparseArray<Parcelable>()
         findViewById<View>(R.id.windowRoot).saveHierarchyState(hierarchy)
         outState.putSparseParcelableArray("viewHierarchy", hierarchy)
-        val expenseOpen = activeDialog?.let { dialog ->
-            dialog.isShowing && dialog.findViewById<View>(R.id.amount) != null
-        } == true
-        outState.putBoolean("expenseOpen", expenseOpen)
-        if (expenseOpen) outState.putBundle("expenseDialogState", activeDialog?.onSaveInstanceState())
+        expenseDialog?.takeIf { it.isShowing }
+            ?.let { outState.putBundle("expenseDraft", it.draft.toBundle()) }
         outState.putInt("pageScrollY", findViewById<ScrollView>(R.id.pageScroll).scrollY)
         outState.putInt("page", page)
         outState.putIntArray("pageHistory", pageHistory.flatMap {

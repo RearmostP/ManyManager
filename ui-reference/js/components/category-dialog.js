@@ -1,5 +1,20 @@
 import {state} from "../state.js";
+import {addCategory} from "../preview-model.js";
 import {tr,escapeValue} from "../render-helpers.js";
+
+export function beginCategoryCreation(){
+  state.categoryDraft="";
+  state.categoryReturnOverlay=state.overlay==="expense"?"expense":null;
+  state.overlay="add-category";
+}
+export function confirmCategoryCreation(){
+  const name=state.categoryDraft.trim();
+  if(!addCategory(name))return false;
+  if(state.categoryReturnOverlay==="expense")state.expenseDraft.category=name;
+  state.overlay=state.categoryReturnOverlay;
+  state.categoryReturnOverlay=null;
+  return true;
+}
 
 export function categoryDialog(){
   return `<div class="scrim dialog-wrap" data-action="close-overlay"><div class="overlay-stage"><div class="dialog-panel" data-stop-close role="dialog" aria-modal="true" aria-labelledby="category-dialog-title">

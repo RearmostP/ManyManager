@@ -67,6 +67,7 @@
     <string name="budget_collapsed">Budget breakdown collapsed</string>
     <string name="back">Back</string>
     <string name="cancel">Cancel</string>
+    <string name="new_category">＋ New category</string>
     <string name="add_category_action">Add category</string>
     <string name="category_name">Category name</string>
     <string name="category_name_required">Enter a category name</string>

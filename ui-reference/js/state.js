@@ -3,7 +3,7 @@ export const state={
   history:[],expanded:new Set(),budgetExpanded:false,
   currentDate:new Date(),budgetMonth:new Date(),
   expenseDraft:{amount:"",date:"",note:"",category:null,sourceId:null},
-  categoryDraft:"",
+  categoryDraft:"",categoryReturnOverlay:null,
   sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
   dialogMonth:null
 };
@@ -14,8 +14,14 @@ export function changePage(index,scrollElement){
   else state.history.push({page:state.page,tab:state.tab,scroll:scrollElement.scrollTop});
   state.page=index;state.budgetExpanded=false;scrollElement.scrollTop=0;
 }
+export function closeOverlay(){
+  if(state.overlay==="add-category"){
+    state.overlay=state.categoryReturnOverlay;
+    state.categoryReturnOverlay=null;
+  }else state.overlay=null;
+}
 export function goBack(scrollElement){
-  if(state.overlay){state.overlay=null;return true}
+  if(state.overlay){closeOverlay();return true}
   if(state.page===0&&state.budgetExpanded){state.budgetExpanded=false;return true}
   if(state.page===0)return false;
   const previous=state.history.pop()||{page:0,tab:0,scroll:0};

@@ -8,5 +8,5 @@ export function budget(){
   <div class="card budget-card"><div class="caption">${tr("monthly_budget")}</div><div class="total">${money(totalFor(state.budgetMonth))}</div></div>
   <h2 class="source-heading">${tr("budget_by_source")}</h2>
   ${rows||`<p class="budget-no-sources">${tr("no_budget_sources_yet")}</p>`}
-  <button class="chip selected add-source" data-action="add-source">${tr("add_source")}</button></section>`;
+  <button class="chip secondary-action add-source" data-action="add-source">${tr("add_source")}</button></section>`;
 }

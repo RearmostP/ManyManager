@@ -1,6 +1,7 @@
 :root {
   --background:#f7f8fa;
   --surface:#fff;
+  --secondary-action-pressed:rgba(32,36,43,.08);
   --text:#20242b;
   --muted:#7a828e;
   --line:#e4e7ec;
@@ -16,6 +17,7 @@
 :root[data-theme="dark"] {
   --background:#15171b;
   --surface:#22252b;
+  --secondary-action-pressed:rgba(241,243,247,.12);
   --text:#f1f3f7;
   --muted:#a0a7b3;
   --line:#30343c;

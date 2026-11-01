@@ -1,4 +1,5 @@
 <resources><color name="background">#f7f8fa</color>
+<color name="secondary_action_ripple">#1420242b</color>
 <color name="surface">#ffffff</color>
 <color name="text">#20242b</color>
 <color name="muted">#7a828e</color>

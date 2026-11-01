@@ -7,5 +7,5 @@ export function categories(){
   return `<section class="categories-page fade-in"><button class="icon-button" data-action="back" aria-label="${tr("back")}">${icon("right")}</button>
   <h1>${tr("expense_categories")}</h1>
   ${rows||`<p class="category-empty">${tr("no_categories")}</p>`}
-  <button class="chip selected category-add" data-action="add-category">${tr("add_category_action")}</button></section>`;
+  <button class="chip secondary-action category-add" data-action="add-category">${tr("add_category_action")}</button></section>`;
 }

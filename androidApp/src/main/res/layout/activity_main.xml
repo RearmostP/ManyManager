@@ -62,6 +62,10 @@
                         android:id="@+id/settingsPage"
                         layout="@layout/page_settings"
                         android:visibility="gone" />
+                    <include
+                        android:id="@+id/categoriesPage"
+                        layout="@layout/page_categories"
+                        android:visibility="gone" />
                 </FrameLayout>
             </LinearLayout>
         </ScrollView>

@@ -1,613 +1,102 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
     android:orientation="vertical">
-    <TextView
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/settings_intro"
-        android:textSize="13sp"
-        android:textColor="@color/muted" />
-    <Space
-        android:layout_width="1dp"
-        android:layout_height="10dp" />
-    <TextView
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/settings"
-        android:textSize="34sp"
-        android:textColor="@color/text"
-        android:textStyle="bold" />
-    <Space
-        android:layout_width="1dp"
-        android:layout_height="28dp" />
-    <TextView
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/manage_categories_and_payment_methods"
-        android:textSize="12sp"
-        android:textColor="@color/muted" />
-    <Space
-        android:layout_width="1dp"
-        android:layout_height="8dp" />
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:id="@+id/categoriesToggle"
-        android:minHeight="78dp"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
-        android:clickable="true"
-        android:focusable="true"
+    <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/settings_intro" android:textSize="13sp" android:textColor="@color/muted" />
+    <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="10dp" android:text="@string/settings" android:textSize="34sp" android:textStyle="bold" />
+    <LinearLayout android:id="@+id/categoriesToggle" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="28dp" android:minHeight="78dp"
+        android:orientation="horizontal" android:gravity="center_vertical" android:paddingTop="14dp"
+        android:paddingBottom="14dp" android:clickable="true" android:focusable="true"
         android:background="?android:attr/selectableItemBackground">
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_category"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no"
-            android:layout_marginEnd="16dp" />
-        <LinearLayout
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/expense_categories"
-                android:textSize="16sp"
-                android:textColor="@color/text" />
-            <Space
-                android:layout_width="1dp"
-                android:layout_height="6dp" />
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/no_categories"
-                android:textSize="12sp"
-                android:textColor="@color/muted" />
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:layout_marginEnd="16dp"
+            android:src="@drawable/ic_category" app:tint="@color/muted" android:importantForAccessibility="no" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/expense_categories" android:textSize="16sp" />
+            <TextView android:id="@+id/settingsCategoriesSummary" style="@style/Text"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:text="@string/no_categories"
+                android:textSize="12sp" android:textColor="@color/muted" />
         </LinearLayout>
-        <ImageView
-            android:id="@+id/categoriesChevron"
-            android:layout_width="15dp"
-            android:layout_height="15dp"
-            android:src="@drawable/ic_left"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no" />
+        <ImageView android:layout_width="15dp" android:layout_height="15dp"
+            android:src="@drawable/ic_left" app:tint="@color/muted" android:importantForAccessibility="no" />
     </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:id="@+id/categoriesDetails"
-        android:visibility="gone"
-        android:paddingStart="40dp"
-        android:paddingBottom="20dp">
-        <TextView
-            style="@style/Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/no_categories"
-            android:textSize="13sp"
-            android:textColor="@color/muted"
-            android:id="@+id/settingsCategoriesEmpty" />
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="14dp">
-            <EditText
-                android:id="@+id/newCategory"
-                style="@style/Text"
-                android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:textSize="14sp"
-                android:background="@drawable/chip"
-                android:padding="14dp"
-                android:textColor="@color/text"
-                android:textColorHint="@color/muted"
-                android:inputType="textMultiLine|textCapSentences"
-                android:hint="@string/new_category"
-                android:layout_width="0dp"
-                android:layout_weight="1" />
-            <TextView
-                style="@style/Text"
-                android:layout_height="wrap_content"
-                android:text="@string/add_category"
-                android:textSize="13sp"
-                android:textColor="@color/blue"
-                android:layout_width="wrap_content"
-                android:layout_marginStart="8dp"
-                android:padding="12dp"
-                android:background="@drawable/chip_active"
-                android:id="@+id/addCategory"
-                android:enabled="false"
-                android:alpha="0.45"
-                android:contentDescription="@string/management_unavailable" />
-        </LinearLayout>
-    </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:id="@+id/sourcesToggle"
-        android:minHeight="78dp"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
-        android:clickable="true"
-        android:focusable="true"
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:layout_marginTop="20dp" android:background="@color/line" />
+    <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="25dp" android:text="@string/language_and_appearance"
+        android:textSize="12sp" android:textColor="@color/muted" />
+    <LinearLayout android:id="@+id/languageToggle" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:minHeight="78dp" android:orientation="horizontal"
+        android:gravity="center_vertical" android:paddingTop="14dp" android:paddingBottom="14dp"
+        android:clickable="true" android:focusable="true"
         android:background="?android:attr/selectableItemBackground">
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_source"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no"
-            android:layout_marginEnd="16dp" />
-        <LinearLayout
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/payment_methods"
-                android:textSize="16sp"
-                android:textColor="@color/text" />
-            <Space
-                android:layout_width="1dp"
-                android:layout_height="6dp" />
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/no_payment_methods"
-                android:textSize="12sp"
-                android:textColor="@color/muted" />
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:layout_marginEnd="16dp"
+            android:src="@drawable/ic_language" app:tint="@color/muted" android:importantForAccessibility="no" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/app_language" android:textSize="16sp" />
+            <TextView android:id="@+id/languageLabel" style="@style/Text"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:text="@string/language_he"
+                android:textSize="12sp" android:textColor="@color/muted" />
         </LinearLayout>
-        <ImageView
-            android:id="@+id/sourcesChevron"
-            android:layout_width="15dp"
-            android:layout_height="15dp"
-            android:src="@drawable/ic_left"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no" />
+        <ImageView android:id="@+id/languageChevron" android:layout_width="15dp"
+            android:layout_height="15dp" android:src="@drawable/ic_left"
+            app:tint="@color/muted" android:importantForAccessibility="no" />
     </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:id="@+id/sourcesDetails"
-        android:visibility="gone"
-        android:paddingStart="40dp"
-        android:paddingBottom="20dp">
-        <TextView
-            style="@style/Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/no_payment_methods"
-            android:textSize="13sp"
-            android:textColor="@color/muted"
-            android:id="@+id/settingsPaymentMethodsEmpty" />
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="14dp">
-            <EditText
-                android:id="@+id/newSource"
-                style="@style/Text"
-                android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:textSize="14sp"
-                android:background="@drawable/chip"
-                android:padding="14dp"
-                android:textColor="@color/text"
-                android:textColorHint="@color/muted"
-                android:inputType="textMultiLine|textCapSentences"
-                android:hint="@string/new_payment_method"
-                android:layout_width="0dp"
-                android:layout_weight="1" />
-            <TextView
-                style="@style/Text"
-                android:layout_height="wrap_content"
-                android:text="@string/add_payment_method"
-                android:textSize="13sp"
-                android:textColor="@color/blue"
-                android:layout_width="wrap_content"
-                android:layout_marginStart="8dp"
-                android:padding="12dp"
-                android:background="@drawable/chip_active"
-                android:id="@+id/addPaymentMethod"
-                android:enabled="false"
-                android:alpha="0.45"
-                android:contentDescription="@string/management_unavailable" />
-        </LinearLayout>
-    </LinearLayout>
-    <Space
-        android:layout_width="1dp"
-        android:layout_height="20dp" />
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/line" />
-    <Space
-        android:layout_width="1dp"
-        android:layout_height="25dp" />
-    <TextView
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/language_and_appearance"
-        android:textSize="12sp"
-        android:textColor="@color/muted" />
-    <Space
-        android:layout_width="1dp"
-        android:layout_height="8dp" />
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:id="@+id/languageToggle"
-        android:minHeight="78dp"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
-        android:clickable="true"
-        android:focusable="true"
+    <com.example.manymanager.ChipFlowLayout android:id="@+id/languageDetails"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingStart="40dp" android:paddingBottom="20dp" android:visibility="gone">
+        <TextView android:id="@+id/languageHe" style="@style/Text" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center"
+            android:text="@string/language_he" android:textSize="13sp" android:padding="11dp"
+            android:background="@drawable/chip" android:clickable="true" android:focusable="true" />
+        <TextView android:id="@+id/languageEn" style="@style/Text" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center"
+            android:text="@string/language_en" android:textSize="13sp" android:padding="11dp"
+            android:background="@drawable/chip" android:clickable="true" android:focusable="true" />
+        <TextView android:id="@+id/languageRu" style="@style/Text" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center"
+            android:text="@string/language_ru" android:textSize="13sp" android:padding="11dp"
+            android:background="@drawable/chip" android:clickable="true" android:focusable="true" />
+    </com.example.manymanager.ChipFlowLayout>
+    <LinearLayout android:id="@+id/themeToggle" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:minHeight="78dp" android:orientation="horizontal"
+        android:gravity="center_vertical" android:paddingTop="14dp" android:paddingBottom="14dp"
+        android:clickable="true" android:focusable="true"
         android:background="?android:attr/selectableItemBackground">
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_language"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no"
-            android:layout_marginEnd="16dp" />
-        <LinearLayout
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/app_language"
-                android:textSize="16sp"
-                android:textColor="@color/text" />
-            <Space
-                android:layout_width="1dp"
-                android:layout_height="6dp" />
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:id="@+id/languageLabel"
-                android:text="@string/language_he"
-                android:textSize="12sp"
-                android:textColor="@color/muted" />
+        <ImageView android:layout_width="24dp" android:layout_height="24dp" android:layout_marginEnd="16dp"
+            android:src="@drawable/ic_theme" app:tint="@color/muted" android:importantForAccessibility="no" />
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/app_appearance" android:textSize="16sp" />
+            <TextView android:id="@+id/themeLabel" style="@style/Text"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="6dp" android:text="@string/theme_light"
+                android:textSize="12sp" android:textColor="@color/muted" />
         </LinearLayout>
-        <ImageView
-            android:id="@+id/languageChevron"
-            android:layout_width="15dp"
-            android:layout_height="15dp"
-            android:src="@drawable/ic_left"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no" />
+        <ImageView android:id="@+id/themeChevron" android:layout_width="15dp"
+            android:layout_height="15dp" android:src="@drawable/ic_left"
+            app:tint="@color/muted" android:importantForAccessibility="no" />
     </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:id="@+id/languageDetails"
-        android:visibility="gone"
-        android:paddingStart="40dp"
-        android:paddingBottom="20dp">
-        <com.example.manymanager.ChipFlowLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-            <TextView
-                android:id="@+id/languageHe"
-                style="@style/Text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:gravity="center"
-                android:textDirection="firstStrong"
-                android:text="@string/language_he"
-                android:textSize="13sp"
-                android:padding="11dp"
-                android:background="@drawable/chip"
-                android:clickable="true"
-                android:focusable="true" />
-            <TextView
-                android:id="@+id/languageEn"
-                style="@style/Text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:gravity="center"
-                android:textDirection="firstStrong"
-                android:text="@string/language_en"
-                android:textSize="13sp"
-                android:padding="11dp"
-                android:background="@drawable/chip"
-                android:clickable="true"
-                android:focusable="true" />
-            <TextView
-                android:id="@+id/languageRu"
-                style="@style/Text"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:gravity="center"
-                android:textDirection="firstStrong"
-                android:text="@string/language_ru"
-                android:textSize="13sp"
-                android:padding="11dp"
-                android:background="@drawable/chip"
-                android:clickable="true"
-                android:focusable="true" />
-        </com.example.manymanager.ChipFlowLayout>
-    </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:id="@+id/themeToggle"
-        android:minHeight="78dp"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
-        android:clickable="true"
-        android:focusable="true"
-        android:background="?android:attr/selectableItemBackground">
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_theme"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no"
-            android:layout_marginEnd="16dp" />
-        <LinearLayout
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/app_appearance"
-                android:textSize="16sp"
-                android:textColor="@color/text" />
-            <Space
-                android:layout_width="1dp"
-                android:layout_height="6dp" />
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/theme_light"
-                android:textSize="12sp"
-                android:textColor="@color/muted"
-                android:id="@+id/themeLabel" />
-        </LinearLayout>
-        <ImageView
-            android:id="@+id/themeChevron"
-            android:layout_width="15dp"
-            android:layout_height="15dp"
-            android:src="@drawable/ic_left"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no" />
-    </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:id="@+id/themeDetails"
-        android:visibility="gone"
-        android:paddingStart="40dp"
-        android:paddingBottom="20dp">
-        <com.example.manymanager.ChipFlowLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content">
-            <TextView
-                style="@style/Text"
-                android:layout_height="wrap_content"
-                android:text="@string/theme_light"
-                android:textSize="13sp"
-                android:textColor="@color/blue"
-                android:layout_width="wrap_content"
-                android:padding="11dp"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="8dp"
-                android:background="@drawable/chip_active"
-                android:id="@+id/lightTheme"
-                android:clickable="true"
-                android:focusable="true" />
-            <TextView
-                style="@style/Text"
-                android:layout_height="wrap_content"
-                android:text="@string/theme_dark"
-                android:textSize="13sp"
-                android:textColor="@color/text"
-                android:layout_width="wrap_content"
-                android:padding="11dp"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="8dp"
-                android:background="@drawable/chip"
-                android:id="@+id/darkTheme"
-                android:clickable="true"
-                android:focusable="true" />
-        </com.example.manymanager.ChipFlowLayout>
-    </LinearLayout>
-    <Space
-        android:layout_width="1dp"
-        android:layout_height="20dp" />
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:background="@color/line" />
-    <Space
-        android:layout_width="1dp"
-        android:layout_height="25dp" />
-    <TextView
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/account_and_sync"
-        android:textSize="12sp"
-        android:textColor="@color/muted" />
-    <Space
-        android:layout_width="1dp"
-        android:layout_height="8dp" />
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:id="@+id/accountToggle"
-        android:minHeight="78dp"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
-        android:clickable="true"
-        android:focusable="true"
-        android:background="?android:attr/selectableItemBackground">
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_account"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no"
-            android:layout_marginEnd="16dp" />
-        <LinearLayout
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/my_account"
-                android:textSize="16sp"
-                android:textColor="@color/text" />
-            <Space
-                android:layout_width="1dp"
-                android:layout_height="6dp" />
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/not_signed_in"
-                android:textSize="12sp"
-                android:textColor="@color/muted" />
-        </LinearLayout>
-        <ImageView
-            android:id="@+id/accountChevron"
-            android:layout_width="15dp"
-            android:layout_height="15dp"
-            android:src="@drawable/ic_left"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no" />
-    </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:id="@+id/accountDetails"
-        android:visibility="gone"
-        android:paddingStart="40dp"
-        android:paddingBottom="20dp">
-        <TextView
-            style="@style/Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/sign_in_unavailable"
-            android:textSize="12sp"
-            android:textColor="@color/muted" />
-    </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:id="@+id/syncToggle"
-        android:minHeight="78dp"
-        android:paddingTop="14dp"
-        android:paddingBottom="14dp"
-        android:clickable="true"
-        android:focusable="true"
-        android:background="?android:attr/selectableItemBackground">
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_sync"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no"
-            android:layout_marginEnd="16dp" />
-        <LinearLayout
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_width="0dp"
-            android:layout_weight="1">
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/sync_and_backup"
-                android:textSize="16sp"
-                android:textColor="@color/text" />
-            <Space
-                android:layout_width="1dp"
-                android:layout_height="6dp" />
-            <TextView
-                style="@style/Text"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/sync_description"
-                android:textSize="12sp"
-                android:textColor="@color/muted" />
-        </LinearLayout>
-        <ImageView
-            android:id="@+id/syncChevron"
-            android:layout_width="15dp"
-            android:layout_height="15dp"
-            android:src="@drawable/ic_left"
-            app:tint="@color/muted"
-            android:importantForAccessibility="no" />
-    </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:id="@+id/syncDetails"
-        android:visibility="gone"
-        android:paddingStart="40dp"
-        android:paddingBottom="20dp">
-        <TextView
-            style="@style/Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/sync_unavailable"
-            android:textSize="12sp"
-            android:textColor="@color/muted" />
-    </LinearLayout>
+    <com.example.manymanager.ChipFlowLayout android:id="@+id/themeDetails"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:paddingStart="40dp" android:paddingBottom="20dp" android:visibility="gone">
+        <TextView android:id="@+id/lightTheme" style="@style/Text" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center"
+            android:text="@string/theme_light" android:textSize="13sp" android:padding="11dp"
+            android:background="@drawable/chip" android:clickable="true" android:focusable="true" />
+        <TextView android:id="@+id/darkTheme" style="@style/Text" android:layout_width="wrap_content"
+            android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center"
+            android:text="@string/theme_dark" android:textSize="13sp" android:padding="11dp"
+            android:background="@drawable/chip" android:clickable="true" android:focusable="true" />
+    </com.example.manymanager.ChipFlowLayout>
 </LinearLayout>

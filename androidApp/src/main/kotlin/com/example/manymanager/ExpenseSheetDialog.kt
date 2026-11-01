@@ -12,6 +12,7 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.LinearLayout
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -23,10 +24,14 @@ import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.doOnPreDraw
 
 /** Slides only the expense sheet away, leaving the Activity beneath it in place. */
-class ExpenseSheetDialog(activity: Activity, date: LocalDate) : Dialog(activity) {
+class ExpenseSheetDialog(
+    activity: Activity, date: LocalDate,
+    categories: List<String>, sources: List<PaymentSource>
+) : Dialog(activity) {
     private val resources get() = context.resources
     private val host: FrameLayout
     private var sheetView: View? = null
+    private var selectedSourceId: String? = null
     private var openingDraw: OneShotPreDrawListener? = null
     var isDismissing = false
         private set
@@ -74,12 +79,42 @@ class ExpenseSheetDialog(activity: Activity, date: LocalDate) : Dialog(activity)
         content.findViewById<TextView>(R.id.expenseDate).text =
             date.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.SHORT)
                 .withLocale(resources.configuration.locales[0]))
-        // Required choices do not exist yet, and no save operation is implemented.
+        // Sources are the same identities shown on Budget Management. Expense saving is not implemented.
         content.findViewById<View>(R.id.saveExpense).isEnabled = false
         content.findViewById<View>(R.id.expenseCategoriesEmpty).visibility =
-            if (ExpenseUiData.categories.isEmpty()) View.VISIBLE else View.GONE
+            if (categories.isEmpty()) View.VISIBLE else View.GONE
         content.findViewById<View>(R.id.expensePaymentMethodsEmpty).visibility =
-            if (ExpenseUiData.paymentMethods.isEmpty()) View.VISIBLE else View.GONE
+            if (sources.isEmpty()) View.VISIBLE else View.GONE
+        bindChoices(content.findViewById(R.id.expenseCategoryChoices),
+            categories.map { it to it }, false)
+        bindChoices(content.findViewById(R.id.expenseSourceChoices),
+            sources.map { it.id to it.name }, true)
+    }
+
+    private fun bindChoices(
+        container: LinearLayout, options: List<Pair<String, String>>, sourceChoices: Boolean
+    ) {
+        options.forEach { (id, name) ->
+            container.addView(TextView(context, null, 0, R.style.Text).apply {
+                text = name
+                textSize = 14f
+                minHeight = dp(48)
+                setPadding(dp(14), dp(14), dp(14), dp(14))
+                setBackgroundResource(R.drawable.chip)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    if (sourceChoices) selectedSourceId = id
+                    for (index in 0 until container.childCount) {
+                        (container.getChildAt(index) as TextView).apply {
+                            isSelected = this === it
+                            setBackgroundResource(if (isSelected) R.drawable.chip_active else R.drawable.chip)
+                            setTextColor(context.getColor(if (isSelected) R.color.blue else R.color.text))
+                        }
+                    }
+                }
+            })
+        }
     }
 
     private fun enableDrag(content: View) {

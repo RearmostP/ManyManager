@@ -47,7 +47,7 @@ class BudgetHomeUi(
 
     fun refresh() {
         val total = state.allocations.total(state.homeMonth)
-        val remaining = (total - ExpenseUiData.monthlyTotal).coerceAtLeast(0L)
+        val remaining = total - ExpenseUiData.monthlyTotal
         val formattedRemaining = money(remaining)
         val formattedTotal = money(total)
 

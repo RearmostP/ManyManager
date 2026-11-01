@@ -1,51 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:layout_marginBottom="16dp"
-    android:background="@drawable/card"
-    android:padding="20dp"
-    android:orientation="vertical">
-    <TextView
-        android:id="@+id/budgetSourceName"
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="16sp"
-        android:textStyle="bold"
-        android:accessibilityHeading="true" />
-    <EditText
-        android:id="@+id/budgetSourceAmount"
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:minHeight="48dp"
-        android:padding="14dp"
-        android:background="@drawable/chip"
-        android:textSize="20sp"
-        android:textDirection="ltr"
-        android:inputType="numberDecimal"
-        android:singleLine="true"
-        android:imeOptions="actionDone"
-        android:importantForAutofill="no"
-        android:saveEnabled="false"
-        android:selectAllOnFocus="true" />
-    <TextView
-        android:id="@+id/budgetApply"
-        style="@style/Text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="end"
-        android:layout_marginTop="12dp"
-        android:minHeight="48dp"
-        android:padding="14dp"
-        android:background="@drawable/chip_active"
-        android:foreground="?android:attr/selectableItemBackground"
-        android:text="@string/apply_budget"
-        android:textSize="14sp"
-        android:textColor="@color/blue"
-        android:gravity="center"
-        android:clickable="true"
-        android:focusable="true" />
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_marginBottom="16dp" android:background="@drawable/card"
+    android:padding="20dp" android:orientation="horizontal" android:gravity="center_vertical"
+    android:clickable="true" android:focusable="true">
+    <TextView android:id="@+id/budgetSourceName" style="@style/Text"
+        android:layout_width="0dp" android:layout_height="wrap_content"
+        android:layout_weight="1" android:textSize="16sp" android:textStyle="bold" />
+    <TextView android:id="@+id/budgetSourceAmount" style="@style/Text"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textSize="17sp" android:textDirection="ltr" />
 </LinearLayout>

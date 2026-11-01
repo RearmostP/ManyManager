@@ -59,6 +59,29 @@ class MonthlyBudgetAllocationsTest {
         assertEquals(0L, budgets.amount(month, "source-b"))
     }
 
+    @Test fun sourceIdentityAndMonthlyAdjustmentsStayTogether() {
+        val budgets = MonthlyBudgetAllocations(emptyList())
+        val source = budgets.addSource("Card", month, 50_000)!!
+        assertEquals(50_000L, budgets.amount(month, source.id))
+        assertEquals(0L, budgets.amount(month.plusMonths(1), source.id))
+        assertEquals(40_000L, budgets.previewAdjustment(month, source.id, -10_000))
+        assertEquals(50_000L, budgets.amount(month, source.id)) // preview and cancel do not write
+        assertTrue(budgets.adjust(month, source.id, -10_000))
+        assertTrue(budgets.renameSource(source.id, "Main card"))
+        assertEquals("Main card", budgets.sources.single().name)
+        assertEquals(40_000L, budgets.amount(month, source.id))
+        assertEquals(0L, budgets.amount(month.plusMonths(1), source.id))
+    }
+
+    @Test fun signedPreviewDoesNotOverrideExistingNegativeAllocationPolicy() {
+        val budgets = MonthlyBudgetAllocations(emptyList())
+        val source = budgets.addSource("Cash", month, 100)!!
+        assertEquals(-100L, budgets.previewAdjustment(month, source.id, -200))
+        assertFalse(budgets.adjust(month, source.id, -200))
+        assertEquals(100L, budgets.amount(month, source.id))
+        assertNull(budgets.addSource(" ", month, 100))
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsDuplicateSourceIds() {
         MonthlyBudgetAllocations(listOf(PaymentSource("same", "One"), PaymentSource("same", "Two")))

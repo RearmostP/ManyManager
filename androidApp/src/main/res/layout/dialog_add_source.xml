@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="24dp">
+    <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/add_source" android:textSize="23sp" android:textStyle="bold" />
+    <TextView android:id="@+id/addSourceMonth" style="@style/Text"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="10dp" android:textSize="13sp" android:textColor="@color/muted" />
+    <EditText android:id="@+id/addSourceName" style="@style/Text"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="24dp" android:minHeight="48dp" android:padding="14dp"
+        android:background="@drawable/chip" android:hint="@string/source_name"
+        android:inputType="textCapSentences" android:singleLine="true" android:textSize="14sp" />
+    <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="20dp" android:text="@string/initial_budget" android:textSize="14sp" />
+    <EditText android:id="@+id/addSourceAmount" style="@style/Text"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:minHeight="48dp" android:padding="14dp"
+        android:background="@drawable/chip" android:hint="@string/amount_zero"
+        android:inputType="numberDecimal" android:singleLine="true"
+        android:textDirection="ltr" android:textSize="20sp" />
+</LinearLayout>

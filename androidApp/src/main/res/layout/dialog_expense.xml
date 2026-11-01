@@ -93,6 +93,9 @@
             android:textSize="13sp"
             android:textColor="@color/muted"
             android:id="@+id/expenseCategoriesEmpty" />
+        <LinearLayout android:id="@+id/expenseCategoryChoices"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" />
         <Space
             android:layout_width="1dp"
             android:layout_height="15dp" />
@@ -115,6 +118,9 @@
             android:textSize="13sp"
             android:textColor="@color/muted"
             android:id="@+id/expensePaymentMethodsEmpty" />
+        <LinearLayout android:id="@+id/expenseSourceChoices"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" />
         <Space
             android:layout_width="1dp"
             android:layout_height="15dp" />

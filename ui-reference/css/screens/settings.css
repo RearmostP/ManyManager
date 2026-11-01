@@ -1,63 +1,13 @@
-.settings-heading {
-  font-size:12px;
-  color:var(--muted);
-  margin-top:28px;
-  margin-bottom:8px}
-.settings-heading.first {
-  margin-top:28px}
-.setting-row {
-  width:100%;
-  min-height:78px;
-  display:flex;
-  align-items:center;
-  padding:14px 0}
-.setting-row .icon {
-  width:24px;
-  height:24px;
-  color:var(--muted);
-  margin-inline-end:16px}
-.setting-copy {
-  flex:1;
-  min-width:0}
-.setting-title {
-  display:block;
-  font-size:16px}
-.setting-subtitle {
-  display:block;
-  font-size:12px;
-  color:var(--muted);
-  margin-top:6px}
-.setting-chevron {
-  font-size:18px;
-  color:var(--muted);
-  transition:transform .18s}
-.setting-row[aria-expanded=true] .setting-chevron {
-  transform:rotate(90deg)}
-.setting-details {
-  padding-inline-start:40px;
-  padding-bottom:20px}
-.setting-details[hidden] {
-  display:none}
-.setting-details .empty {
-  color:var(--muted);
-  font-size:13px}
-.setting-form {
-  display:flex;
-  align-items:center;
-  gap:8px;
-  margin-top:14px}
-.setting-form input {
-  flex:1;
-  min-width:0}
-.setting-form button {
-  min-height:48px;
-  padding:12px}
-.chips {
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px}
-.setting-divider {
-  margin-top:20px}
-.settings-note {
-  font-size:12px;
-  color:var(--muted)}
+.settings-heading{font-size:12px;color:var(--muted);margin-top:25px;margin-bottom:8px}
+.setting-row{width:100%;min-height:78px;display:flex;align-items:center;padding:14px 0}
+.setting-row .icon{width:24px;height:24px;color:var(--muted);margin-inline-end:16px}
+.setting-copy{flex:1;min-width:0}
+.setting-title{display:block;font-size:16px}
+.setting-subtitle{display:block;font-size:12px;color:var(--muted);margin-top:6px}
+.setting-chevron{font-size:18px;color:var(--muted);transition:transform .18s}
+.setting-row[aria-expanded=true] .setting-chevron{transform:rotate(90deg)}
+.setting-details{padding-inline-start:40px;padding-bottom:20px}
+.setting-details[hidden]{display:none}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.setting-divider{margin-top:20px}
+.category-link{margin-top:28px}

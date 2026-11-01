@@ -13,6 +13,9 @@ import android.widget.FrameLayout
 import androidx.core.view.doOnAttach
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.EditText
+import androidx.appcompat.app.AlertDialog
+import android.content.DialogInterface
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
@@ -30,19 +33,12 @@ class MainActivity : AppCompatActivity() {
     private data class PageVisit(val page: Int, val tab: Int, val scrollY: Int)
     private val pageHistory = mutableListOf<PageVisit>()
     private val pageBackCallback = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() {
-            if (page == 0 && budgetState.breakdownExpanded) {
-                homeBudgetUi?.setExpanded(false)
-                return
-            }
-            val previous = pageHistory.removeLastOrNull() ?: PageVisit(0, 0, 0)
-            selectPage(previous.page, animate = true, scrollY = previous.scrollY)
-            selectTab(previous.tab)
-        }
+        override fun handleOnBackPressed() { navigateBack() }
     }
     private val budgetState by lazy { ViewModelProvider(this)[BudgetViewModel::class.java] }
     private var homeBudgetUi: BudgetHomeUi? = null
     private var budgetManagementUi: BudgetManagementUi? = null
+    private var categoryManagementUi: CategoryManagementUi? = null
     private var page = 0
     private var tab = 0
     private var currentDate = LocalDate.now()
@@ -95,6 +91,7 @@ class MainActivity : AppCompatActivity() {
         homeBudgetUi?.dispose()
         homeBudgetUi = null
         budgetManagementUi = null
+        categoryManagementUi = null
         dismissActiveDialogImmediately()
         currentDate = savedInstanceState?.takeIf { it.containsKey("currentDate") }
             ?.getLong("currentDate")?.let(LocalDate::ofEpochDay) ?: currentDate
@@ -141,16 +138,12 @@ class MainActivity : AppCompatActivity() {
         listOf(R.id.categoryTab, R.id.sourceTab, R.id.allTab).forEachIndexed { index, id ->
             findViewById<View>(id).setOnClickListener { selectTab(index) }
         }
+        findViewById<View>(R.id.categoriesToggle).setOnClickListener { navigateToPage(4) }
         val toggles = listOf(
-            R.id.categoriesToggle to R.id.categoriesDetails,
-            R.id.sourcesToggle to R.id.sourcesDetails,
             R.id.languageToggle to R.id.languageDetails,
-            R.id.themeToggle to R.id.themeDetails,
-            R.id.accountToggle to R.id.accountDetails,
-            R.id.syncToggle to R.id.syncDetails
+            R.id.themeToggle to R.id.themeDetails
         )
-        val arrows = listOf(R.id.categoriesChevron, R.id.sourcesChevron, R.id.languageChevron,
-            R.id.themeChevron, R.id.accountChevron, R.id.syncChevron)
+        val arrows = listOf(R.id.languageChevron, R.id.themeChevron)
         toggles.forEachIndexed { index, (toggle, details) ->
             fun update() {
                 val open = details in expanded
@@ -191,8 +184,12 @@ class MainActivity : AppCompatActivity() {
             pageBackCallback.isEnabled = page != 0 || budgetState.breakdownExpanded
         }
         budgetManagementUi = BudgetManagementUi(
-            findViewById(R.id.budgetPage), budgetState, ::openPaymentSources
-        ) { homeBudgetUi?.refresh() }
+            findViewById(R.id.budgetPage), budgetState,
+            ::showAddSource, ::showEditSource
+        )
+        categoryManagementUi = CategoryManagementUi(
+            findViewById(R.id.categoriesPage), budgetState, ::navigateBack, ::showAddCategory
+        )
         listOf(R.id.previousMonth, R.id.nextMonth).forEach { id ->
             findViewById<View>(id).apply {
                 isEnabled = false
@@ -245,10 +242,27 @@ class MainActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.summaryCount).text = getString(
             R.string.monthly_expense_count, numbers.format(ExpenseUiData.expenseCount)
         )
-        findViewById<View>(R.id.settingsCategoriesEmpty).visibility =
-            if (ExpenseUiData.categories.isEmpty()) View.VISIBLE else View.GONE
-        findViewById<View>(R.id.settingsPaymentMethodsEmpty).visibility =
-            if (ExpenseUiData.paymentMethods.isEmpty()) View.VISIBLE else View.GONE
+        val count = budgetState.categories.size
+        findViewById<TextView>(R.id.settingsCategoriesSummary).text =
+            if (count == 0) getString(R.string.no_categories)
+            else getString(R.string.categories_count, numbers.format(count))
+        findViewById<TextView>(R.id.categorySummaryEmpty).setText(
+            if (count == 0) R.string.no_categories else R.string.no_expenses
+        )
+        findViewById<TextView>(R.id.sourceSummaryEmpty).setText(
+            if (budgetState.allocations.sources.isEmpty()) R.string.no_payment_methods
+            else R.string.no_expenses
+        )
+    }
+
+    private fun navigateBack() {
+        if (page == 0 && budgetState.breakdownExpanded) {
+            homeBudgetUi?.setExpanded(false)
+            return
+        }
+        val previous = pageHistory.removeLastOrNull() ?: PageVisit(0, 0, 0)
+        selectPage(previous.page, animate = true, scrollY = previous.scrollY)
+        selectTab(previous.tab)
     }
 
     private fun navigateToPage(index: Int) {
@@ -275,7 +289,9 @@ class MainActivity : AppCompatActivity() {
                 pageBackCallback.isEnabled = index != 0 || budgetState.breakdownExpanded
                 if (index == 0) homeBudgetUi?.refresh()
                 if (index == 3) budgetManagementUi?.render()
-                listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage, R.id.budgetPage).forEachIndexed { i, id ->
+                if (index == 4) categoryManagementUi?.render()
+                listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage,
+                    R.id.budgetPage, R.id.categoriesPage).forEachIndexed { i, id ->
                     findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
                 }
             },
@@ -347,13 +363,55 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun openPaymentSources() {
-        navigateToPage(2)
-        if (R.id.sourcesDetails !in expanded) findViewById<View>(R.id.sourcesToggle).performClick()
-        findViewById<View>(R.id.sourcesDetails).post {
-            val section = findViewById<View>(R.id.sourcesDetails)
-            section.requestRectangleOnScreen(Rect(0, 0, section.width, section.height), false)
+    private fun refreshManagedData() {
+        budgetManagementUi?.render()
+        categoryManagementUi?.render()
+        bindEmptyState()
+        homeBudgetUi?.refresh()
+    }
+
+    private fun showAddSource(month: YearMonth) {
+        dismissActiveDialogImmediately()
+        val dialog = BudgetSourceDialogs.add(this, budgetState, month, ::refreshManagedData)
+        activeDialog = dialog
+        dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
+        dialog.show()
+    }
+
+    private fun showEditSource(source: PaymentSource, month: YearMonth) {
+        dismissActiveDialogImmediately()
+        val dialog = BudgetSourceDialogs.edit(this, budgetState, source, month, ::refreshManagedData)
+        activeDialog = dialog
+        dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
+        dialog.show()
+    }
+
+    private fun showAddCategory() {
+        dismissActiveDialogImmediately()
+        val input = EditText(this).apply {
+            hint = getString(R.string.category_name)
+            setSingleLine(true)
+            setPadding(dp(24), dp(14), dp(24), dp(14))
         }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.add_category_action)
+            .setView(input)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.add_category, null)
+            .create()
+        activeDialog = dialog
+        dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
+        dialog.setOnShowListener {
+            dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                if (!budgetState.addCategory(input.text.toString())) {
+                    input.error = getString(R.string.category_name_required)
+                    return@setOnClickListener
+                }
+                refreshManagedData()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
     }
 
     private fun showMenu() {
@@ -376,7 +434,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showExpense() {
         dismissActiveDialogImmediately()
-        val dialog = ExpenseSheetDialog(this, currentDate)
+        val dialog = ExpenseSheetDialog(this, currentDate,
+            budgetState.categories, budgetState.allocations.sources)
         activeDialog = dialog
         dialog.setOnDismissListener { if (activeDialog === dialog) activeDialog = null }
         dialog.show()
@@ -410,6 +469,7 @@ class MainActivity : AppCompatActivity() {
         homeBudgetUi?.dispose()
         homeBudgetUi = null
         budgetManagementUi = null
+        categoryManagementUi = null
         appearanceTransition.clear()
         dismissActiveDialogImmediately()
         super.onDestroy()

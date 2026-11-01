@@ -2,8 +2,10 @@ export const state={
   page:0,tab:0,language:"he",theme:"light",overlay:null,
   history:[],expanded:new Set(),budgetExpanded:false,
   currentDate:new Date(),budgetMonth:new Date(),
-  settingsDrafts:{category:"",source:""},
-  expenseDraft:{amount:"",date:"",note:""}
+  expenseDraft:{amount:"",date:"",note:"",category:null,sourceId:null},
+  categoryDraft:"",
+  sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
+  dialogMonth:null
 };
 export function changePage(index,scrollElement){
   if(index===state.page)return;

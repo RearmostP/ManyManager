@@ -1,96 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:orientation="vertical">
-    <TextView
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="@string/budget_management"
-        android:textSize="34sp"
-        android:textStyle="bold"
+    android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+    <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:text="@string/budget_management" android:textSize="34sp" android:textStyle="bold"
         android:accessibilityHeading="true" />
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="28dp"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-        <ImageButton
-            android:id="@+id/budgetPreviousMonth"
-            style="@style/IconButton"
-            android:src="@drawable/ic_right"
-            android:contentDescription="@string/previous_month" />
-        <TextView
-            android:id="@+id/budgetMonth"
-            style="@style/Text"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            android:accessibilityLiveRegion="polite" />
-        <ImageButton
-            android:id="@+id/budgetNextMonth"
-            style="@style/IconButton"
-            android:src="@drawable/ic_left"
-            android:contentDescription="@string/next_month" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="28dp" android:orientation="horizontal" android:gravity="center_vertical">
+        <ImageButton android:id="@+id/budgetPreviousMonth" style="@style/IconButton"
+            android:src="@drawable/ic_right" android:contentDescription="@string/previous_month" />
+        <TextView android:id="@+id/budgetMonth" style="@style/Text" android:layout_width="0dp"
+            android:layout_height="wrap_content" android:layout_weight="1" android:gravity="center"
+            android:textSize="15sp" android:textStyle="bold" android:accessibilityLiveRegion="polite" />
+        <ImageButton android:id="@+id/budgetNextMonth" style="@style/IconButton"
+            android:src="@drawable/ic_left" android:contentDescription="@string/next_month" />
     </LinearLayout>
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:background="@drawable/card"
-        android:padding="24dp"
-        android:orientation="vertical">
-        <TextView
-            style="@style/Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/monthly_budget"
-            android:textSize="13sp"
-            android:textColor="@color/muted" />
-        <TextView
-            android:id="@+id/budgetAllocatedTotal"
-            style="@style/Text"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:textSize="40sp"
-            android:textDirection="ltr"
-            android:textStyle="bold"
-            android:accessibilityLiveRegion="polite" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="24dp" android:background="@drawable/card"
+        android:padding="24dp" android:orientation="vertical">
+        <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:text="@string/monthly_budget" android:textSize="13sp" android:textColor="@color/muted" />
+        <TextView android:id="@+id/budgetAllocatedTotal" style="@style/Text"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="12dp" android:textSize="40sp" android:textDirection="ltr"
+            android:textStyle="bold" android:accessibilityLiveRegion="polite" />
     </LinearLayout>
-    <TextView
-        android:id="@+id/budgetNoSources"
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
-        android:text="@string/budget_add_sources_first"
-        android:textSize="14sp"
-        android:textColor="@color/muted" />
-    <TextView
-        android:id="@+id/budgetManageSources"
-        style="@style/Text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:minHeight="48dp"
-        android:padding="14dp"
-        android:background="@drawable/chip_active"
-        android:foreground="?android:attr/selectableItemBackground"
-        android:text="@string/manage_payment_sources"
-        android:textColor="@color/blue"
-        android:textSize="14sp"
-        android:clickable="true"
-        android:focusable="true" />
-    <LinearLayout
-        android:id="@+id/budgetSourceRows"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+    <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="24dp" android:text="@string/budget_by_source"
+        android:textSize="19sp" android:textStyle="bold" />
+    <TextView android:id="@+id/budgetNoSources" style="@style/Text"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="15dp" android:text="@string/no_budget_sources_yet"
+        android:textSize="14sp" android:textColor="@color/muted" />
+    <LinearLayout android:id="@+id/budgetSourceRows" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:layout_marginTop="16dp"
         android:orientation="vertical" />
+    <TextView android:id="@+id/budgetAddSource" style="@style/Text"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="16dp" android:minHeight="48dp" android:padding="14dp"
+        android:background="@drawable/chip_active" android:text="@string/add_source"
+        android:textColor="@color/blue" android:textSize="14sp"
+        android:clickable="true" android:focusable="true" />
 </LinearLayout>

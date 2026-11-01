@@ -1,6 +1,6 @@
 # ManyManager UI reference
 
-A source based, interactive reconstruction of the current Android interface. The Android app and its data are untouched.
+An interactive HTML/CSS/JavaScript companion to the Android XML interface. Both implementations now show the simplified Settings, category management, and source and budget management.
 
 ## Run
 
@@ -10,20 +10,18 @@ From the repository root:
 python -m http.server 8000 --directory ui-reference
 ```
 
-Open http://localhost:8000/ . The entry point is `index.html`. ES modules and fetched locale JSON require an HTTP server; direct `file://` loading is not supported.
+Open http://localhost:8000/ . The entry point is `index.html`. ES modules and fetched locale JSON require an HTTP server.
 
-## Included
+## Screens and interactions
 
-The home, expense summary, settings, and budget management screens; the side menu; the new expense sheet; summary tabs; home budget expansion; settings expansions; budget month controls; and language and theme choices. Escape closes an overlay or returns to the previous page. The sheet can be dismissed by dragging its handle downward at least 64 CSS px. Drawer and sheet edges align with the app viewport.
+Home, expense summary, Settings, Budget Management, and the dedicated Expense Categories screen are available through the existing side menu or screen links. Settings contains Expense Categories, Language, and Appearance. Expense Categories opens a separate page with back navigation and an Add Category dialog.
 
-Initial state matches the Android source: Hebrew, RTL, light theme, home screen, current month, zero expenses, no categories or payment methods, no budget sources. Language, theme, and draft field values live only in JavaScript memory on the currently loaded page. They reset on reload or tab reopening. The disabled Add and Save controls mirror the Android code. Summary month buttons are disabled in Android; budget month buttons work.
+Budget Management keeps the existing month arrows and total card. It lists the same source identities offered in the expense sheet. Add Source accepts a name and an initial allocation for the selected month. Tapping a source opens its editor with a source name, current allocation, positive adjustment magnitude, +/− selector, signed resulting allocation preview, Cancel, and Update budget. Empty adjustment means zero change. A confirmed adjustment changes the selected month's allocation once and never creates an expense. The existing allocation rule rejects a negative allocated budget; its signed preview remains visible. Remaining balance may be negative.
+
+The initial state is Hebrew, RTL, light theme, home screen, current month, and no categories, sources, budgets, or expenses. Category and source data, allocations, language, theme, and drafts live only in JavaScript memory and reset on reload or tab reopening. Android's new category/source operations similarly live in its Activity ViewModel, surviving ordinary configuration changes but not process death. Expense saving remains unavailable in both implementations; no sample data or storage service is present.
 
 ## Viewport and fidelity
 
-The layout is capped at 440 CSS px on desktop and fills the width of a narrow phone browser. The source uses a 440dp cap, with a 25dp page inset, 66dp top area, and system insets supplied by Android. Visual checks used a 1280 × 956 CSS px desktop viewport and a 390 × 844 CSS px phone viewport. A 440 × 956 CSS px viewport is also useful for a direct phone width comparison. CSS px are not physical screenshot pixels.
+The layout is capped at 440 CSS px on desktop and fills a narrow phone browser. The Android source uses a 440dp cap with system insets. CSS px are not physical screenshot pixels. Browser font metrics, native EditText behavior, IME, system bars, ripple effects, and native AlertDialog appearance can differ. No fake system bars are drawn.
 
-The Android app uses the platform `sans` font, normally Roboto on Android, and resource vector icons. Browser rendering uses locally available Roboto or system fallback. The icon paths are reproduced as inline SVG from the Android vectors. Font metrics, native EditText behavior and IME, system bars, ripple effects, and window insets can differ. The web version does not draw fake system bars.
-
-Verified through the local HTTP server in a browser after the file split: all four screens loaded; summary tabs, budget and settings navigation, settings expansions, theme and language changes worked; Hebrew was RTL and English/Russian were LTR. On desktop, the Hebrew drawer met the app's right edge and the English drawer met its left edge. On a 390px viewport, the Russian drawer met the left edge and the Hebrew drawer met the right edge. The expense sheet matched the app width; its close button, backdrop, and downward drag beyond the handle dismissed it. Clicking inside the drawer and sheet kept them open. No browser console errors were reported.
-
-A connected device showed another application, so no screenshot from a running ManyManager build was obtained. Visual equivalence against Android rendering has not been confirmed. The reconstruction was also checked against Android XML layouts, Kotlin behavior, color resources, and strings.
+The Android `:androidApp:assembleDebug` build and `:androidApp:testDebugUnitTest` passed (14 unit tests). The debug app was launched on a connected Samsung device. Settings, category navigation and dialog, Budget Management, source creation, −₪100 preview and cancellation, confirmation, and month isolation were checked on device. The web reference was loaded through the local HTTP server and exercised in the browser: Settings removal; category navigation, cancel and add; source add, edit, cancel, month isolation, +/− preview, negative allocation validation, home budget refresh, expense source selection, English and Russian LTR, Hebrew RTL, and dark theme. No browser console errors appeared during those checks. Android and browser budget screens were inspected at their respective 440dp and 440 CSS px caps; pixel-level visual equivalence has not been established.

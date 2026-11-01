@@ -1,0 +1,5 @@
+.categories-page h1{margin-top:12px}
+.category-empty{font-size:14px;color:var(--muted);margin-top:24px}
+.category-row{margin-top:16px;padding:20px;font-size:16px}
+.category-add{display:block;width:100%;min-height:48px;margin-top:16px;padding:14px;text-align:start;font-size:14px}
+[dir=rtl] .categories-page .icon{transform:scaleX(-1)}

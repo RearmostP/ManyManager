@@ -62,6 +62,11 @@ class BudgetHomeUi(
         )
         area.setOnClickListener { if (state is PersistentDataState.Failed) onRetry() }
         setExpanded(expanded, animate = false)
+        area.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        ViewCompat.removeAccessibilityAction(area, AccessibilityNodeInfoCompat.ACTION_EXPAND)
+        ViewCompat.removeAccessibilityAction(area, AccessibilityNodeInfoCompat.ACTION_COLLAPSE)
+        ViewCompat.setStateDescription(area, null)
+        area.isClickable = state is PersistentDataState.Failed
     }
 
     fun render(snapshot: BudgetSnapshot, expanded: Boolean) {

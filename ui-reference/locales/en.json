@@ -87,5 +87,6 @@
   "deduct_from_budget": "Deduct from budget",
   "update_budget": "Update budget",
   "budget_plus_symbol": "+",
-  "budget_minus_symbol": "−"
+  "budget_minus_symbol": "−",
+  "budget_period_description": "From %1$s through %2$s"
 }

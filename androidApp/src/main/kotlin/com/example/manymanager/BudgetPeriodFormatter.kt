@@ -6,6 +6,13 @@ import java.time.format.DateTimeFormatter
 
 /** Formats a BudgetPeriod into a localized date range string. */
 object BudgetPeriodFormatter {
+    fun description(context: Context, period: BudgetPeriod): String {
+        val formatter = DateTimeFormatter.ofLocalizedDate(java.time.format.FormatStyle.LONG)
+            .withLocale(context.resources.configuration.locales[0])
+        return context.getString(R.string.budget_period_description,
+            period.start.format(formatter), period.endExclusive.minusDays(1).format(formatter))
+    }
+
     fun format(context: Context, period: BudgetPeriod): String {
         val locale = context.resources.configuration.locales[0]
         val endDate = period.endExclusive.minusDays(1)

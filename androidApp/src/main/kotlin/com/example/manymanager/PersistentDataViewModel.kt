@@ -51,9 +51,9 @@ data class SourceCreationState(
 
     companion object {
         fun fromBundle(bundle: Bundle): SourceCreationState? {
-            val startEpoch = bundle.getLong("startEpochDay", -1L)
-            val endEpoch = bundle.getLong("endExclusiveEpochDay", -1L)
-            if (startEpoch < 0 || endEpoch < 0) return null
+            if (!bundle.containsKey("startEpochDay") || !bundle.containsKey("endExclusiveEpochDay")) return null
+            val startEpoch = bundle.getLong("startEpochDay")
+            val endEpoch = bundle.getLong("endExclusiveEpochDay")
             val period = BudgetPeriod(LocalDate.ofEpochDay(startEpoch), LocalDate.ofEpochDay(endEpoch))
             val source = bundle.getString("createdId")?.let { id ->
                 BudgetSource(checkNotNull(bundle.getString("createdOwner")), id, bundle.getString("createdName").orEmpty())
@@ -103,9 +103,9 @@ data class SourceEditingState(
     companion object {
         fun fromBundle(bundle: Bundle): SourceEditingState? {
             val sourceId = bundle.getString("sourceId") ?: return null
-            val startEpoch = bundle.getLong("startEpochDay", -1L)
-            val endEpoch = bundle.getLong("endExclusiveEpochDay", -1L)
-            if (startEpoch < 0 || endEpoch < 0) return null
+            if (!bundle.containsKey("startEpochDay") || !bundle.containsKey("endExclusiveEpochDay")) return null
+            val startEpoch = bundle.getLong("startEpochDay")
+            val endEpoch = bundle.getLong("endExclusiveEpochDay")
             val source = BudgetSource(bundle.getString("sourceOwner").orEmpty(), sourceId, bundle.getString("sourceName").orEmpty())
             val period = BudgetPeriod(LocalDate.ofEpochDay(startEpoch), LocalDate.ofEpochDay(endEpoch))
             return SourceEditingState(
@@ -231,19 +231,23 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
 
     fun updateSourceCreationName(name: String) {
         sourceCreation.update { current ->
-            if (current == null || current.submitting || current.result is DataResult.Success || current.name == name) current
+            if (current == null || current.submitting || current.interrupted || current.result is DataResult.Success || current.name == name) current
             else current.copy(name = name, result = null)
         }
     }
 
     fun updateSourceCreationAmount(amountText: String) {
         sourceCreation.update { current ->
-            if (current == null || current.submitting || current.result is DataResult.Success || current.initialAmountText == amountText) current
+            if (current == null || current.submitting || current.interrupted || current.result is DataResult.Success || current.initialAmountText == amountText) current
             else current.copy(initialAmountText = amountText, result = null)
         }
     }
 
     fun cancelSourceCreation() {
+        sourceCreation.value?.takeIf { it.interrupted }?.let {
+            selectPeriod(it.period)
+            refresh()
+        }
         sourceCreation.update { current ->
             if (current?.submitting == true || current?.result is DataResult.Success) current else null
         }
@@ -255,7 +259,7 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
 
     fun submitSourceCreation(): Job? {
         val current = sourceCreation.value ?: return null
-        if (current.submitting || current.result is DataResult.Success) return null
+        if (current.submitting || current.interrupted || current.result is DataResult.Success) return null
         val parsed = BudgetAmounts.parse(current.initialAmountText)
         if (parsed == null) {
             sourceCreation.value = current.copy(result = DataResult.Failure(DataError.AmountOverflow))
@@ -283,21 +287,21 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
     fun restoreSourceEditing(restored: SourceEditingState) {
         if (sourceEditing.value == null) {
             sourceEditing.value = restored
-            if (restored.submitResult !is DataResult.Success)
+            if (!restored.interrupted && restored.submitResult !is DataResult.Success)
                 updateSourceEditingAdjustment(restored.adjustmentText, restored.isAdd)
         }
     }
 
     fun updateSourceEditingName(name: String) {
         sourceEditing.update { current ->
-            if (current == null || current.submitting || current.submitResult is DataResult.Success || current.name == name) current
+            if (current == null || current.submitting || current.interrupted || current.submitResult is DataResult.Success || current.name == name) current
             else current.copy(name = name, submitResult = null)
         }
     }
 
     fun updateSourceEditingAdjustment(text: String, isAdd: Boolean) {
         val current = sourceEditing.value ?: return
-        if (current.submitting || current.submitResult is DataResult.Success) return
+        if (current.submitting || current.interrupted || current.submitResult is DataResult.Success) return
         val revision = ++previewRevision
         val updated = current.copy(adjustmentText = text, isAdd = isAdd, submitResult = null, previewResult = null)
         sourceEditing.value = updated
@@ -320,6 +324,11 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
     }
 
     fun cancelSourceEditing() {
+        sourceEditing.value?.takeIf { it.interrupted }?.let {
+            selectPeriod(it.period)
+            refresh()
+        }
+        ++previewRevision
         previewJob?.cancel()
         previewJob = null
         sourceEditing.update { current ->
@@ -333,7 +342,7 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
 
     fun submitSourceEditing(): Job? {
         val current = sourceEditing.value ?: return null
-        if (current.submitting || current.submitResult is DataResult.Success) return null
+        if (current.submitting || current.interrupted || current.submitResult is DataResult.Success) return null
         val parsed = if (current.adjustmentText.isBlank()) 0L else BudgetAmounts.parse(current.adjustmentText)
         val preview = (current.previewResult as? DataResult.Success)?.value
         if (current.name.isBlank() || parsed == null || preview == null ||
@@ -349,11 +358,14 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         }
     }
 
+    private var navigationRevision = 0L
+
     fun selectPreviousPeriod() {
         val current = (state.value as? PersistentDataState.Ready)?.snapshot?.period ?: return
+        val revision = ++navigationRevision
         viewModelScope.launch {
             val prevResult = repository.periodContaining(current.start.minusDays(1))
-            if (prevResult is DataResult.Success) {
+            if (revision == navigationRevision && prevResult is DataResult.Success) {
                 selectPeriod(prevResult.value)
             }
         }
@@ -361,9 +373,10 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
 
     fun selectNextPeriod() {
         val current = (state.value as? PersistentDataState.Ready)?.snapshot?.period ?: return
+        val revision = ++navigationRevision
         viewModelScope.launch {
             val nextResult = repository.periodContaining(current.endExclusive)
-            if (nextResult is DataResult.Success) {
+            if (revision == navigationRevision && nextResult is DataResult.Success) {
                 selectPeriod(nextResult.value)
             }
         }
@@ -371,7 +384,10 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
 
     /** Null follows today. Call refresh on resume/date changes when screens are migrated. */
     val selectedPeriod: BudgetPeriod? get() = selection.value.period
-    fun selectPeriod(period: BudgetPeriod?) { selection.update { it.copy(period = period) } }
+    fun selectPeriod(period: BudgetPeriod?) {
+        ++navigationRevision
+        selection.update { it.copy(period = period) }
+    }
     fun refresh() {
         selection.update { it.copy(refresh = it.refresh + 1) }
         activeRefresh.update { it + 1 }

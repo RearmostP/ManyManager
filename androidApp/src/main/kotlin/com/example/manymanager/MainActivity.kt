@@ -324,6 +324,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun navigateToPage(index: Int) {
         if (index == page) return
+        if (index == 3) persistentViewModel.selectPeriod(null)
         if (index == 0) {
             pageHistory.clear()
         } else {
@@ -343,11 +344,7 @@ class MainActivity : AppCompatActivity() {
                 if (page == 0 && index != 0) homeBudgetUi?.setExpanded(false, animate = false)
                 page = index
                 pageBackCallback.isEnabled = index != 0 || budgetState.breakdownExpanded
-                if (index == 3 && contentReady) persistentViewModel.selectPeriod(null)
-                (persistentViewModel.state.value as? PersistentDataState.Ready)?.snapshot?.let { snapshot ->
-                    budgetManagementUi?.render(snapshot)
-                    categoryManagementUi?.render(persistentViewModel.categories.value)
-                }
+                categoryManagementUi?.render(persistentViewModel.categories.value)
                 listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage,
                     R.id.budgetPage, R.id.categoriesPage).forEachIndexed { i, id ->
                     findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
@@ -437,8 +434,12 @@ class MainActivity : AppCompatActivity() {
         } ?: "—"
         snapshot?.let {
             val label = BudgetPeriodFormatter.format(this, it.period)
-            findViewById<TextView>(R.id.homeMonth).text = label
-            findViewById<TextView>(R.id.monthLabel).text = label
+            listOf(R.id.homeMonth, R.id.monthLabel).forEach { id ->
+                findViewById<TextView>(id).apply {
+                    text = label
+                    contentDescription = BudgetPeriodFormatter.description(this@MainActivity, it.period)
+                }
+            }
         }
     }
 

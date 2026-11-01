@@ -87,5 +87,6 @@
   "deduct_from_budget": "Вычесть из бюджета",
   "update_budget": "Обновить бюджет",
   "budget_plus_symbol": "+",
-  "budget_minus_symbol": "−"
+  "budget_minus_symbol": "−",
+  "budget_period_description": "С %1$s по %2$s"
 }

@@ -87,5 +87,6 @@
   "deduct_from_budget": "הפחתה מהתקציב",
   "update_budget": "עדכון תקציב",
   "budget_plus_symbol": "+",
-  "budget_minus_symbol": "−"
+  "budget_minus_symbol": "−",
+  "budget_period_description": "מ־%1$s עד %2$s"
 }

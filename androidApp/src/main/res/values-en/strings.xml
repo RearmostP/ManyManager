@@ -83,7 +83,7 @@
     <string name="source_name_required">Enter a source name</string>
     <string name="source_saving">Saving…</string>
     <string name="source_save_error">Failed to save budget source. Please try again.</string>
-    <string name="source_save_interrupted">Operation was interrupted. Check if saved before retrying.</string>
+    <string name="source_save_interrupted">The previous save outcome is unknown. This form cannot be submitted again. Close it, check the saved data, then deliberately start a new operation.</string>
     <string name="initial_budget">Initial budget for the selected month</string>
     <string name="budget_for_month">Budget for %1$s</string>
     <string name="current_budget">Current budget: %1$s</string>
@@ -98,4 +98,7 @@
     <string name="sources_load_error">Failed to load sources. Tap to retry.</string>
     <string name="budget_loading">Loading budget…</string>
     <string name="budget_load_error">Failed to load budget. Tap to retry.</string>
+    <string name="review_saved_budget">Close and check saved data</string>
+    <string name="budget_preview_error">Failed to load preview. Tap to retry.</string>
+    <string name="budget_period_description">From %1$s through %2$s</string>
 </resources>

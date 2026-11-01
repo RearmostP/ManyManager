@@ -16,12 +16,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 
 /** Owns the single persistent repository for this process. */
-class ManyManagerApplication : Application() {
+open class ManyManagerApplication : Application() {
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    val database: ManyManagerDatabase by lazy { ManyManagerDatabase.create(this) }
+    open val database: ManyManagerDatabase by lazy { ManyManagerDatabase.create(this) }
 
-    val repository: ManyManagerRepository by lazy {
+    open val repository: ManyManagerRepository by lazy {
         ManyManagerRepository(database, databaseInitialization, object : Clock() {
             // Resolve the device zone at read time, including after a timezone change.
             override fun getZone(): ZoneId = ZoneId.systemDefault()

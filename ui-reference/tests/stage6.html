@@ -2,8 +2,8 @@
 <meta charset="utf-8">
 <meta name="google" content="notranslate">
 <base href="../">
-<title>Stage 6 companion checks</title>
-<h1>Stage 6 companion checks</h1>
+<title>Budget companion checks — stages 6–7</title>
+<h1>Budget companion checks — stages 6–7</h1>
 <pre id="results">Running…</pre>
 <script type="module">
 import {periodFor,periodKey,adjacentPeriod} from "../js/budget-period.js";
@@ -14,6 +14,7 @@ import {expense} from "../js/components/expense-sheet.js";
 import {home} from "../js/screens/home.js";
 import {canConfirmSourceEdit} from "../js/components/source-dialog.js";
 import {loadLanguage} from "../js/i18n.js";
+import {periodLabel,periodDescription} from "../js/render-helpers.js";
 const results=[];
 function check(condition,label){if(!condition)throw Error(label);results.push("PASS "+label)}
 try{
@@ -52,6 +53,20 @@ try{
  check(state.expenseDraft.categoryId===categoryId&&state.overlay==="expense","category cancellation");
  state.currentDate=after;state.budgetMonth=next;
  check(home().includes("Renamed")&&home().includes("14"),"home follows active period independently of management");
+ const crossing=new Date(2026,11,10);
+ for(const language of ["he","ru","en"]){
+   await loadLanguage(language);
+   const label=periodLabel(language,crossing);
+   check(label.includes("2026")&&label.includes("2027"),language+" year-crossing label includes both years");
+   check(periodDescription(language,crossing).includes("2026"),language+" accessible full period description");
+ }
+ state.language="en";
+ state.dialogMonth=after;
+ state.sourceDraft={sourceId:a.id,name:"Captured period",adjustment:"1",operation:"add"};
+ state.currentDate=next;state.budgetMonth=next;
+ check(updateSource(a.id,state.sourceDraft.name,state.dialogMonth,100)&&amountFor(after,a.id)===1500&&amountFor(next,a.id)===0,"confirmation after rollover affects captured period only");
+ const saved=amountFor(after,a.id);state.overlay="edit-source";closeOverlay();
+ check(amountFor(after,a.id)===saved,"cancel never changes allocation");
  document.getElementById("results").textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
 }catch(error){document.getElementById("results").textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}
 </script>

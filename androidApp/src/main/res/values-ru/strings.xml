@@ -83,7 +83,7 @@
     <string name="source_name_required">Введите название источника</string>
     <string name="source_saving">Сохранение…</string>
     <string name="source_save_error">Не удалось сохранить источник бюджета. Попробуйте еще раз.</string>
-    <string name="source_save_interrupted">Операция была прервана. Проверьте, сохранена ли она.</string>
+    <string name="source_save_interrupted">Результат предыдущего сохранения неизвестен. Повторная отправка этой формы недоступна. Закройте её, проверьте сохранённые данные и только затем начните новую операцию.</string>
     <string name="initial_budget">Начальный бюджет для выбранного месяца</string>
     <string name="budget_for_month">Бюджет на %1$s</string>
     <string name="current_budget">Текущий бюджет: %1$s</string>
@@ -98,4 +98,7 @@
     <string name="sources_load_error">Не удалось загрузить источники. Нажмите, чтобы повторить.</string>
     <string name="budget_loading">Загрузка бюджета…</string>
     <string name="budget_load_error">Не удалось загрузить бюджет. Нажмите, чтобы повторить.</string>
+    <string name="review_saved_budget">Закрыть и проверить данные</string>
+    <string name="budget_preview_error">Не удалось загрузить предпросмотр. Нажмите, чтобы повторить.</string>
+    <string name="budget_period_description">С %1$s по %2$s</string>
 </resources>

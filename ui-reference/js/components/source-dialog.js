@@ -1,6 +1,6 @@
 import {state} from "../state.js";
 import {previewModel,amountFor,parseAmount,previewAdjustment} from "../preview-model.js";
-import {tr,money,periodLabel,escapeValue} from "../render-helpers.js";
+import {tr,money,periodLabel,periodDescription,escapeValue} from "../render-helpers.js";
 
 export function sourcePreview(){
   const sourceId=state.sourceDraft.sourceId;
@@ -35,7 +35,7 @@ export function sourceDialog(){
     <label class="field-label initial-label" for="source-initial">${tr("initial_budget")}</label>
     <input id="source-initial" class="sheet-field" data-source-draft="initial" inputmode="decimal" value="${escapeValue(state.sourceDraft.initial)}">`;
   return `<div class="scrim dialog-wrap" data-action="close-overlay"><div class="overlay-stage"><div class="dialog-panel" data-stop-close role="dialog" aria-modal="true" aria-labelledby="source-dialog-title">
-    <h2 id="source-dialog-title">${title}</h2><p class="dialog-month">${month}</p>
+    <h2 id="source-dialog-title">${title}</h2><p class="dialog-month" aria-label="${escapeValue(periodDescription(state.language,state.dialogMonth))}">${month}</p>
     ${body}<p id="source-error" class="form-error" role="alert" hidden></p>
     <div class="dialog-actions"><button data-action="close-overlay">${tr("cancel")}</button><button class="primary" data-action="${edit?"confirm-edit-source":"confirm-add-source"}" ${edit&&!canConfirmSourceEdit()?"disabled":""}>${tr(edit?"update_budget":"add_source")}</button></div>
     </div></div></div>`;

@@ -26,8 +26,10 @@ class SideMenuDialog(
     private val menuWidth: Int
     private val opensFromRight: Boolean
     private var isDismissing = false
+    private var dismissed = false
 
     init {
+        setOwnerActivity(activity)
         val dialog = this
         val button = anchor
         val position = IntArray(2)
@@ -81,6 +83,7 @@ class SideMenuDialog(
 
     override fun show() {
         val alreadyShowing = isShowing
+        dismissed = false
         panel.translationX = if (ValueAnimator.areAnimatorsEnabled() && !alreadyShowing) {
             if (opensFromRight) menuWidth.toFloat() else -menuWidth.toFloat()
         } else 0f
@@ -109,8 +112,12 @@ class SideMenuDialog(
     }
 
     fun dismissImmediately() {
-        panel.animate().cancel()
-        super.dismiss()
+        if (dismissed) return
+        dismissed = true
+        panel.animate().withEndAction(null).cancel()
+        if (ownerActivity?.isDestroyed != true && window?.decorView?.isAttachedToWindow == true) {
+            super.dismiss()
+        }
         isDismissing = false
     }
 

@@ -65,8 +65,10 @@ class BudgetManagementUi(
         root.findViewById<TextView>(R.id.budgetNoSources).setText(R.string.no_budget_sources_yet)
         currentSnapshot = snapshot
         val period = snapshot.period
-        root.findViewById<TextView>(R.id.budgetMonth).text =
-            BudgetPeriodFormatter.format(context, period)
+        root.findViewById<TextView>(R.id.budgetMonth).apply {
+            text = BudgetPeriodFormatter.format(context, period)
+            contentDescription = BudgetPeriodFormatter.description(context, period)
+        }
         root.findViewById<TextView>(R.id.budgetAllocatedTotal).text =
             money(snapshot.totalAllocatedMinor)
         val sources = snapshot.sources

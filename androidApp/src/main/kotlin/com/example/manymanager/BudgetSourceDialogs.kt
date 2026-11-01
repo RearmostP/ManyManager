@@ -28,9 +28,11 @@ class SourceCreationDialog(
         .setPositiveButton(R.string.add_source, null)
         .create()
 
+    private var rendering = false
+
     init {
-        nameInput.doAfterTextChanged { onNameChanged(it.toString()) }
-        amountInput.doAfterTextChanged { onAmountChanged(it.toString()) }
+        nameInput.doAfterTextChanged { if (!rendering) onNameChanged(it.toString()) }
+        amountInput.doAfterTextChanged { if (!rendering) onAmountChanged(it.toString()) }
         dialog.setOnCancelListener { onCancel() }
         dialog.setOnShowListener {
             dialog.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener { onSubmit() }
@@ -44,6 +46,13 @@ class SourceCreationDialog(
         monthLabel.text = context.getString(
             R.string.budget_for_month, BudgetPeriodFormatter.format(context, state.period)
         )
+        monthLabel.contentDescription = BudgetPeriodFormatter.description(context, state.period)
+        monthLabel.accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+        if (state.interrupted) {
+            monthLabel.append("\n" + context.getString(R.string.source_save_interrupted))
+            monthLabel.contentDescription = monthLabel.text
+        }
+        rendering = true
         if (nameInput.text.toString() != state.name) {
             nameInput.setText(state.name)
             nameInput.setSelection(nameInput.length())
@@ -52,15 +61,19 @@ class SourceCreationDialog(
             amountInput.setText(state.initialAmountText)
             amountInput.setSelection(amountInput.length())
         }
-        nameInput.isEnabled = !state.submitting
-        amountInput.isEnabled = !state.submitting
+        rendering = false
+        nameInput.isEnabled = !state.submitting && !state.interrupted
+        amountInput.isEnabled = !state.submitting && !state.interrupted
         dialog.setCancelable(!state.submitting)
         dialog.setCanceledOnTouchOutside(!state.submitting)
         dialog.getButton(DialogInterface.BUTTON_POSITIVE).apply {
-            isEnabled = !state.submitting && state.result !is DataResult.Success
+            isEnabled = !state.submitting && !state.interrupted && state.result !is DataResult.Success
             setText(if (state.submitting) R.string.source_saving else R.string.add_source)
         }
-        dialog.getButton(DialogInterface.BUTTON_NEGATIVE).isEnabled = !state.submitting
+        dialog.getButton(DialogInterface.BUTTON_NEGATIVE).apply {
+            isEnabled = !state.submitting
+            setText(if (state.interrupted) R.string.review_saved_budget else R.string.cancel)
+        }
 
         val error = (state.result as? DataResult.Failure)?.error
         nameInput.error = when (error) {
@@ -72,8 +85,7 @@ class SourceCreationDialog(
                 context.getString(R.string.budget_invalid_amount)
             error != null && error != DataError.BlankName ->
                 context.getString(R.string.source_save_error)
-            state.interrupted ->
-                context.getString(R.string.source_save_interrupted)
+            state.interrupted -> null
             else -> null
         }
     }
@@ -110,13 +122,16 @@ class SourceEditingDialog(
         .setPositiveButton(R.string.update_budget, null)
         .create()
 
+    private var rendering = false
+
     init {
-        nameInput.doAfterTextChanged { onNameChanged(it.toString()) }
-        amountInput.doAfterTextChanged { onAdjustmentChanged(it.toString(), isAdd) }
+        nameInput.doAfterTextChanged { if (!rendering) onNameChanged(it.toString()) }
+        amountInput.doAfterTextChanged { if (!rendering) onAdjustmentChanged(it.toString(), isAdd) }
         plusBtn.setOnClickListener {
             isAdd = true
             onAdjustmentChanged(amountInput.text.toString(), true)
         }
+        previewText.setOnClickListener { onAdjustmentChanged(amountInput.text.toString(), isAdd) }
         minusBtn.setOnClickListener {
             isAdd = false
             onAdjustmentChanged(amountInput.text.toString(), false)
@@ -141,6 +156,10 @@ class SourceEditingDialog(
         currentLabel.text = context.getString(
             R.string.current_budget, money((state.previewResult as? DataResult.Success)?.value?.currentAllocatedMinor ?: state.currentAllocationMinor)
         )
+        monthLabel.contentDescription = BudgetPeriodFormatter.description(context, state.period)
+        monthLabel.accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
+
+        rendering = true
         if (nameInput.text.toString() != state.name) {
             nameInput.setText(state.name)
             nameInput.setSelection(nameInput.length())
@@ -156,28 +175,40 @@ class SourceEditingDialog(
         plusBtn.setTextColor(context.getColor(if (isAdd) R.color.blue else R.color.text))
         minusBtn.setTextColor(context.getColor(if (isAdd) R.color.text else R.color.blue))
 
-        nameInput.isEnabled = !state.submitting
-        amountInput.isEnabled = !state.submitting
-        plusBtn.isEnabled = !state.submitting
-        minusBtn.isEnabled = !state.submitting
+        rendering = false
+        nameInput.isEnabled = !state.submitting && !state.interrupted
+        amountInput.isEnabled = !state.submitting && !state.interrupted
+        plusBtn.isEnabled = !state.submitting && !state.interrupted
+        minusBtn.isEnabled = !state.submitting && !state.interrupted
         dialog.setCancelable(!state.submitting)
         dialog.setCanceledOnTouchOutside(!state.submitting)
 
+        previewText.accessibilityLiveRegion = android.view.View.ACCESSIBILITY_LIVE_REGION_POLITE
         val preview = state.previewResult
+        previewText.isClickable = !state.submitting && !state.interrupted && preview is DataResult.Failure
+        previewText.isFocusable = previewText.isClickable || state.interrupted
         val isValidPreview = preview is DataResult.Success && preview.value.resultingAllocatedMinor >= 0
         if (preview is DataResult.Success) {
             previewText.text = context.getString(
                 R.string.budget_after_change, money(preview.value.resultingAllocatedMinor)
             )
         } else {
-            previewText.text = context.getString(if (preview == null) R.string.budget_loading else R.string.budget_invalid_amount)
+            previewText.text = context.getString(when {
+                state.interrupted -> R.string.source_save_interrupted
+                preview == null -> R.string.budget_loading
+                (preview as? DataResult.Failure)?.error == DataError.AmountOverflow -> R.string.budget_invalid_amount
+                else -> R.string.budget_preview_error
+            })
         }
 
         dialog.getButton(DialogInterface.BUTTON_POSITIVE).apply {
-            isEnabled = !state.submitting && isValidPreview && state.name.isNotBlank() && state.submitResult !is DataResult.Success
+            isEnabled = !state.submitting && !state.interrupted && isValidPreview && state.name.isNotBlank() && state.submitResult !is DataResult.Success
             setText(if (state.submitting) R.string.source_saving else R.string.update_budget)
         }
-        dialog.getButton(DialogInterface.BUTTON_NEGATIVE).isEnabled = !state.submitting
+        dialog.getButton(DialogInterface.BUTTON_NEGATIVE).apply {
+            isEnabled = !state.submitting
+            setText(if (state.interrupted) R.string.review_saved_budget else R.string.cancel)
+        }
 
         val error = (state.submitResult as? DataResult.Failure)?.error
         nameInput.error = when (error) {
@@ -189,8 +220,7 @@ class SourceEditingDialog(
                 context.getString(R.string.budget_invalid_amount)
             error != null && error != DataError.BlankName ->
                 context.getString(R.string.source_save_error)
-            state.interrupted ->
-                context.getString(R.string.source_save_interrupted)
+            state.interrupted -> null
             else -> null
         }
     }

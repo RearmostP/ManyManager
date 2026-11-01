@@ -4,8 +4,8 @@ import android.app.Application
 import android.content.Context
 import androidx.test.runner.AndroidJUnitRunner
 
-/** Database fixtures never start the production Application or initialize its database. */
+/** The test Application supplies in-memory Room; production storage/preferences are never opened. */
 class DatabaseTestRunner : AndroidJUnitRunner() {
     override fun newApplication(cl: ClassLoader, className: String, context: Context): Application =
-        super.newApplication(cl, Application::class.java.name, context)
+        super.newApplication(cl, BudgetTestApplication::class.java.name, context)
 }

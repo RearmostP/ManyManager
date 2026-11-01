@@ -1,7 +1,8 @@
 # תוכנית אחסון מתמשך — ManyManager
 
-שלב 1 מתוך 10. מסמך תכנון בלבד, המבוסס על הקוד שנבדק ב־2026-11-01.
-אין במסמך טענה ש־Room, הוצאות מתמשכות או תקופות חיוב כבר מומשו.
+תוכנית לעשרה שלבים, עם ממצאי הבסיס של שלב 1 ומעקב מימוש של שלב 2.
+ממצאי הקוד בסעיף הבסיס מתארים את המצב לפני שלב 2; מצב התשתית העדכני מתועד בסוף המסמך.
+שמירת הוצאות וחיבור המסכים למסד עדיין אינם ממומשים.
 
 ## מצב העבודה והיקף
 
@@ -11,7 +12,7 @@
 - לא נמצאו קובצי AGENTS.md בחיפוש בפרויקט ובתיקיות האב שנבדקו עד שורש הכונן. תיקיית docs לא הייתה קיימת.
 - התוצר החדש היחיד בשלב זה הוא מסמך זה. אין שינוי בקוד, ב־Gradle, במסד נתונים או בממשק HTML.
 
-## ממצאים מהקוד הקיים
+## ממצאי הבסיס מהקוד — לפני שלב 2
 
 כל הנתיבים להלן יחסיים לשורש המאגר. קובצי Kotlin של האפליקציה נמצאים תחת
 `androidApp/src/main/kotlin/com/example/manymanager/`.
@@ -104,7 +105,9 @@ Home/Summary מציגים סכומי הוצאות אפס. שפה ומראה בד
 - קטגוריות ומקורות הם נתוני משתמש, מתחילים ריקים וזמינים בכל התקופות.
 - מקור תקציב ומקור הוצאה הם אותה ישות. לקטגוריות ולמקורות מזהים יציבים,
   שאינם שם, תרגום או מיקום ברשימה.
-- כסף הוא Long באגורות. הוצאה מכילה סכום, תאריך, קשר לקטגוריה, קשר למקור והערה אופציונלית.
+- כסף הוא Long באגורות. הוצאה מכילה סכום, תאריך, קטגוריה אופציונלית, מקור חובה והערה אופציונלית.
+- החלטת מוצר לשלב 2: categoryId=null מייצג הוצאה ללא קטגוריה. „ללא קטגוריה” הוא כיתוב תצוגה,
+  לא רשומת קטגוריה שנזרעת במסד. non-null חייב להפנות לקטגוריה באותו מחשבון.
 - הקצאות לפי מקור ותקופה והוצאות הן העובדות. סכומים, ספירות ויתרות נגזרים מהן;
   אין טבלת יתרות מתעדכנת או expenseTotal עצמאי.
 - שינוי תקציב משנה הקצאה בלבד ואינו יוצר הוצאה.
@@ -157,7 +160,7 @@ endExclusive הוא 10 בחודש הבא יחסית לתחילת התקופה.
 compile/target SDK 37, minSdk 30, lifecycle 2.11.0.
 Gradle wrapper הוא 9.6.0; יעד bytecode הוא JVM 11 (אין להסיק ממנו את גרסת JDK להפעלת Gradle).
 androidApp משתמש ב־Kotlin המובנה של AGP, ללא plugin נפרד של kotlin.android.
-אין כיום Room, KSP או הגדרת schema export.
+במצב הבסיס לא היו Room, KSP או schema export; תוצאות מימוש שלב 2 מפורטות בסוף המסמך.
 
 בשלב 2 יש לבדוק גרסה יציבה של Room ושל KSP שתומכת בפועל בשרשרת הזאת,
 לרבות Kotlin המובנה, ולהוסיף runtime/compiler/export ובדיקות בלבד דרך version catalog.
@@ -186,7 +189,7 @@ Flow, viewModelScope ו־repeatOnLifecycle יצריכו תלויות Android מ�
 | Category | calculatorId: String; id: String; name: String | PK (calculatorId,id); FK calculatorId -> Calculator.id. אינדקס ה־PK מכסה סינון לפי בעלים. אין UNIQUE על name לפני החלטת כפילויות. |
 | BudgetSource | calculatorId: String; id: String; name: String | PK (calculatorId,id); FK למחשבון; ה־PK מכסה רשימת מקורות בבעלות מחשבון. אין קשר באמצעות שם. |
 | BudgetAllocation | calculatorId: String; sourceId: String; periodStartEpochDay: Long; allocatedMinor: Long | PK (calculatorId,sourceId,periodStartEpochDay), המבטיח הקצאה יחידה. FK (calculatorId,sourceId) -> BudgetSource(calculatorId,id). אינדקס (calculatorId,periodStartEpochDay) לשליפת תקופה. הבעלות מובטחת דרך FK המקור. |
-| Expense | calculatorId: String; id: String; amountMinor: Long; dateEpochDay: Long; categoryId: String; sourceId: String; note: String? | PK (calculatorId,id); FK (calculatorId,categoryId) -> Category(calculatorId,id); FK (calculatorId,sourceId) -> BudgetSource(calculatorId,id). אינדקסים (calculatorId,dateEpochDay), (calculatorId,categoryId), (calculatorId,sourceId). categoryId non-null הוא המלצה מותנית בהחלטה להלן. |
+| Expense | calculatorId: String; id: String; amountMinor: Long; dateEpochDay: Long; categoryId: String?; sourceId: String; note: String? | PK (calculatorId,id); FK (calculatorId,categoryId) -> Category(calculatorId,id); FK (calculatorId,sourceId) -> BudgetSource(calculatorId,id). אינדקסים (calculatorId,dateEpochDay), (calculatorId,categoryId), (calculatorId,sourceId). categoryId nullable בהתאם להחלטת המוצר; sourceId חובה. נוסף גם FK ישיר למחשבון. |
 
 מפתחות מורכבים מונעים ברמת SQLite הוצאה עם בעלים A שמפנה לקטגוריה או מקור של B,
 גם אם קוד קורא שוגה. FK ל־id בלבד ובדיקת ViewModel לא מספיקים.
@@ -202,8 +205,8 @@ Repository מאמת שם לא ריק לאחר trim, בעלות, כסף מדוי�
 הקצאה לא שלילית נשמרת בכלל העסקי הקיים; יש לבחון בשלב 2 אכיפת CHECK
 בכלים הנתמכים בגרסת Room הנבחרת, בלי ליצור DDL שלא תואם לסכמה המיוצאת.
 אין CHECK amount>0 להוצאות לפני החלטת החזרים/אפס.
-אם category תהיה אופציונלית, categoryId יהיה nullable וה־FK יחול על קשר קיים;
-זו החלטה שצריכה להיסגר לפני קיבוע סכמה 1, או שהטבלה תידחה במפורש.
+קטגוריה אופציונלית הוכרעה: categoryId nullable וה־FK חל כאשר הערך אינו null.
+אין חסם nullability להקמת טבלת Expense בגרסה 1.
 
 ## שכבת נתונים וגבול הבקרים
 
@@ -264,7 +267,8 @@ renderContent שמחליף Views בעקבות locale/theme אינו רשאי ל�
   או צבירה מדויקת עם BigInteger בשכבת הנתונים ובדיקת המרה ל־Long.
 - מסד אחד פרטי לאפליקציה. אתחול async יוצר אם חסר את המחשבון המקומי עם id פנימי קבוע,
   ILS ויום 10; INSERT IGNORE/עסקה ואחריו קריאה מונעים כפילויות. אין עדכון יום ההתחלה
-  בכל פתיחה, ואין seed של קטגוריות/מקורות/כסף. לפני מוכנות מוצג loading.
+  בכל פתיחה, ואין seed של קטגוריות/מקורות/כסף. בשלב 2 האתחול אינו משנה rendering;
+  מצב loading יידרש רק כאשר מסך יתחיל להסתמך על המסד.
 - סכמות מיוצאות נשמרות ב־version control מהגרסה הראשונה; כל שינוי עתידי מקבל version
   ומיגרציה מפורשת או auto migration שנבדקה. אין fallbackToDestructiveMigration.
   בדיקות משדרגות קובץ קיים ומוודאות זהויות, קשרים, סכומים ותאריכים נשמרים.
@@ -284,10 +288,10 @@ renderContent שמחליף Views בעקבות locale/theme אינו רשאי ל�
 AndroidManifest.xml.
 **חדשים:** data/local/{ManyManagerDatabase,Entities,ManyManagerDao}.kt,
 ManyManagerApplication.kt, androidApp/schemas, בדיקות device למסד ואתחול.
-**תלות:** מסמך זה ובדיקת תאימות Room/KSP/JDK; החלטת nullable לקטגוריית הוצאה.
+**תלות:** מסמך זה ובדיקת תאימות Room/KSP/JDK. קטגוריית הוצאה אופציונלית — הוכרע ומומש.
 **בדיקה:** assembleDebug, schema export, פתיחה חוזרת ללא כפילות calculator, FK בין בעלים,
 הקצאה כפולה לאותו מקור/תקופה, הישרדות נתונים בסגירה/פתיחה.
-**פתוח:** category חובה; כפילויות שמות אם רוצים UNIQUE כבר בסכמה 1.
+**הוכרע:** קטגוריה אופציונלית; אין אילוץ ייחודיות על שמות משתמש בשלב 2.
 אין צורך בחישוב יום 10 כדי להקים שדות epochDay; בדיקות סכמה מזינות גבולות מפורשים.
 
 ### 3 — חישוב תקופות
@@ -360,7 +364,8 @@ BudgetViewModel.kt, MainActivity.kt; strings לשפות ותוויות התקו�
 **קיימים:** ExpenseSheetDialog.kt, MainActivity.kt, BudgetViewModel.kt, dialog_expense.xml,
 page_summary.xml/panel_all.xml והתרגומים במידה שנדרש לחיבור פעולות.
 **חדשים:** בקר/renderer ממוקד לרשימת הוצאות, למשל ExpenseListUi.kt, ובדיקות CRUD.
-**תלות:** 4–7; החלטות קטגוריה אופציונלית, אפס/החזר/סכום שלילי, וכללי עריכה/מחיקה.
+**תלות:** 4–7; החלטות אפס/החזר/סכום שלילי וכללי עריכה/מחיקה.
+קטגוריה אופציונלית כבר הוכרעה בשלב 2.
 **בדיקה:** אגורות מדויקות, תאריכים משני צדי הגבול, תיקון תאריך שמעביר תקופה,
 הערה ריקה, כשל FK, restart, מחיקה והחזרת totals לתוצאה נכונה.
 מקור בהקצאת אפס והוצאה שמביאה ליתרה שלילית חייבים לעבוד.
@@ -398,7 +403,7 @@ README.md, ui-reference/{README.md,UI_MAP.md}, בדיקות ישנות ו־Gradl
 
 | שאלה | מה ידוע / המלצה בלבד | מועד הכרעה |
 | --- | --- | --- |
-| קטגוריה חובה בהוצאה? | UI מציע בחירה אך save מושבת, לכן אין כלל מוצר שניתן להסיק. סכמה לעיל ממליצה non-null; לא קביעה מוסכמת. | לפני שלב 2 אם מגדירים את Expense בסכמה 1. |
+| קטגוריה חובה בהוצאה? | הוכרע: לא. categoryId=null; „ללא קטגוריה” הוא כיתוב בלבד. מקור נשאר חובה. | נסגר בשלב 2. |
 | שמות קטגוריות/מקורות כפולים? | מתקבלים כרגע; בדיקות אף משתמשות בשני מקורות עם אותו שם. מומלץ לא להוסיף UNIQUE ולשמר זאת עד הכרעה. יש להגדיר trim/case/Unicode אם בוחרים ייחודיות. | לפני 2 רק אם רוצים אילוץ UNIQUE; אחרת לפני שינוי התנהגות ב־5/6. |
 | מחיקה או ארכוב של ישות עם הוצאות? | לא קיים UI. המלצה: הגנת FK נגד orphan וללא cascade; מחיקה פיזית/ארכוב/העברה דורשים החלטה. | לפני חשיפת delete/archive ב־5/6 או שלב עתידי, לא blocker ליצירה. |
 | החזרים, אפס או הוצאה שלילית? | parser תקציב דוחה סימן שלילי, אך אינו מדיניות הוצאות. אין כתיבת הוצאות כיום. | לפני ולידציית הוצאות בשלב 8; לא להוסיף CHECK מגביל בשלב 2. |
@@ -407,11 +412,8 @@ README.md, ui-reference/{README.md,UI_MAP.md}, בדיקות ישנות ו־Gradl
 | טיוטה לאחר הריגה יזומה/פתיחה חדשה | שמירה זמנית בשחזור Activity קיימת; durable draft אינו דרישה מוסכמת. | לפני הרחבת טיוטות בשלב 8, רק אם מבקשים שרידות נוספת. |
 | גיבוי | Manifest הנוכחי allowBackup=true. "פרטי" אינו הבטחה שהמסד מוצפן או מוחרג מגיבוי. | בדיקת scope וגיבוי לפני סיום 10; אין שינוי הגדרה בשלב 1. |
 
-מלבד הכרעת nullability של Category בהוצאה אם הסכמה המלאה נכתבת בשלב 2,
-אין צורך להמתין לשאלות המוצר האחרות כדי להתחיל את התשתית.
-בדיקת תאימות Room/KSP היא משימת הנדסה של שלב 2, לא שאלה למשתמש.
-אם לא מחליטים על nullability, אפשר להתחיל את תשתית המסד אך יש לדחות במפורש את
-קיבוע טבלת Expense; אין לבחור מדיניות קבועה בשקט.
+חסם הקטגוריה לשלב 2 הוסר בהחלטת המוצר. הסכמה המלאה כוללת Expense עם categoryId nullable.
+אין לשנות מדיניות כפילויות, החזרים או מחיקה באופן סמוי במסגרת התשתית.
 
 ## שמירת ההקבלה ל־ui-reference
 
@@ -464,3 +466,96 @@ git diff --check
 לא הורצו בדיקות Room שאינו קיים, ולא בוצע אימות חזותי או תפקודי בממשק בשלב זה.
 אירוע ה־IDE שסופק בתחילת הבקשה דיווח על build/run מוצלח של androidApp;
 זה אינו build חדש שהורץ במסגרת כתיבת המסמך.
+
+## מימוש שלב 2 — תשתית Android
+
+החלטת הקטגוריה האופציונלית נסגרה: Expense.categoryId הוא String?,
+המקור String שאינו nullable. „ללא קטגוריה” יתווסף רק לתצוגה בעת חיבור ההוצאות;
+אין seed כזה. אין מגבלת סכום הוצאה או ייחודיות שמות חדשות.
+
+### כלי הבנייה שנבחרו
+
+- Room runtime/compiler/testing וה־Gradle plugin: **2.8.5**, הגרסה היציבה הנוכחית
+  של משפחת androidx.room לפי [release notes](https://developer.android.com/jetpack/androidx/releases/room).
+  נבחרה המשפחה היציבה 2.x עם platform SQLite כדי לשמור על תשתית Android מצומצמת;
+  Room 3 קיים אך אינו תנאי למודל הזה. composite PK/FK, nullable child column ו־RESTRICT
+  נתמכים ב־Room 2.x; הקומפיילר ובדיקות המכשיר מאמתים את הסכמה בפועל.
+- KSP **2.3.13**, KSP2 בלבד, לפי [המהדורה הרשמית](https://github.com/google/ksp/releases/tag/2.3.13).
+  נשמר Kotlin המובנה של AGP; לא נוסף Kotlin Android plugin.
+- kotlinx-coroutines-android **1.11.0** לאתחול async ולבדיקות suspend;
+  AndroidX Test core **1.7.0**, ext JUnit **1.3.0**, runner **1.7.0**.
+- Serialization BOM **1.8.1** מיישר core ו־JSON גם ב־app וגם ב־androidTest.
+  בדיקת הסכמה הראשונה חשפה AbstractMethodError: consistent resolution בחר core 1.7.3
+  מ־runtime האפליקציה, בעוד room-testing דרש JSON 1.8.1. נבחרה גרסת ה־BOM שתואמת
+  לתלות המוצהרת של Room, ללא serialization plugin נוסף וללא שינוי קוד האפליקציה.
+  [תיעוד גרסת serialization](https://github.com/Kotlin/kotlinx.serialization/releases/tag/v1.8.1).
+- AGP 9.5.0, Kotlin 2.4.21, Gradle 9.6.0, minSdk 30 ו־compile/targetSdk 37 נשמרו.
+  launcher Java שנמצא הוא JBR 25.0.4; הגדרת daemon הקיימת ב־
+  gradle/gradle-daemon-jvm.properties בוחרת Azul JDK 21, וכך פועל ה־daemon בפועל.
+  bytecode נשאר JVM 11. אין שינוי בתצורת JDK/SDK הקיימת.
+
+### קבצים ומנגנון
+
+- androidApp/src/main/kotlin/com/example/manymanager/data/local/Entities.kt:
+  חמש הישויות, סכומים/תאריכים כ־Long; אין צורך ב־type converters.
+  PK מורכבים ו־FK מורכבים מונעים יחסים בין בעלים שונים.
+  Expense כולל גם FK ישיר למחשבון. כל FK הוא RESTRICT במחיקה ו־NO ACTION בעדכון.
+  אין CASCADE, REPLACE או טבלאות יתרות.
+- data/local/ManyManagerDao.kt: primitives של insert/read ועסקת initializeLocalCalculator.
+  insert של נתונים הוא ABORT; כפילות הקצאה נדחית ומשאירה את הערך המקורי.
+  רק insert של מחשבון באתחול הוא IGNORE.
+- data/local/ManyManagerDatabase.kt: version=1, exportSchema=true,
+  קובץ ייצור פרטי בשם many-manager.db. אין destructive fallback ואין מיגרציה פיקטיבית.
+- ManyManagerApplication.kt: בעלות על מופע lazy אחד, CoroutineScope של תהליך על IO,
+  Deferred<Result<CalculatorEntity>> לתוצאת האתחול; כשל נרשם ואינו מוצג כהצלחה.
+  אין תלות של מסכים במוכנות המסד ואין loading UI חדש.
+- המזהה הפנימי הקבוע **local-calculator** אינו שם תצוגה. אתחול מכניס אותו רק אם חסר
+  עם day=10 ו־ILS. עסקה ו־INSERT IGNORE מונעים כפילות ואינם מאפסים הגדרות קיימות.
+- AndroidManifest.xml רושם את Application; Gradle root, androidApp ו־version catalog
+  מוסיפים tooling ותלויות ממוקדות. schema export מוגדר תחת androidApp/schemas.
+- androidApp/src/androidTest/kotlin/com/example/manymanager/DatabaseTestRunner.kt
+  מפעיל Application בסיסי לבדיקות, כדי שלא לאתחל/לזרוע את מסד הייצור בזמן fixtures.
+- androidApp/src/androidTest/kotlin/com/example/manymanager/data/local/ManyManagerDatabaseTest.kt:
+  Room אמיתי עם platform SQLite; בדיקות in-memory ובדיקות קובץ עם שמות UUID
+  המתחילים many-manager-test-. הניקוי מוחק רק שמות שנוצרו בידי הבדיקה.
+  אין clear-data, uninstall או שינוי בקובץ הייצור.
+- הבדיקות מכסות אתחול כפול/מקביל, שימור הגדרות, אפס seed, reopen של כל סוגי הרשומות,
+  uniqueness של הקצאה, קטגוריה null, FK תקינים/חסרים/בין בעלים, מקור חובה,
+  מניעת מחיקת הורים עם היסטוריה, שמות כפולים, סכומי הוצאה שלא הוכרעו,
+  ופתיחת מסד שנוצר מה־JSON המיוצא באמצעות MigrationTestHelper.
+
+אין כעת Repository, חישוב יום 10, חיבור ViewModel למסד או שמירת הוצאות בממשק.
+אין יבוא אוטומטי של רשימות זמניות. מסכי Android, הגדרות שפה/מראה ו־ui-reference
+נשארים בהתנהגותם הקיימת. כלל איסור הקצאה שלילית עדיין נאכף רק במודל הזמני;
+בשלב 4/7 יועבר ל־business transaction. לא הוכנס CHECK ידני שאינו מיוצג ב־Room Entity.
+
+סכמה 1 תישמר במאגר כתוצר הקומפיילר. בעת שינוי עתידי יוגדל version, תיכתב מיגרציה
+ותיבדק מול הסכמה/נתונים הישנים. אין למחוק מסד משתמש כדי לעקוף כשל שדרוג.
+
+### תוצאות אימות שלב 2
+
+**שלב 2 הושלם.** לאחר תיקון יישור serialization הורצה בהצלחה הפקודה:
+
+```powershell
+$env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr'
+.\gradlew.bat :androidApp:assembleDebug :androidApp:testDebugUnitTest :shared:testAndroidHostTest :androidApp:connectedDebugAndroidTest
+```
+
+- assembleDebug עבר עם KSP ו־Room; אין שינוי בגרסאות AGP/Kotlin/SDK.
+- 14 בדיקות היחידה הקיימות ב־androidApp עברו (5 parsing/formatting, 9 allocations).
+- שתי בדיקות shared:testAndroidHostTest עברו.
+- כל 12 בדיקות Room/SQLite החדשות עברו במכשיר SM-S928B עם Android 17, ללא דילוג.
+  זו הרצת SQLite אמיתית, כולל בדיקת file-backed reopen ובדיקת הסכמה המיוצאת.
+- סכמה 1 שנוצרה בקומפיילר נמצאת ב־
+  androidApp/schemas/com.example.manymanager.data.local.ManyManagerDatabase/1.json.
+  נבדקו גם PK, nullability, FK ואינדקסים ב־JSON; identityHash:
+  bafcc93374123a999f237711f0f81500.
+- בדיקת diff מוודאת שאין שגיאות whitespace. שינויי העיצוב הקודמים נשארו מחוץ לעבודת שלב 2.
+- בהרצת הבדיקות לא נוקה מידע של האפליקציה ולא בוצע uninstall כפתרון לבעיה.
+  ה־runner מבודד את אתחול הייצור; כל רשומות ה־fixtures הן במסדי בדיקה נפרדים.
+- לא בוצע אימות חזותי או end-to-end של המסכים. הם אינם מחוברים למסד;
+  דפדפן ה־preview נשאר בזיכרון בלבד. אזהרות deprecation בקוד UI קיים נשארו ללא שינוי.
+
+לשלב 3 אין חסם מוצר שנותר משלב 2. יש לממש את BudgetPeriodCalculator המרכזי
+ובדיקות גבולות 10–9; אין להחליף זאת בחישוב מקומי במסכים.
+חיבור Repository, תצפיות ופעולות עסקיות למסד נשאר לשלבים הבאים.

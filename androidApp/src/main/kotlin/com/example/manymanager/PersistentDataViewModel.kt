@@ -360,34 +360,103 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
 
     private val expenseCreation = MutableStateFlow<ExpenseCreationState?>(null)
     val expenseCreationState: StateFlow<ExpenseCreationState?> = expenseCreation
-    private val expenseCorrection = MutableStateFlow<ExpenseCorrectionState?>(null)
-    val expenseCorrectionState: StateFlow<ExpenseCorrectionState?> = expenseCorrection
+    private val groupSelection = MutableStateFlow<ExpenseGroupSelection?>(null)
+    val expenseGroup: StateFlow<ExpenseGroupSelection?> = groupSelection
+    private val groupRefresh = MutableStateFlow(0L)
+    val groupBudget: StateFlow<PersistentDataState> = groupRefresh.flatMapLatest {
+        groupSelection.flatMapLatest { group ->
+            if (group == null) kotlinx.coroutines.flow.flowOf(PersistentDataState.Loading)
+            else repository.observeSnapshot(group.period).map { result ->
+                when (result) {
+                    is DataResult.Success -> PersistentDataState.Ready(result.value)
+                    is DataResult.Failure -> PersistentDataState.Failed(result.error)
+                }
+            }.onStart { emit(PersistentDataState.Loading) }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PersistentDataState.Loading)
+
+    fun openExpenseGroup(group: ExpenseGroupSelection) { groupSelection.value = group }
+    fun closeExpenseGroup() { groupSelection.value = null }
+    fun retryExpenseGroup() { groupRefresh.update { it + 1 } }
+    private var expenseLoad: Job? = null
+
+    fun openExpenseDetails(id: String) {
+        if (expenseCreation.value != null) return
+        expenseCreation.value = ExpenseCreationState(ExpenseDraft(), expenseId = id, loading = true)
+        loadExpenseForEditing(id)
+    }
+    fun retryExpenseLoading() {
+        val current = expenseCreation.value ?: return
+        if (current.expenseId != null && !current.interrupted && !current.submitting)
+            loadExpenseForEditing(current.expenseId)
+    }
+    private fun loadExpenseForEditing(id: String) {
+        expenseLoad?.cancel()
+        expenseCreation.update { it?.copy(loading = it.original == null, error = null) }
+        expenseLoad = viewModelScope.launch {
+            repository.observeExpense(id).collect { result ->
+                currentCoroutineContext().ensureActive()
+                expenseCreation.update { current ->
+                    if (current?.expenseId != id || current.submitting || current.saved || current.interrupted) current
+                    else when (result) {
+                        is DataResult.Success -> current.copy(
+                            draft = if (current.editing) current.draft else ExpenseDraft.fromExpense(result.value),
+                            original = result.value, loading = false, error = if (current.editing) current.error else null)
+                        is DataResult.Failure -> if (result.error is DataError.MissingEntity)
+                            current.copy(original = null, loading = false, editing = false, confirmingDelete = false, error = result.error)
+                        else current.copy(loading = false, error = result.error)
+                    }
+                }
+            }
+        }
+    }
 
     fun beginExpenseCreation(date: LocalDate) {
         if (expenseCreation.value == null) expenseCreation.value = ExpenseCreationState(ExpenseDraft(date = date))
     }
     fun restoreExpenseCreation(state: ExpenseCreationState) {
-        if (expenseCreation.value == null) expenseCreation.value = state
+        if (expenseCreation.value == null) {
+            expenseCreation.value = state
+            if (state.expenseId != null && !state.interrupted && !state.saved)
+                loadExpenseForEditing(state.expenseId)
+        }
     }
     fun updateExpenseDraft(draft: ExpenseDraft) {
         expenseCreation.update {
-            if (it == null || it.submitting || it.saved || it.interrupted) it
+            if (it == null || it.submitting || it.saved || it.interrupted || it.loading || it.confirmingDelete ||
+                (it.expenseId != null && !it.editing)) it
             else it.copy(draft = draft, error = null)
         }
+    }
+    fun editExpense() {
+        expenseCreation.update {
+            if (it?.original == null || it.submitting || it.loading || it.interrupted || it.error != null) it
+            else it.copy(editing = true, draft = ExpenseDraft.fromExpense(it.original), error = null)
+        }
+    }
+    fun cancelExpenseEdit() {
+        val current = expenseCreation.value ?: return
+        if (current.submitting) return
+        if (current.interrupted) { cancelExpenseCreation(); return }
+        expenseCreation.value = current.copy(editing = false, confirmingDelete = false, error = null,
+            draft = current.original?.let(ExpenseDraft::fromExpense) ?: current.draft)
+        current.expenseId?.let(::loadExpenseForEditing)
     }
     fun selectExpenseCategory(id: String) {
         expenseCreation.value?.let { updateExpenseDraft(it.draft.copy(categoryId = id)) }
     }
     fun cancelExpenseCreation() {
+        if (expenseCreation.value?.submitting != true) expenseLoad?.cancel()
         expenseCreation.update { if (it?.submitting == true || it?.saved == true) it else null }
     }
     fun acknowledgeExpenseCreation() {
-        if (expenseCreation.value?.saved == true) expenseCreation.value = null
+        if (expenseCreation.value?.saved == true) { expenseLoad?.cancel(); expenseCreation.value = null }
     }
     fun canSaveExpense(): Boolean {
         val state = expenseCreation.value ?: return false
         val draft = state.draft
-        return !state.submitting && !state.saved && !state.interrupted && draft.date != null &&
+        return !state.submitting && !state.saved && !state.interrupted && !state.loading && !state.confirmingDelete &&
+            (state.expenseId == null || (state.original != null && state.editing)) && draft.date != null &&
             BudgetAmounts.positive(draft.amount) is DataResult.Success &&
             (sources.value as? SourceListState.Ready)?.sources?.any { it.id == draft.sourceId } == true &&
             (draft.categoryId == null ||
@@ -395,7 +464,8 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
     }
     fun submitExpenseCreation(): Job? {
         val current = expenseCreation.value ?: return null
-        if (current.submitting || current.saved || current.interrupted) return null
+        if (current.submitting || current.saved || current.interrupted || current.loading || current.confirmingDelete ||
+            (current.expenseId != null && !current.editing)) return null
         val amount = BudgetAmounts.positive(current.draft.amount)
         val error = when {
             amount is DataResult.Failure -> amount.error
@@ -409,42 +479,44 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
             current.draft.sourceId!!, current.draft.categoryId, current.draft.note)
         expenseCreation.value = current.copy(submitting = true, error = null)
         return viewModelScope.launch {
-            val result = repository.createExpense(input)
+            val result = if (current.expenseId == null) repository.createExpense(input)
+                else repository.updateExpense(current.expenseId, input)
             currentCoroutineContext().ensureActive()
-            expenseCreation.value = current.copy(saved = result is DataResult.Success,
-                error = (result as? DataResult.Failure)?.error)
+            if (current.expenseId != null && result is DataResult.Success) {
+                expenseCreation.value = current.copy(original = result.value, draft = ExpenseDraft.fromExpense(result.value),
+                    editing = false, submitting = false, error = null)
+                loadExpenseForEditing(current.expenseId)
+            } else {
+                val error = (result as? DataResult.Failure)?.error
+                expenseCreation.value = current.copy(saved = result is DataResult.Success, error = error,
+                    original = if (error is DataError.MissingEntity && error.kind == EntityKind.EXPENSE) null else current.original,
+                    editing = current.editing && !(error is DataError.MissingEntity && error.kind == EntityKind.EXPENSE))
+            }
         }
     }
 
-    fun beginExpenseCorrection(expense: Expense) {
-        if (expenseCorrection.value == null) expenseCorrection.value = ExpenseCorrectionState(expense,
-            BudgetAmounts.number(expense.amountMinor, java.util.Locale.ROOT, grouping = false))
-    }
-    fun restoreExpenseCorrection(state: ExpenseCorrectionState) {
-        if (expenseCorrection.value == null) expenseCorrection.value = state
-    }
-    fun updateExpenseCorrectionAmount(text: String) {
-        expenseCorrection.update {
-            if (it == null || it.submitting || it.saved || it.interrupted) it else it.copy(amountText = text, error = null)
+    fun requestExpenseDeletion() {
+        expenseCreation.update {
+            if (it == null || it.expenseId == null || it.original == null || !it.editing || it.loading ||
+                it.submitting || it.saved || it.interrupted) it
+            else it.copy(confirmingDelete = true, error = null)
         }
     }
-    fun cancelExpenseCorrection() {
-        expenseCorrection.update { if (it?.submitting == true || it?.saved == true) it else null }
+    fun cancelExpenseDeletion() {
+        expenseCreation.update { if (it?.submitting == true) it else it?.copy(confirmingDelete = false) }
     }
-    fun acknowledgeExpenseCorrection() {
-        if (expenseCorrection.value?.saved == true) expenseCorrection.value = null
-    }
-    fun submitExpenseCorrection(): Job? {
-        val current = expenseCorrection.value ?: return null
-        if (current.submitting || current.saved || current.interrupted) return null
-        val parsed = BudgetAmounts.positive(current.amountText)
-        if (parsed is DataResult.Failure) { expenseCorrection.value = current.copy(error = parsed.error); return null }
-        expenseCorrection.value = current.copy(submitting = true, error = null)
+    fun confirmExpenseDeletion(): Job? {
+        val current = expenseCreation.value ?: return null
+        val id = current.expenseId ?: return null
+        if (!current.confirmingDelete || current.submitting || current.saved || current.interrupted) return null
+        expenseCreation.value = current.copy(submitting = true, error = null)
         return viewModelScope.launch {
-            val result = repository.correctExpenseAmount(current.expense.id, (parsed as DataResult.Success).value)
+            val result = repository.deleteExpense(id)
             currentCoroutineContext().ensureActive()
-            expenseCorrection.value = current.copy(saved = result is DataResult.Success,
-                error = (result as? DataResult.Failure)?.error)
+            val error = (result as? DataResult.Failure)?.error
+            val missing = error is DataError.MissingEntity && error.kind == EntityKind.EXPENSE
+            expenseCreation.value = current.copy(confirmingDelete = false, saved = result is DataResult.Success,
+                error = error, original = if (missing) null else current.original, editing = current.editing && !missing)
         }
     }
 
@@ -482,6 +554,7 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         selection.update { it.copy(refresh = it.refresh + 1) }
         activeRefresh.update { it + 1 }
         retrySources()
+        retryExpenseGroup()
     }
 }
 

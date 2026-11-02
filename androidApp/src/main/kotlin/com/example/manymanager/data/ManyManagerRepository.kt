@@ -76,13 +76,7 @@ class ManyManagerRepository(
 
     /** Date determines the period; validation of all exposed totals happens before commit. */
     suspend fun createExpense(input: NewExpense): DataResult<Expense> = execute { calculator ->
-        if (input.amountMinor <= 0) reject(DataError.NonPositiveAmount)
-        val period = expensePeriod(calculator, input.date)
-        requireSource(calculator.id, input.sourceId)
-        input.categoryId?.let { id ->
-            if (dao.categories(calculator.id).none { it.id == id })
-                reject(DataError.MissingEntity(EntityKind.CATEGORY, id))
-        }
+        val period = validateExpense(calculator, input)
         val expense = ExpenseEntity(calculator.id, UUID.randomUUID().toString(), input.amountMinor,
             input.date.toEpochDay(), input.categoryId, input.sourceId, input.note?.takeIf { it.isNotBlank() })
         dao.insertExpense(expense)
@@ -90,15 +84,47 @@ class ManyManagerRepository(
         expense.domain()
     }
 
-    /** An UPDATE of one column on the same row, never a replacement/second expense. */
-    suspend fun correctExpenseAmount(expenseId: String, amountMinor: Long): DataResult<Expense> = execute { calculator ->
-        if (amountMinor <= 0) reject(DataError.NonPositiveAmount)
-        val expense = dao.expense(calculator.id, expenseId)
-            ?: reject(DataError.MissingEntity(EntityKind.EXPENSE, expenseId))
-        val period = expensePeriod(calculator, LocalDate.ofEpochDay(expense.dateEpochDay))
-        check(dao.correctExpenseAmount(calculator.id, expenseId, amountMinor) == 1)
+    fun observeExpense(expenseId: String): Flow<DataResult<Expense>> =
+        observe(arrayOf("calculators", "expenses")) { expense(expenseId) }
+
+    suspend fun expense(expenseId: String): DataResult<Expense> = execute {
+        requireExpense(it.id, expenseId).domain()
+    }
+
+    /** Validate and UPDATE the same owned row. Both periods must remain representable before commit. */
+    suspend fun updateExpense(expenseId: String, input: NewExpense): DataResult<Expense> = execute { calculator ->
+        val original = requireExpense(calculator.id, expenseId)
+        val oldPeriod = expensePeriod(calculator, LocalDate.ofEpochDay(original.dateEpochDay))
+        val newPeriod = validateExpense(calculator, input)
+        val updated = original.copy(amountMinor = input.amountMinor, dateEpochDay = input.date.toEpochDay(),
+            sourceId = input.sourceId, categoryId = input.categoryId, note = input.note?.takeIf { it.isNotBlank() })
+        check(dao.updateExpense(updated.calculatorId, updated.id, updated.amountMinor, updated.dateEpochDay,
+            updated.sourceId, updated.categoryId, updated.note) == 1)
+        readSnapshot(calculator, oldPeriod)
+        if (newPeriod != oldPeriod) readSnapshot(calculator, newPeriod)
+        updated.domain()
+    }
+
+    suspend fun deleteExpense(expenseId: String): DataResult<Unit> = execute { calculator ->
+        val original = requireExpense(calculator.id, expenseId)
+        val period = expensePeriod(calculator, LocalDate.ofEpochDay(original.dateEpochDay))
+        check(dao.deleteExpense(calculator.id, expenseId) == 1)
         readSnapshot(calculator, period)
-        expense.copy(amountMinor = amountMinor).domain()
+        Unit
+    }
+
+    private suspend fun requireExpense(calculatorId: String, id: String): ExpenseEntity =
+        dao.expense(calculatorId, id) ?: reject(DataError.MissingEntity(EntityKind.EXPENSE, id))
+
+    private suspend fun validateExpense(calculator: CalculatorEntity, input: NewExpense): BudgetPeriod {
+        if (input.amountMinor <= 0) reject(DataError.NonPositiveAmount)
+        val period = expensePeriod(calculator, input.date)
+        requireSource(calculator.id, input.sourceId)
+        input.categoryId?.let { id ->
+            if (dao.categories(calculator.id).none { it.id == id })
+                reject(DataError.MissingEntity(EntityKind.CATEGORY, id))
+        }
+        return period
     }
 
     private fun expensePeriod(calculator: CalculatorEntity, date: LocalDate): BudgetPeriod =

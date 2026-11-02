@@ -179,3 +179,22 @@ to {
 .adjustment-row input{flex:1;min-width:0}
 .adjustment-row .chip{width:48px;height:48px;min-height:48px;text-align:center;font-size:20px}
 .source-preview{font-size:16px;font-weight:700;margin-top:20px}
+.expense-details-panel{display:flex;flex-direction:column;max-height:90dvh;overflow:hidden}
+.expense-details-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.expense-details-header h2{font-size:22px;margin:0}
+.expense-details-fields{overflow:auto;min-height:0;margin-top:12px}
+.expense-detail-field{padding:12px 0 4px}
+.detail-label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+.detail-value{font-size:16px;color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere}
+.expense-details-actions{display:flex;align-items:center;gap:12px;margin-top:16px}
+.expense-details-primary-actions{display:flex;flex:2;gap:6px;min-width:0}
+.expense-details-primary-actions button,.detail-delete{flex:1;min-width:0;min-height:48px;padding:10px;white-space:normal;overflow-wrap:anywhere;border-radius:12px}
+.detail-delete{color:#b71c1c}
+[data-theme=dark] .detail-delete{color:#ff8a80}
+.expense-details-read-actions{display:flex;margin-top:16px}
+.expense-details-read-actions button{min-height:48px;padding:12px 24px}
+.detail-new-category{min-height:48px;color:var(--blue);text-align:start}
+#expense-details-error{font-size:13px;margin-top:12px}
+#expense-details-error[hidden]{display:none}
+.summary-breakdown-row{width:100%;text-align:start}
+.summary-breakdown-row:active{box-shadow:inset 0 0 0 100vmax var(--secondary-action-pressed)}

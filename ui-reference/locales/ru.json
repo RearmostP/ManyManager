@@ -103,5 +103,18 @@
   "expenses_load_error": "Не удалось загрузить расходы. Нажмите, чтобы повторить.",
   "breakdown_pending": "Разбивка пока недоступна",
   "source_remaining": "%1$s · остаток",
-  "breakdown_expense_count": "Расходов: %1$s"
+  "breakdown_expense_count": "Расходов: %1$s",
+  "edit_expense": "Изменить расход",
+  "save_expense_changes": "Сохранить изменения",
+  "delete_expense": "Удалить расход",
+  "delete_expense_question": "Удалить этот расход?",
+  "delete_expense_details": "Будет удалён следующий сохранённый расход:",
+  "expense_missing_record": "Этот расход больше не существует. Закройте форму и проверьте сохранённые данные.",
+  "expense_edit_loading": "Загрузка расхода…",
+  "expense_edit_retry": "Не удалось загрузить расход. Нажмите, чтобы повторить.",
+  "group_expenses_empty": "В этой группе нет расходов за выбранный период.",
+  "open_group_expenses": "Открыть расходы группы",
+  "expense_deleted": "Расход удалён",
+  "expense_details": "Детали расхода",
+  "edit": "Изменить"
 }

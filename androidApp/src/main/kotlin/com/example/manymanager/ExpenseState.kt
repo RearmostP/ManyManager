@@ -15,62 +15,75 @@ data class ExpenseDraft(
     fun toBundle() = Bundle().apply {
         putString("amount", amount)
         date?.let { putLong("dateEpochDay", it.toEpochDay()) }
-        putString("note", note)
-        putString("categoryId", categoryId)
-        putString("sourceId", sourceId)
+        putString("note", note); putString("categoryId", categoryId); putString("sourceId", sourceId)
     }
     companion object {
         fun fromBundle(bundle: Bundle) = ExpenseDraft(
-            amount = bundle.getString("amount").orEmpty(),
-            date = if (bundle.containsKey("dateEpochDay")) LocalDate.ofEpochDay(bundle.getLong("dateEpochDay")) else null,
-            note = bundle.getString("note").orEmpty(),
-            categoryId = bundle.getString("categoryId"), sourceId = bundle.getString("sourceId"),
-        )
+            bundle.getString("amount").orEmpty(),
+            if (bundle.containsKey("dateEpochDay")) LocalDate.ofEpochDay(bundle.getLong("dateEpochDay")) else null,
+            bundle.getString("note").orEmpty(), bundle.getString("categoryId"), bundle.getString("sourceId"))
+        fun fromExpense(expense: Expense) = ExpenseDraft(
+            BudgetAmounts.number(expense.amountMinor, java.util.Locale.ROOT, grouping = false),
+            expense.date, expense.note.orEmpty(), expense.categoryId, expense.sourceId)
     }
 }
 
+/** Controller state: creation form or saved details with a separate in-place edit draft. */
 data class ExpenseCreationState(
     val draft: ExpenseDraft,
     val submitting: Boolean = false,
     val saved: Boolean = false,
     val error: DataError? = null,
     val interrupted: Boolean = false,
+    val expenseId: String? = null,
+    val original: Expense? = null,
+    val loading: Boolean = false,
+    val confirmingDelete: Boolean = false,
+    val editing: Boolean = false,
 ) {
     fun toBundle() = draft.toBundle().apply {
         putBoolean("submitting", submitting); putBoolean("saved", saved); putBoolean("interrupted", interrupted)
+        putString("expenseId", expenseId); putBoolean("loading", loading)
+        putBoolean("confirmingDelete", confirmingDelete); putBoolean("editing", editing)
+        original?.let {
+            putBundle("original", ExpenseDraft.fromExpense(it).toBundle().apply {
+                putString("owner", it.calculatorId); putLong("amountMinor", it.amountMinor)
+            })
+        }
     }
     companion object {
-        fun fromBundle(bundle: Bundle) = ExpenseCreationState(ExpenseDraft.fromBundle(bundle),
-            saved = bundle.getBoolean("saved"),
-            interrupted = bundle.getBoolean("submitting") || bundle.getBoolean("interrupted"))
+        fun fromBundle(bundle: Bundle): ExpenseCreationState {
+            val id = bundle.getString("expenseId")
+            val original = bundle.getBundle("original")?.let {
+                val draft = ExpenseDraft.fromBundle(it)
+                if (id == null || draft.date == null || draft.sourceId == null) null
+                else Expense(it.getString("owner").orEmpty(), id, it.getLong("amountMinor"),
+                    draft.date, draft.categoryId, draft.sourceId, draft.note.takeIf(String::isNotEmpty))
+            }
+            val interrupted = bundle.getBoolean("submitting") || bundle.getBoolean("interrupted")
+            return ExpenseCreationState(ExpenseDraft.fromBundle(bundle), saved = bundle.getBoolean("saved"),
+                interrupted = interrupted, expenseId = id, original = original,
+                loading = bundle.getBoolean("loading"), confirmingDelete = !interrupted && bundle.getBoolean("confirmingDelete"),
+                editing = bundle.getBoolean("editing"))
+        }
     }
 }
 
-data class ExpenseCorrectionState(
-    val expense: Expense,
-    val amountText: String,
-    val submitting: Boolean = false,
-    val saved: Boolean = false,
-    val error: DataError? = null,
-    val interrupted: Boolean = false,
+data class ExpenseGroupSelection(
+    val category: Boolean, val id: String?, val name: String, val period: BudgetPeriod,
+    val originTab: Int, val originScroll: Int,
 ) {
-    fun toBundle() = ExpenseDraft(amountText, expense.date, expense.note.orEmpty(),
-        expense.categoryId, expense.sourceId).toBundle().apply {
-        putString("id", expense.id); putString("owner", expense.calculatorId)
-        putLong("currentMinor", expense.amountMinor)
-        putBoolean("submitting", submitting); putBoolean("saved", saved); putBoolean("interrupted", interrupted)
+    fun includes(expense: Expense) = if (category) expense.categoryId == id else expense.sourceId == id
+    fun toBundle() = Bundle().apply {
+        putBoolean("category", category); putString("id", id); putString("name", name)
+        putLong("start", period.startEpochDay); putLong("end", period.endExclusiveEpochDay)
+        putInt("tab", originTab); putInt("scroll", originScroll)
     }
     companion object {
-        fun fromBundle(bundle: Bundle): ExpenseCorrectionState? {
-            val id = bundle.getString("id") ?: return null
-            val draft = ExpenseDraft.fromBundle(bundle)
-            val date = draft.date ?: return null
-            return ExpenseCorrectionState(
-                Expense(bundle.getString("owner").orEmpty(), id, bundle.getLong("currentMinor"),
-                    date, draft.categoryId, draft.sourceId ?: return null, draft.note.takeIf { it.isNotEmpty() }),
-                draft.amount, saved = bundle.getBoolean("saved"),
-                interrupted = bundle.getBoolean("submitting") || bundle.getBoolean("interrupted"))
-        }
+        fun fromBundle(bundle: Bundle) = ExpenseGroupSelection(bundle.getBoolean("category"),
+            bundle.getString("id"), bundle.getString("name").orEmpty(),
+            BudgetPeriod(LocalDate.ofEpochDay(bundle.getLong("start")), LocalDate.ofEpochDay(bundle.getLong("end"))),
+            bundle.getInt("tab"), bundle.getInt("scroll"))
     }
 }
 
@@ -78,6 +91,6 @@ fun expenseErrorMessage(error: DataError): Int = when (error) {
     DataError.InvalidAmount, DataError.NonPositiveAmount -> R.string.expense_positive_amount
     DataError.AmountOverflow -> R.string.expense_amount_overflow
     DataError.InvalidDate, DataError.InvalidPeriod -> R.string.expense_invalid_date
-    is DataError.MissingEntity -> R.string.expense_missing_choice
+    is DataError.MissingEntity -> if (error.kind == EntityKind.EXPENSE) R.string.expense_missing_record else R.string.expense_missing_choice
     else -> R.string.expense_save_error
 }

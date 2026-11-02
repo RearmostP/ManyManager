@@ -69,8 +69,14 @@ abstract class ManyManagerDao {
     @Query("UPDATE budget_sources SET name = :name WHERE calculatorId = :calculatorId AND id = :id")
     abstract suspend fun renameSource(calculatorId: String, id: String, name: String): Int
 
-    @Query("UPDATE expenses SET amountMinor = :amountMinor WHERE calculatorId = :calculatorId AND id = :id")
-    abstract suspend fun correctExpenseAmount(calculatorId: String, id: String, amountMinor: Long): Int
+    @Query("""UPDATE expenses SET amountMinor = :amountMinor, dateEpochDay = :dateEpochDay,
+        sourceId = :sourceId, categoryId = :categoryId, note = :note
+        WHERE calculatorId = :calculatorId AND id = :id""")
+    abstract suspend fun updateExpense(calculatorId: String, id: String, amountMinor: Long,
+        dateEpochDay: Long, sourceId: String, categoryId: String?, note: String?): Int
+
+    @Query("DELETE FROM expenses WHERE calculatorId = :calculatorId AND id = :id")
+    abstract suspend fun deleteExpense(calculatorId: String, id: String): Int
 
     @Upsert
     abstract suspend fun putAllocation(allocation: BudgetAllocationEntity)

@@ -116,4 +116,17 @@
     <string name="breakdown_pending">Разбивка пока недоступна</string>
     <string name="source_remaining">%1$s · остаток</string>
     <string name="breakdown_expense_count">Расходов: %1$s</string>
+    <string name="edit_expense">Изменить расход</string>
+    <string name="save_expense_changes">Сохранить изменения</string>
+    <string name="delete_expense">Удалить расход</string>
+    <string name="delete_expense_question">Удалить этот расход?</string>
+    <string name="delete_expense_details">Будет удалён следующий сохранённый расход:</string>
+    <string name="expense_missing_record">Этот расход больше не существует. Закройте форму и проверьте сохранённые данные.</string>
+    <string name="expense_edit_loading">Загрузка расхода…</string>
+    <string name="expense_edit_retry">Не удалось загрузить расход. Нажмите, чтобы повторить.</string>
+    <string name="group_expenses_empty">В этой группе нет расходов за выбранный период.</string>
+    <string name="open_group_expenses">Открыть расходы группы</string>
+    <string name="expense_deleted">Расход удалён</string>
+    <string name="expense_details">Детали расхода</string>
+    <string name="edit">Изменить</string>
 </resources>

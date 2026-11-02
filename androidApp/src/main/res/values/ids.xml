@@ -1,6 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="categoryNameInput" type="id" />
-    <item name="expenseCorrectionAmount" type="id" />
-    <item name="expenseCorrectionStatus" type="id" />
+    <item name="closeExpenseDetails" type="id" />
+    <item name="expenseDetailsTitle" type="id" />
+    <item name="expenseDetailsAmount" type="id" />
+    <item name="expenseDetailsDate" type="id" />
+    <item name="expenseDetailsCategory" type="id" />
+    <item name="expenseDetailsSource" type="id" />
+    <item name="expenseDetailsNote" type="id" />
+    <item name="expenseDetailsAmountValue" type="id" />
+    <item name="expenseDetailsDateValue" type="id" />
+    <item name="expenseDetailsCategoryValue" type="id" />
+    <item name="expenseDetailsSourceValue" type="id" />
+    <item name="expenseDetailsNoteValue" type="id" />
+    <item name="expenseDetailsNewCategory" type="id" />
+    <item name="expenseDetailsStatus" type="id" />
+    <item name="editExpenseDetails" type="id" />
+    <item name="saveExpenseDetails" type="id" />
+    <item name="cancelExpenseDetails" type="id" />
+    <item name="deleteExpenseDetails" type="id" />
+    <item name="expenseDetailsActions" type="id" />
+    <item name="expenseDetailsPrimaryActions" type="id" />
 </resources>

@@ -49,7 +49,7 @@ class MainActivity : AppCompatActivity() {
             (application as ManyManagerApplication).repository
         ))[PersistentDataViewModel::class.java]
     }
-    private var correctionDialog: ExpenseCorrectionDialog? = null
+    private var groupExpensesUi: AllExpensesUi? = null
     private var allExpensesUi: AllExpensesUi? = null
     private var summaryBreakdownUi: SummaryBreakdownUi? = null
     private var categoryDialog: CategoryCreationDialog? = null
@@ -68,6 +68,7 @@ class MainActivity : AppCompatActivity() {
     private var renderedConfiguration: Configuration? = null
     private var activeDialog: Dialog? = null
     private var expenseDialog: ExpenseSheetDialog? = null
+    private var expenseDetailsDialog: ExpenseDetailsDialog? = null
     private val expanded = mutableSetOf<Int>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,7 +94,7 @@ class MainActivity : AppCompatActivity() {
                 launch { persistentViewModel.sourceCreationState.collect(::renderSourceCreation) }
                 launch { persistentViewModel.sourceEditingState.collect(::renderSourceEditing) }
                 launch { persistentViewModel.expenseCreationState.collect(::renderExpenseCreation) }
-                launch { persistentViewModel.expenseCorrectionState.collect(::renderExpenseCorrection) }
+                launch { persistentViewModel.groupBudget.collect(::renderExpenseGroup) }
             }
         }
     }
@@ -261,15 +262,18 @@ class MainActivity : AppCompatActivity() {
                 alpha = 0.45f
             }
         }
-        allExpensesUi = AllExpensesUi(findViewById(R.id.allPanel), ::showExpenseCorrection, persistentViewModel::refresh)
-        summaryBreakdownUi = SummaryBreakdownUi(findViewById(R.id.summaryPage), persistentViewModel::refresh)
+        allExpensesUi = AllExpensesUi(findViewById(R.id.allPanel), ::showExpenseEditor, persistentViewModel::refresh)
+        summaryBreakdownUi = SummaryBreakdownUi(findViewById(R.id.summaryPage), persistentViewModel::refresh, ::openExpenseGroup)
+        groupExpensesUi = AllExpensesUi(findViewById(R.id.expenseGroupPage), ::showExpenseEditor,
+            persistentViewModel::retryExpenseGroup, R.id.expenseGroupRows, R.id.expenseGroupEmpty, R.string.group_expenses_empty)
+        findViewById<View>(R.id.expenseGroupBack).setOnClickListener { navigateBack() }
+        savedInstanceState?.getBundle("expenseGroup")?.let {
+            persistentViewModel.openExpenseGroup(ExpenseGroupSelection.fromBundle(it))
+        }
         selectPage(page)
         selectTab(tab)
         savedInstanceState?.getBundle("expenseCreation")?.let {
             persistentViewModel.restoreExpenseCreation(ExpenseCreationState.fromBundle(it))
-        }
-        savedInstanceState?.getBundle("expenseCorrection")?.let {
-            ExpenseCorrectionState.fromBundle(it)?.let(persistentViewModel::restoreExpenseCorrection)
         }
         if (savedInstanceState?.containsKey("pageScrollY") != true &&
             page == 2 && R.id.languageDetails in expanded
@@ -295,7 +299,7 @@ class MainActivity : AppCompatActivity() {
         renderSources(persistentViewModel.sources.value)
         renderCategoryState(persistentViewModel.categories.value)
         renderExpenseCreation(persistentViewModel.expenseCreationState.value)
-        renderExpenseCorrection(persistentViewModel.expenseCorrectionState.value)
+        renderExpenseGroup(persistentViewModel.groupBudget.value)
         renderCategoryCreation(persistentViewModel.categoryCreation.value)
         renderSourceCreation(persistentViewModel.sourceCreationState.value)
         renderSourceEditing(persistentViewModel.sourceEditingState.value)
@@ -323,7 +327,29 @@ class MainActivity : AppCompatActivity() {
         renderActiveBudget(persistentViewModel.activeBudget.value)
     }
 
+    private fun openExpenseGroup(category: Boolean, id: String?, name: String, period: BudgetPeriod) {
+        persistentViewModel.openExpenseGroup(ExpenseGroupSelection(category, id, name, period, tab,
+            findViewById<ScrollView>(R.id.pageScroll).scrollY))
+        selectPage(5)
+        renderExpenseGroup(PersistentDataState.Loading)
+    }
+
+    private fun renderExpenseGroup(state: PersistentDataState) {
+        if (!contentReady) return
+        val group = persistentViewModel.expenseGroup.value ?: return
+        findViewById<TextView>(R.id.expenseGroupTitle).text = group.name
+        findViewById<TextView>(R.id.expenseGroupPeriod).text = BudgetPeriodFormatter.description(this, group.period)
+        groupExpensesUi?.render(state, group::includes)
+    }
+
     private fun navigateBack() {
+        if (page == 5) {
+            val group = persistentViewModel.expenseGroup.value
+            persistentViewModel.closeExpenseGroup()
+            selectPage(1, scrollY = group?.originScroll ?: 0)
+            selectTab(group?.originTab ?: tab)
+            return
+        }
         if (page == 0 && budgetState.breakdownExpanded) {
             homeBudgetUi?.setExpanded(false)
             return
@@ -334,6 +360,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun navigateToPage(index: Int) {
+        if (page == 5) navigateBack()
         if (index == page) return
         if (index == 3) persistentViewModel.selectPeriod(null)
         if (index == 0) {
@@ -357,7 +384,7 @@ class MainActivity : AppCompatActivity() {
                 pageBackCallback.isEnabled = index != 0 || budgetState.breakdownExpanded
                 categoryManagementUi?.render(persistentViewModel.categories.value)
                 listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage,
-                    R.id.budgetPage, R.id.categoriesPage).forEachIndexed { i, id ->
+                    R.id.budgetPage, R.id.categoriesPage, R.id.expenseGroupPage).forEachIndexed { i, id ->
                     findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
                 }
             },
@@ -480,7 +507,7 @@ class MainActivity : AppCompatActivity() {
         if (state == null) {
             sourceCreationDialog?.dispose()
             if (activeDialog === sourceCreationDialog?.dialog) {
-                activeDialog = expenseDialog?.takeIf { it.isShowing }
+                activeDialog = expenseDialog?.takeIf { it.isShowing } ?: expenseDetailsDialog?.dialog?.takeIf { it.isShowing }
             }
             sourceCreationDialog = null
             return
@@ -489,7 +516,7 @@ class MainActivity : AppCompatActivity() {
         if (created != null) {
             sourceCreationDialog?.dispose()
             sourceCreationDialog = null
-            activeDialog = expenseDialog?.takeIf { it.isShowing }
+            activeDialog = expenseDialog?.takeIf { it.isShowing } ?: expenseDetailsDialog?.dialog?.takeIf { it.isShowing }
             persistentViewModel.acknowledgeSourceCreation()
             return
         }
@@ -512,7 +539,7 @@ class MainActivity : AppCompatActivity() {
         if (state == null) {
             sourceEditingDialog?.dispose()
             if (activeDialog === sourceEditingDialog?.dialog) {
-                activeDialog = expenseDialog?.takeIf { it.isShowing }
+                activeDialog = expenseDialog?.takeIf { it.isShowing } ?: expenseDetailsDialog?.dialog?.takeIf { it.isShowing }
             }
             sourceEditingDialog = null
             return
@@ -521,7 +548,7 @@ class MainActivity : AppCompatActivity() {
         if (updated != null) {
             sourceEditingDialog?.dispose()
             sourceEditingDialog = null
-            activeDialog = expenseDialog?.takeIf { it.isShowing }
+            activeDialog = expenseDialog?.takeIf { it.isShowing } ?: expenseDetailsDialog?.dialog?.takeIf { it.isShowing }
             persistentViewModel.acknowledgeSourceEditing()
             return
         }
@@ -559,7 +586,7 @@ class MainActivity : AppCompatActivity() {
         if (state == null) {
             categoryDialog?.dispose()
             if (activeDialog === categoryDialog?.dialog) {
-                activeDialog = expenseDialog?.takeIf { it.isShowing }
+                activeDialog = expenseDialog?.takeIf { it.isShowing } ?: expenseDetailsDialog?.dialog?.takeIf { it.isShowing }
             }
             categoryDialog = null
             return
@@ -572,7 +599,7 @@ class MainActivity : AppCompatActivity() {
             }
             categoryDialog?.dispose()
             categoryDialog = null
-            activeDialog = expenseDialog?.takeIf { it.isShowing }
+            activeDialog = expenseDialog?.takeIf { it.isShowing } ?: expenseDetailsDialog?.dialog?.takeIf { it.isShowing }
             persistentViewModel.acknowledgeCategoryCreation()
             return
         }
@@ -598,8 +625,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun dismissActiveDialogImmediately() {
         expenseDialog?.setOnDismissListener(null)
-        correctionDialog?.dispose()
-        correctionDialog = null
+        expenseDetailsDialog?.dispose()
+        expenseDetailsDialog = null
         categoryDialog?.dispose()
         categoryDialog = null
         sourceCreationDialog?.dispose()
@@ -631,6 +658,39 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderExpenseCreation(state: ExpenseCreationState?) {
         if (!contentReady || isFinishing || isDestroyed) return
+        if (state?.expenseId != null && !state.saved) {
+            if (expenseDetailsDialog == null) {
+                expenseDetailsDialog = ExpenseDetailsDialog(this,
+                    persistentViewModel::editExpense,
+                    persistentViewModel::updateExpenseDraft,
+                    { persistentViewModel.submitExpenseCreation() },
+                    persistentViewModel::cancelExpenseEdit,
+                    {
+                        val unknown = persistentViewModel.expenseCreationState.value?.interrupted == true
+                        persistentViewModel.cancelExpenseCreation()
+                        if (unknown) inspectExpenses()
+                    },
+                    {
+                        persistentViewModel.retryExpenseLoading()
+                        persistentViewModel.retryCategories()
+                        persistentViewModel.retrySources()
+                    },
+                    persistentViewModel::requestExpenseDeletion,
+                    { persistentViewModel.confirmExpenseDeletion() },
+                    persistentViewModel::cancelExpenseDeletion,
+                    {
+                        persistentViewModel.beginCategoryCreation(true)
+                        renderCategoryCreation(persistentViewModel.categoryCreation.value)
+                    }
+                ).also { activeDialog = it.dialog; it.show() }
+            }
+            expenseDetailsDialog?.render(state, persistentViewModel.categories.value,
+                persistentViewModel.sources.value, persistentViewModel.canSaveExpense())
+            return
+        }
+        expenseDetailsDialog?.dispose()
+        if (activeDialog === expenseDetailsDialog?.dialog) activeDialog = null
+        expenseDetailsDialog = null
         if (state == null || state.saved) {
             expenseDialog?.setOnDismissListener(null)
             expenseDialog?.dismissImmediately()
@@ -662,35 +722,10 @@ class MainActivity : AppCompatActivity() {
         expenseDialog?.renderOperation(state, persistentViewModel.canSaveExpense())
     }
 
-    private fun showExpenseCorrection(expense: com.example.manymanager.domain.Expense) {
+    private fun showExpenseEditor(expense: com.example.manymanager.domain.Expense) {
         dismissActiveDialogImmediately()
-        persistentViewModel.beginExpenseCorrection(expense)
-        renderExpenseCorrection(persistentViewModel.expenseCorrectionState.value)
-    }
-
-    private fun renderExpenseCorrection(state: ExpenseCorrectionState?) {
-        if (!contentReady || isFinishing || isDestroyed) return
-        if (state == null || state.saved) {
-            correctionDialog?.dispose()
-            if (activeDialog === correctionDialog?.dialog) activeDialog = null
-            correctionDialog = null
-            if (state?.saved == true) persistentViewModel.acknowledgeExpenseCorrection()
-            return
-        }
-        if (correctionDialog == null) {
-            val window = ExpenseCorrectionDialog(this,
-                persistentViewModel::updateExpenseCorrectionAmount,
-                { persistentViewModel.submitExpenseCorrection() },
-                {
-                    val unknown = persistentViewModel.expenseCorrectionState.value?.interrupted == true
-                    persistentViewModel.cancelExpenseCorrection()
-                    if (unknown) inspectExpenses()
-                })
-            correctionDialog = window
-            activeDialog = window.dialog
-            window.show()
-        }
-        correctionDialog?.render(state)
+        persistentViewModel.openExpenseDetails(expense.id)
+        renderExpenseCreation(persistentViewModel.expenseCreationState.value)
     }
 
     private fun saveUiState(outState: Bundle) {
@@ -700,8 +735,8 @@ class MainActivity : AppCompatActivity() {
         persistentViewModel.expenseCreationState.value?.let {
             outState.putBundle("expenseCreation", it.toBundle())
         }
-        persistentViewModel.expenseCorrectionState.value?.let {
-            outState.putBundle("expenseCorrection", it.toBundle())
+        persistentViewModel.expenseGroup.value?.let {
+            outState.putBundle("expenseGroup", it.toBundle())
         }
         persistentViewModel.categoryCreation.value?.let {
             outState.putBundle("categoryCreation", it.toBundle())

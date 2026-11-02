@@ -6,11 +6,12 @@
 <h1>Expense companion checks — stage 8</h1><pre id="results">Running…</pre>
 <script type="module">
 import {civilDate,parseCivilDate,periodKey} from "../js/budget-period.js";
-import {previewModel,addCategory,addSource,createExpense,correctExpenseAmount,snapshotFor,parseAmount} from "../js/preview-model.js";
+import {previewModel,addCategory,addSource,createExpense,updateExpense,snapshotFor,parseAmount} from "../js/preview-model.js";
 import {state,closeOverlay} from "../js/state.js";
 import {beginCategoryCreation,confirmCategoryCreation} from "../js/components/category-dialog.js";
 import {expense,canSaveExpense} from "../js/components/expense-sheet.js";
-import {expenseCorrection} from "../js/components/expense-correction.js";
+import {expenseDetails} from "../js/components/expense-details.js";
+const updateAmount=(id,amountMinor)=>{const item=previewModel.expenses.find(item=>item.id===id);return item&&updateExpense(id,{...item,amountMinor})};
 import {summary} from "../js/screens/summary.js";
 import {home} from "../js/screens/home.js";
 import {loadLanguage} from "../js/i18n.js";
@@ -32,12 +33,12 @@ try {
  const historical=createExpense({amountMinor:99,date:"2026-11-09",sourceId:source.id});
  check(snapshotFor(today).expenses.length===2&&snapshotFor(new Date(2026,10,9)).expenses[0].id===historical.id,"9/10 date period isolation");
  const before={...original};
- check(correctExpenseAmount(original.id,456)&&JSON.stringify(original)===JSON.stringify({...before,amountMinor:456}),"correction changes only amount and keeps identity");
+ check(updateAmount(original.id,456)&&JSON.stringify(original)===JSON.stringify({...before,amountMinor:456}),"correction changes only amount and keeps identity");
  check(snapshotFor(today).spent===463&&snapshotFor(today).expenses.length===2,"derived totals no double counting");
- check(!correctExpenseAmount(original.id,0)&&original.amountMinor===456,"failed correction unchanged");
+ check(!updateAmount(original.id,0)&&original.amountMinor===456,"failed correction unchanged");
  const size=previewModel.expenses.length;
  check(!createExpense({amountMinor:Number.MAX_SAFE_INTEGER,date:"2026-11-10",sourceId:source.id})&&previewModel.expenses.length===size,"creation overflow atomic");
- check(!correctExpenseAmount(original.id,Number.MAX_SAFE_INTEGER)&&original.amountMinor===456,"correction overflow atomic");
+ check(!updateAmount(original.id,Number.MAX_SAFE_INTEGER)&&original.amountMinor===456,"correction overflow atomic");
  state.expenseDraft={amount:"1.01",date:"2026-11-10",note:"draft",sourceId:second.id,categoryId:null};state.overlay="expense";
  check(canSaveExpense(),"save availability with nullable category");
  beginCategoryCreation();state.categoryDraft="New";check(confirmCategoryCreation(),"category inside draft");
@@ -45,10 +46,10 @@ try {
  const host=document.createElement("div");host.innerHTML=expense();
  check(host.querySelector("#expense-date").type==="date"&&!host.querySelector('[data-action="save-expense"]').disabled,"date picker and enabled save");
  state.tab=2;host.innerHTML=summary();
- check(host.querySelectorAll('[data-action="correct-expense"]').length===2&&host.textContent.includes("Uncategorized")&&host.textContent.includes("keep"),"recognizable all-expense rows");
+ check(host.querySelectorAll('[data-action="view-expense"]').length===2&&host.textContent.includes("Uncategorized")&&host.textContent.includes("keep"),"recognizable all-expense rows");
  check(home().includes("remaining")&&home().includes("4.63"),"home shares derived facts");
- state.correctionDraft={id:original.id,amount:"3.21"};state.overlay="correct-expense";host.innerHTML=expenseCorrection();
- check(host.querySelectorAll("input").length===1&&!host.querySelector('[data-action="confirm-expense-correction"]').disabled,"only amount editable");
+ state.expenseEditId=original.id;state.expenseDraft={amount:"3.21",date:original.date,sourceId:original.sourceId,categoryId:original.categoryId,note:original.note};state.overlay="expense-details";state.expenseEditing=false;host.innerHTML=expenseDetails();
+ check(!host.querySelector("input")&&host.querySelector('[data-action="begin-expense-edit"]'),"saved expense opens read-only details");
  closeOverlay();check(original.amountMinor===456,"cancel does not mutate");
  state.expenseDraft.amount="0";check(!canSaveExpense(),"zero disables save");
  state.expenseDraft.amount="1";state.expenseDraft.sourceId=null;check(!canSaveExpense(),"source required");
@@ -71,11 +72,11 @@ try {
  click('[data-action="save-expense"]');
  check(!doc.querySelector("#amount")&&doc.querySelector(".amount-display").textContent.includes("12.34"),"app events commit and refresh home");
  click("#menu-button");click('[data-action="navigate"][data-index="1"]');click('[data-action="tab"][data-index="2"]');
- check(doc.querySelectorAll('[data-action="correct-expense"]').length===1,"app events populate expense list once");
- click('[data-action="correct-expense"]');type("#correction-amount","2.01");click('.dialog-actions [data-action="close-overlay"]');
- check(doc.querySelector('[data-action="correct-expense"]').textContent.includes("12.34"),"app correction cancel");
- click('[data-action="correct-expense"]');type("#correction-amount","2.01");click('[data-action="confirm-expense-correction"]');
- check(doc.querySelector('[data-action="correct-expense"]').textContent.includes("2.01")&&doc.querySelectorAll('[data-action="correct-expense"]').length===1,"app correction confirm updates same row");
+ check(doc.querySelectorAll('[data-action="view-expense"]').length===1,"app events populate expense list once");
+ click('[data-action="view-expense"]');click('[data-action="begin-expense-edit"]');type("#details-amount","2.01");click('[data-action="cancel-expense-edit"]');click('#expense-details [data-action="close-overlay"]');
+ check(doc.querySelector('[data-action="view-expense"]').textContent.includes("12.34"),"app correction cancel");
+ click('[data-action="view-expense"]');click('[data-action="begin-expense-edit"]');type("#details-amount","2.01");click('[data-action="save-expense-details"]');click('#expense-details [data-action="close-overlay"]');
+ check(doc.querySelector('[data-action="view-expense"]').textContent.includes("2.01")&&doc.querySelectorAll('[data-action="view-expense"]').length===1,"app correction confirm updates same row");
  frame.remove();
  document.getElementById("results").textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
 }catch(error){document.getElementById("results").textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}

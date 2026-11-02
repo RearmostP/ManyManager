@@ -116,4 +116,17 @@
     <string name="breakdown_pending">Breakdown is not available yet</string>
     <string name="source_remaining">%1$s · remaining</string>
     <string name="breakdown_expense_count">Expenses: %1$s</string>
+    <string name="edit_expense">Edit expense</string>
+    <string name="save_expense_changes">Save changes</string>
+    <string name="delete_expense">Delete expense</string>
+    <string name="delete_expense_question">Delete this expense?</string>
+    <string name="delete_expense_details">This will delete the following saved expense:</string>
+    <string name="expense_missing_record">This expense no longer exists. Close and review saved data.</string>
+    <string name="expense_edit_loading">Loading expense…</string>
+    <string name="expense_edit_retry">Could not load the expense. Tap to retry.</string>
+    <string name="group_expenses_empty">No expenses in this group for the selected period.</string>
+    <string name="open_group_expenses">Open group expenses</string>
+    <string name="expense_deleted">Expense deleted</string>
+    <string name="expense_details">Expense details</string>
+    <string name="edit">Edit</string>
 </resources>

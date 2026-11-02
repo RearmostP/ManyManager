@@ -7,7 +7,8 @@ import android.widget.TextView
 import java.text.NumberFormat
 
 /** Both panels consume one financial revision, never the independent choice-list streams. */
-class SummaryBreakdownUi(private val root: View, private val onRetry: () -> Unit) {
+class SummaryBreakdownUi(private val root: View, private val onRetry: () -> Unit,
+    private val onGroup: (Boolean, String?, String, com.example.manymanager.domain.BudgetPeriod) -> Unit = { _, _, _, _ -> }) {
     private val context = root.context
 
     fun render(state: PersistentDataState) {
@@ -36,16 +37,20 @@ class SummaryBreakdownUi(private val root: View, private val onRetry: () -> Unit
             val names = snapshot.categories.associateBy { it.id }
             snapshot.categoryBreakdown.forEach {
                 addRow(rows, it.categoryId, names[it.categoryId]?.name ?: context.getString(R.string.uncategorized),
-                    it.spentMinor, it.expenseCount)
+                    it.spentMinor, it.expenseCount) { name ->
+                        onGroup(true, it.categoryId, name, snapshot.period)
+                    }
             }
         } else {
             snapshot.sourceBreakdown.forEach {
-                addRow(rows, it.source.id, it.source.name, it.spentMinor, it.expenseCount)
+                addRow(rows, it.source.id, it.source.name, it.spentMinor, it.expenseCount) { name ->
+                    onGroup(false, it.source.id, name, snapshot.period)
+                }
             }
         }
     }
 
-    private fun addRow(rows: LinearLayout, id: String?, name: String, spent: Long, count: Int) {
+    private fun addRow(rows: LinearLayout, id: String?, name: String, spent: Long, count: Int, open: (String) -> Unit) {
         val row = LayoutInflater.from(context).inflate(R.layout.row_summary_breakdown, rows, false)
         val locale = context.resources.configuration.locales[0]
         val amount = context.getString(R.string.ils_amount, BudgetAmounts.number(spent, locale))
@@ -55,7 +60,13 @@ class SummaryBreakdownUi(private val root: View, private val onRetry: () -> Unit
         row.findViewById<TextView>(R.id.breakdownName).text = name
         row.findViewById<TextView>(R.id.breakdownAmount).text = amount
         row.findViewById<TextView>(R.id.breakdownCount).text = countLabel
-        row.contentDescription = "$name · $amount · $countLabel"
+        row.contentDescription = "$name · $amount · $countLabel. " + context.getString(R.string.open_group_expenses)
+        row.isClickable = true
+        row.isFocusable = true
+        val pressed = android.util.TypedValue()
+        context.theme.resolveAttribute(android.R.attr.selectableItemBackground, pressed, true)
+        row.foreground = context.getDrawable(pressed.resourceId)
+        row.setOnClickListener { open(name) }
         rows.addView(row)
     }
 }

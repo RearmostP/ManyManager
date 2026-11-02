@@ -1,8 +1,8 @@
-import {adjacentPeriod,civilDate} from "./budget-period.js";
-import {state,changePage,goBack,closeOverlay} from "./state.js";
+import {adjacentPeriod,civilDate,periodFor} from "./budget-period.js";
+import {state,changePage,goBack,closeOverlay,cancelExpenseEdit,savedExpenseDraft} from "./state.js";
 import {loadLanguage,t,shortDate} from "./i18n.js";
 import {icon} from "./icons.js";
-import {previewModel,addSource,updateSource,parseAmount,createExpense,correctExpenseAmount} from "./preview-model.js";
+import {previewModel,addSource,updateSource,parseAmount,createExpense,updateExpense,deleteExpense,observePreview} from "./preview-model.js";
 import {home} from "./screens/home.js";
 import {summary} from "./screens/summary.js";
 import {budget} from "./screens/budget.js";
@@ -10,7 +10,9 @@ import {settings} from "./screens/settings.js";
 import {categories} from "./screens/categories.js";
 import {drawer} from "./components/drawer.js";
 import {expense,canSaveExpense} from "./components/expense-sheet.js";
-import {expenseCorrection} from "./components/expense-correction.js";
+import {expenseDelete} from "./components/expense-delete.js";
+import {expenseDetails,expenseDetailsBody} from "./components/expense-details.js";
+import {expenseGroup} from "./screens/expense-group.js";
 import {categoryDialog,beginCategoryCreation,confirmCategoryCreation} from "./components/category-dialog.js";
 import {sourceDialog,sourcePreview,canConfirmSourceEdit} from "./components/source-dialog.js";
 
@@ -29,9 +31,21 @@ function render(){
   document.title=translate("app_name");
   menuButton.setAttribute("aria-label",translate("menu_button_label"));
   menuButton.innerHTML=icon("menu");
-  page.innerHTML=[home,summary,settings,budget,categories][state.page]();
-  overlay.innerHTML=({
-    menu:drawer,expense, "correct-expense":expenseCorrection, "add-category":categoryDialog,
+  page.innerHTML=[home,summary,settings,budget,categories,expenseGroup][state.page]();
+  if(["expense-details","delete-expense"].includes(state.overlay)){
+    if(!overlay.querySelector("#expense-details"))overlay.innerHTML=expenseDetails();
+    const panel=overlay.querySelector("#expense-details");
+    const focused=document.activeElement,focusId=panel.contains(focused)?focused.id:null;
+    panel.innerHTML=expenseDetailsBody();
+    panel.inert=state.overlay==="delete-expense";
+    if(panel.inert)panel.setAttribute("aria-hidden","true");else panel.removeAttribute("aria-hidden");
+    overlay.querySelector("[data-expense-delete-confirmation]")?.remove();
+    if(panel.inert){
+      const confirmation=document.createElement("div");confirmation.dataset.expenseDeleteConfirmation="";
+      confirmation.innerHTML=expenseDelete();overlay.append(confirmation);
+    }else if(focusId)panel.querySelector("#"+CSS.escape(focusId))?.focus({preventScroll:true});
+  }else overlay.innerHTML=({
+    menu:drawer,expense,"add-category":categoryDialog,
     "add-source":sourceDialog,"edit-source":sourceDialog
   })[state.overlay]?.()??"";
   app.inert=Boolean(state.overlay);
@@ -53,17 +67,21 @@ function clearError(id){
 }
 await loadLanguage(state.language);
 render();
+observePreview(()=>renderKeepScroll());
 
 document.addEventListener("input",event=>{
+  if(event.target.dataset.details && state.expenseEditing){
+    const key=event.target.dataset.details;
+    state.expenseDraft[key]=["categoryId","sourceId"].includes(key)?(event.target.value||null):event.target.value;
+    state.expenseDetailsError=null;
+    const save=document.querySelector('[data-action="save-expense-details"]');
+    if(save)save.disabled=!canSaveExpense();
+    clearError("expense-details-error");
+  }
   if(event.target.dataset.expense){
     state.expenseDraft[event.target.dataset.expense]=event.target.value;
     document.querySelector('[data-action="save-expense"]').disabled=!canSaveExpense();
     clearError("expense-error");
-  }
-  if(event.target.hasAttribute("data-correction")){
-    state.correctionDraft.amount=event.target.value;
-    document.querySelector('[data-action="confirm-expense-correction"]').disabled=!(parseAmount(event.target.value)>0);
-    clearError("correction-error");
   }
   if(event.target.hasAttribute("data-category-draft")){
     state.categoryDraft=event.target.value;
@@ -131,27 +149,63 @@ document.addEventListener("click",async event=>{
     case "expense-source":
       state.expenseDraft.sourceId=button.dataset.id;renderKeepScroll();break;
     case "expense":
+      state.expenseEditId=null;state.expenseOriginal=null;state.expenseEditing=false;state.expenseDetailsError=null;
       state.overlay="expense";
       state.expenseDraft={amount:"",date:civilDate(state.currentDate),note:"",categoryId:null,sourceId:null};
       renderKeepScroll();break;
     case "save-expense":{
       if(!canSaveExpense())break;
-      if(!createExpense({...state.expenseDraft,amountMinor:parseAmount(state.expenseDraft.amount)})){
-        showError("expense-error","expense_save_error");break;
+      const input={...state.expenseDraft,amountMinor:parseAmount(state.expenseDraft.amount)};
+      const saved=createExpense(input);
+      if(!saved){
+        showError("expense-error",state.expenseEditId&&!previewModel.expenses.some(item=>item.id===state.expenseEditId)?"expense_missing_record":"expense_save_error");break;
       }
       closeOverlay();renderKeepScroll();break;
     }
-    case "correct-expense":{
+    case "view-expense":{
       const item=previewModel.expenses.find(value=>value.id===button.dataset.id);
-      if(!item)break;
-      state.correctionDraft={id:item.id,amount:`${Math.trunc(item.amountMinor/100)}.${String(item.amountMinor%100).padStart(2,"0")}`};
-      state.overlay="correct-expense";renderKeepScroll();break;
+      state.expenseEditId=button.dataset.id;state.expenseOriginal=item?{...item}:null;
+      state.expenseEditing=false;state.expenseDetailsError=null;
+      state.expenseDraft=savedExpenseDraft(item);
+      state.overlay="expense-details";renderKeepScroll();break;
     }
-    case "confirm-expense-correction":{
-      if(!correctExpenseAmount(state.correctionDraft.id,parseAmount(state.correctionDraft.amount))){
-        showError("correction-error","expense_save_error");break;
+    case "begin-expense-edit":{
+      const saved=previewModel.expenses.find(item=>item.id===state.expenseEditId);
+      if(!saved){renderKeepScroll();break}
+      state.expenseDraft=savedExpenseDraft(saved);state.expenseEditing=true;state.expenseDetailsError=null;
+      renderKeepScroll();break;
+    }
+    case "cancel-expense-edit":
+      cancelExpenseEdit();renderKeepScroll();break;
+    case "save-expense-details":{
+      if(state.overlay!=="expense-details"||!state.expenseEditing||!canSaveExpense())break;
+      if(!updateExpense(state.expenseEditId,{...state.expenseDraft,amountMinor:parseAmount(state.expenseDraft.amount)})){
+        state.expenseDetailsError=previewModel.expenses.some(item=>item.id===state.expenseEditId)?"expense_save_error":"expense_missing_record";
+        renderKeepScroll();break;
       }
-      closeOverlay();renderKeepScroll();break;
+      cancelExpenseEdit();renderKeepScroll();break;
+    }
+    case "delete-expense":{
+      const saved=previewModel.expenses.find(item=>item.id===state.expenseEditId);
+      if(state.overlay!=="expense-details"||!state.expenseEditing)break;
+      if(!saved){state.expenseDetailsError="expense_missing_record";renderKeepScroll();break}
+      state.expenseOriginal={...saved};
+      state.overlay="delete-expense";renderKeepScroll();break;
+    }
+    case "confirm-delete-expense":{
+      if(state.overlay!=="delete-expense"||!state.expenseEditing)break;
+      const deleted=deleteExpense(state.expenseEditId);
+      state.overlay=deleted?null:"expense-details";
+      if(!deleted)state.expenseDetailsError=previewModel.expenses.some(item=>item.id===state.expenseEditId)?"expense_save_error":"expense_missing_record";
+      renderKeepScroll();
+      break;
+    }
+    case "expense-group":{
+      const category=button.dataset.kind==="category",id=button.dataset.id||null;
+      const name=category?(previewModel.categories.find(item=>item.id===id)?.name??translate("uncategorized")):
+        previewModel.sources.find(item=>item.id===id)?.name??"";
+      state.expenseGroup={category,id,name,periodStart:civilDate(periodFor(state.currentDate).start),tab:state.tab,scroll:scroll.scrollTop};
+      state.page=5;render();scroll.scrollTop=0;break;
     }
     case "budget-toggle":
       state.budgetExpanded=!state.budgetExpanded;renderKeepScroll();break;
@@ -185,7 +239,7 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshTod
 setInterval(()=>{if(!document.hidden)refreshToday()},60000);
 menuButton.addEventListener("click",()=>{state.overlay="menu";renderKeepScroll()});
 document.addEventListener("keydown",event=>{
-  if(event.key==="Escape"||(event.key==="Backspace"&&event.target.tagName!=="INPUT"&&event.target.tagName!=="TEXTAREA")){
+  if(event.key==="Escape"||(event.key==="Backspace"&&event.target.tagName!=="INPUT"&&event.target.tagName!=="TEXTAREA"&&event.target.tagName!=="SELECT")){
     if(goBack(scroll)){event.preventDefault();renderKeepScroll()}
   }
 });

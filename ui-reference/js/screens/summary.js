@@ -1,8 +1,7 @@
 import {state} from "../state.js";
 import {previewModel,snapshotFor} from "../preview-model.js";
 import {parseCivilDate} from "../budget-period.js";
-import {shortDate} from "../i18n.js";
-import {number} from "../i18n.js";
+import {shortDate,number} from "../i18n.js";
 import {tr,monthControls,money,escapeValue} from "../render-helpers.js";
 
 const panels=[
@@ -10,19 +9,22 @@ const panels=[
  ["payment_breakdown_title","payment_breakdown_description","no_payment_methods","payment_breakdown_explanation"],
  ["expense_list_title","expense_list_description","no_expenses",null]
 ];
-export function summary(){
- const keys=panels[state.tab];
- const snapshot=snapshotFor(state.currentDate);
- const rows=state.tab===2?snapshot.expenses.map(item=>{
+export function expenseRows(expenses){
+ return expenses.map(item=>{
    const category=previewModel.categories.find(value=>value.id===item.categoryId)?.name??tr("uncategorized");
    const source=previewModel.sources.find(value=>value.id===item.sourceId)?.name??"";
    const label=[money(item.amountMinor),shortDate(state.language,parseCivilDate(item.date)),category,source,item.note].filter(Boolean).map(escapeValue).join(" · ");
-   return `<button class="chip" style="display:block;width:100%;text-align:start;margin-top:12px;white-space:normal" data-action="correct-expense" data-id="${item.id}" aria-label="${label} · ${escapeValue(tr("correct_expense_amount"))}">${label}</button>`;
- }).join(""):"";
+   return `<button class="chip" style="display:block;width:100%;text-align:start;margin-top:12px;white-space:normal" data-action="view-expense" data-id="${item.id}" aria-label="${label} · ${escapeValue(tr("expense_details"))}">${label}</button>`;
+ }).join("");
+}
+export function summary(){
+ const keys=panels[state.tab];
+ const snapshot=snapshotFor(state.currentDate);
+ const rows=state.tab===2?expenseRows(snapshot.expenses):"";
  const groups=state.tab===0?snapshot.categoryBreakdown:snapshot.sourceBreakdown;
  const breakdown=groups.map(item=>{
    const label=[item.name??tr("uncategorized"),money(item.spent),tr("breakdown_expense_count",number(state.language,item.expenseCount))];
-   return `<div class="chip summary-breakdown-row" data-breakdown-id="${item.id??""}" aria-label="${escapeValue(label.join(" · "))}">${label.map(value=>`<div>${escapeValue(value)}</div>`).join("")}</div>`;
+   return `<button class="chip summary-breakdown-row" data-action="expense-group" data-kind="${state.tab===0?"category":"source"}" data-id="${item.id??""}" data-breakdown-id="${item.id??""}" aria-label="${escapeValue(label.join(" · "))} · ${escapeValue(tr("open_group_expenses"))}">${label.map(value=>`<div>${escapeValue(value)}</div>`).join("")}</button>`;
  }).join("");
  return `<section class="summary fade-in"><p class="intro">${tr("summary_intro")}</p><h1>${tr("expense_summary")}</h1>
  ${monthControls()}<div class="summary-amount"><span class="currency">${tr("ils_symbol")}</span><span class="number">${number(state.language,snapshot.spent/100)}</span></div>

@@ -4,14 +4,14 @@ import {tr,escapeValue} from "../render-helpers.js";
 
 export function beginCategoryCreation(){
   state.categoryDraft="";
-  state.categoryReturnOverlay=state.overlay==="expense"?"expense":null;
+  state.categoryReturnOverlay=["expense","expense-details"].includes(state.overlay)?state.overlay:null;
   state.overlay="add-category";
 }
 export function confirmCategoryCreation(){
   const name=state.categoryDraft.trim();
   const created=addCategory(name);
   if(!created)return false;
-  if(state.categoryReturnOverlay==="expense")state.expenseDraft.categoryId=created.id;
+  if(["expense","expense-details"].includes(state.categoryReturnOverlay))state.expenseDraft.categoryId=created.id;
   state.overlay=state.categoryReturnOverlay;
   state.categoryReturnOverlay=null;
   return true;

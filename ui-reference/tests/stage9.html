@@ -1,12 +1,13 @@
 <!doctype html><meta charset="utf-8"><meta name="google" content="notranslate"><base href="../">
 <title>Summary consistency checks — stage 9</title><h1>Summary consistency checks — stage 9</h1><pre id="results">Running…</pre>
 <script type="module">
-import {previewModel,addCategory,addSource,createExpense,correctExpenseAmount,snapshotFor,updateSource} from "../js/preview-model.js";
+import {previewModel,addCategory,addSource,createExpense,updateExpense,snapshotFor,updateSource} from "../js/preview-model.js";
 import {state} from "../js/state.js";
 import {summary} from "../js/screens/summary.js";
 import {home} from "../js/screens/home.js";
 import {expense} from "../js/components/expense-sheet.js";
 import {loadLanguage} from "../js/i18n.js";
+const updateAmount=(id,amountMinor)=>{const item=previewModel.expenses.find(item=>item.id===id);return item&&updateExpense(id,{...item,amountMinor})};
 const results=[],check=(value,label)=>{if(!value)throw Error(label);results.push("PASS "+label)};
 const host=document.createElement("div");
 const render=tab=>{state.tab=tab;host.innerHTML=summary();return [...host.querySelectorAll("[data-breakdown-id]")]};
@@ -32,8 +33,8 @@ try{
  const categoryRows=render(0);check(categoryRows.length===3&&host.textContent.includes("Uncategorized")&&host.textContent.includes("0.29"),"category presentation uses prepared values");
  check(categoryRows.every(row=>row.getAttribute("aria-label").includes("Expenses:")),"accessible name amount count");
  check(render(1).length===2&&host.textContent.includes("0.29"),"source panel displays spending rather than allocation");
- check(!host.querySelector("[data-breakdown-id] button"),"breakdowns have no new actions");
- check(correctExpenseAmount(first.id,30),"amount correction succeeds");
+ check(host.querySelector('button[data-breakdown-id][data-action="expense-group"]'),"breakdowns open predictable group lists");
+ check(updateAmount(first.id,30),"amount correction succeeds");
  snap=snapshotFor(date);check(snap.spent===59&&sum(snap.categoryBreakdown)===59&&sum(snap.sourceBreakdown)===59&&snap.expenses.length===3,"correction updates groups without changing count");
  const moneyBefore=snap.sourceBreakdown.map(row=>row.spent).join(",");
  check(updateSource(b.id,"Renamed",date,0),"source rename");
@@ -60,7 +61,7 @@ try{
  click("#menu-button");click('[data-action="navigate"][data-index="1"]');
  check(doc.querySelectorAll("[data-breakdown-id]").length===1,"real app uncategorized group after save");
  click('[data-action="tab"][data-index="1"]');check(doc.querySelector("[data-breakdown-id]").textContent.includes("Preview source")&&doc.querySelector("[data-breakdown-id]").textContent.includes("1.23"),"real app source group after save");
- click('[data-action="tab"][data-index="2"]');click('[data-action="correct-expense"]');type("#correction-amount","2.34");click('[data-action="confirm-expense-correction"]');
+ click('[data-action="tab"][data-index="2"]');click('[data-action="view-expense"]');click('[data-action="begin-expense-edit"]');type("#details-amount","2.34");click('[data-action="save-expense-details"]');click('#expense-details [data-action="close-overlay"]');
  click('[data-action="tab"][data-index="0"]');check(doc.querySelector("[data-breakdown-id]").textContent.includes("2.34"),"real app category follows correction");
  click('[data-action="tab"][data-index="1"]');check(doc.querySelector("[data-breakdown-id]").textContent.includes("2.34"),"real app source follows correction");
  frame.remove();

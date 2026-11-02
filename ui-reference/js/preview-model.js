@@ -11,6 +11,10 @@ export const previewModel={
 
 import {periodKey,parseCivilDate} from "./budget-period.js";
 
+const observers=new Set();
+export function observePreview(observer){observers.add(observer);return ()=>observers.delete(observer)}
+function changed(){for(const observer of observers)queueMicrotask(observer)}
+
 export function amountFor(date,sourceId){
   return previewModel.allocations.get(periodKey(date))?.get(sourceId)??0;
 }
@@ -60,15 +64,31 @@ export function createExpense(input){
   const expense={id:`expense-${previewModel.nextExpenseId}`,amountMinor:input.amountMinor,
     date:input.date,sourceId:input.sourceId,categoryId:input.categoryId??null,note:input.note||null};
   try{snapshotFor(date,[...previewModel.expenses,expense])}catch{return null}
-  previewModel.expenses.push(expense);previewModel.nextExpenseId++;
+  previewModel.expenses.push(expense);previewModel.nextExpenseId++;changed();
   return expense;
 }
-export function correctExpenseAmount(id,amountMinor){
+export function updateExpense(id,input){
   const original=previewModel.expenses.find(item=>item.id===id);
-  if(!original||!Number.isSafeInteger(amountMinor)||amountMinor<=0)return false;
-  const candidate=previewModel.expenses.map(item=>item.id===id?{...item,amountMinor}:item);
+  const date=parseCivilDate(input.date);
+  if(!original||!date||!Number.isSafeInteger(input.amountMinor)||input.amountMinor<=0||
+    !previewModel.sources.some(item=>item.id===input.sourceId)||
+    (input.categoryId!=null&&!previewModel.categories.some(item=>item.id===input.categoryId)))return false;
+  const updated={id:original.id,amountMinor:input.amountMinor,date:input.date,
+    sourceId:input.sourceId,categoryId:input.categoryId??null,note:input.note||null};
+  const candidate=previewModel.expenses.map(item=>item.id===id?updated:item);
+  try{
+    snapshotFor(parseCivilDate(original.date),candidate);
+    snapshotFor(date,candidate);
+  }catch{return false}
+  Object.assign(original,updated);changed();
+  return true;
+}
+export function deleteExpense(id){
+  const original=previewModel.expenses.find(item=>item.id===id);
+  if(!original)return false;
+  const candidate=previewModel.expenses.filter(item=>item.id!==id);
   try{snapshotFor(parseCivilDate(original.date),candidate)}catch{return false}
-  original.amountMinor=amountMinor;
+  previewModel.expenses=candidate;changed();
   return true;
 }
 
@@ -76,7 +96,7 @@ export function addCategory(name){
   const clean=name.trim();
   if(!clean)return null;
   const category={id:`category-${previewModel.nextCategoryId++}`,name:clean};
-  previewModel.categories.push(category);
+  previewModel.categories.push(category);changed();
   return category;
 }
 
@@ -90,7 +110,7 @@ export function addSource(name,date,initial){
   const allocations=previewModel.allocations.get(key)??new Map();
   allocations.set(source.id,initial);
   previewModel.allocations.set(key,allocations);
-  return source;
+  changed();return source;
 }
 
 export function previewAdjustment(date,sourceId,delta){
@@ -110,6 +130,6 @@ export function updateSource(sourceId,name,date,delta){
   const key=periodKey(date);
   const allocations=previewModel.allocations.get(key)??new Map();
   allocations.set(sourceId,result);
-  previewModel.allocations.set(key,allocations);
+  previewModel.allocations.set(key,allocations);changed();
   return true;
 }

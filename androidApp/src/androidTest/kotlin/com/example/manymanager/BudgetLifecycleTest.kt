@@ -293,7 +293,7 @@ class BudgetLifecycleTest {
         val screen = launch()
         openBudget(screen)
         val controller = model(screen)
-        screen.onActivity { controller.selectPeriod(old) }
+        screen.onActivity { if (controller.selectedPeriod != old) controller.selectPeriod(old) }
         androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().waitForIdleSync()
         awaitUi(screen) { it.findViewById<View>(R.id.budgetAddSource).isEnabled &&
             (controller.state.value as? PersistentDataState.Ready)?.snapshot?.period == old }
@@ -583,51 +583,67 @@ class BudgetLifecycleTest {
         screen.onActivity { it.findViewById<View>(R.id.allTab).performClick() }
         awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).childCount == 1 }
         screen.onActivity { it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).getChildAt(0).performClick() }
-        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.original != null }
+        val detailsWindow = rootWith(R.id.expenseDetailsTitle)
         screen.onActivity {
-            rootWith(R.id.expenseCorrectionAmount)!!.findViewById<EditText>(R.id.expenseCorrectionAmount).setText("9.87")
-            controller.cancelExpenseCorrection()
+            assertFalse(controller.expenseCreationState.value!!.editing)
+            assertEquals(View.GONE, rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.expenseDetailsAmount).visibility)
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.editExpenseDetails).performClick()
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<EditText>(R.id.expenseDetailsAmount).setText("9.87")
+            detailsBack(it)
         }
-        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) == null }
-        assertEquals(saved, success(app.repository.snapshot(savedPeriod)).expenses.single())
-        screen.onActivity { it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).getChildAt(0).performClick() }
-        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
-        screen.onActivity { rootWith(R.id.expenseCorrectionAmount)!!.findViewById<EditText>(R.id.expenseCorrectionAmount).setText("9.87") }
+        awaitUi(screen) { controller.expenseCreationState.value?.editing == false }
+        assertTrue(detailsWindow === rootWith(R.id.expenseDetailsTitle))
+        assertEquals(saved, success(app.repository.expense(saved.id)))
+        screen.onActivity {
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.editExpenseDetails).performClick()
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<EditText>(R.id.expenseDetailsAmount).setText("9.87")
+        }
         screen.recreate()
-        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.editing == true }
         app.database.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_correction BEFORE UPDATE ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
         screen.onActivity {
-            assertEquals("9.87", rootWith(R.id.expenseCorrectionAmount)!!.findViewById<EditText>(R.id.expenseCorrectionAmount).text.toString())
-            controller.submitExpenseCorrection()
-            assertNull(controller.submitExpenseCorrection())
+            assertEquals("9.87", rootWith(R.id.expenseDetailsTitle)!!.findViewById<EditText>(R.id.expenseDetailsAmount).text.toString())
+            controller.submitExpenseCreation()
+            assertNull(controller.submitExpenseCreation())
         }
-        awaitUi(screen) { controller.expenseCorrectionState.value?.error is DataError.StorageFailure }
-        assertEquals(saved, success(app.repository.snapshot(savedPeriod)).expenses.single())
-        assertEquals("9.87", controller.expenseCorrectionState.value!!.amountText)
+        awaitUi(screen) { controller.expenseCreationState.value?.error is DataError.StorageFailure }
+        assertEquals(saved, success(app.repository.expense(saved.id)))
+        assertEquals("9.87", controller.expenseCreationState.value!!.draft.amount)
         app.database.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_correction")
         val (releaseCorrection, heldCorrection) = gate()
         try {
-            screen.onActivity { controller.submitExpenseCorrection() }
+            screen.onActivity { controller.submitExpenseCreation() }
             screen.recreate()
-            awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
+            awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.submitting == true }
             screen.onActivity {
-                assertFalse(rootWith(R.id.expenseCorrectionAmount)!!.findViewById<View>(android.R.id.button1).isEnabled)
-                assertNull(controller.submitExpenseCorrection())
+                assertFalse(rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.saveExpenseDetails).isEnabled)
+                assertNull(controller.submitExpenseCreation())
+                assertNull(controller.confirmExpenseDeletion())
             }
         } finally { releaseCorrection.complete(Unit); heldCorrection.join() }
-        awaitUi(screen) { controller.expenseCorrectionState.value == null }
+        awaitUi(screen) { controller.expenseCreationState.value?.editing == false &&
+            controller.expenseCreationState.value?.original?.amountMinor == 987L }
+        assertNotNull(rootWith(R.id.expenseDetailsTitle))
         val corrected = saved.copy(amountMinor = 987)
-        assertEquals(corrected, success(app.repository.snapshot(savedPeriod)).expenses.single())
+        assertEquals(corrected, success(app.repository.expense(saved.id)))
         screen.onActivity {
-            controller.restoreExpenseCorrection(ExpenseCorrectionState.fromBundle(
-                ExpenseCorrectionState(corrected, "2", submitting = true).toBundle())!!)
+            assertNull(controller.submitExpenseCreation())
+            controller.cancelExpenseCreation()
         }
-        awaitUi(screen) { rootWith(R.id.expenseCorrectionAmount) != null }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) == null }
         screen.onActivity {
-            assertFalse(rootWith(R.id.expenseCorrectionAmount)!!.findViewById<View>(android.R.id.button1).isEnabled)
-            assertNull(controller.submitExpenseCorrection())
+            controller.restoreExpenseCreation(ExpenseCreationState.fromBundle(
+                ExpenseCreationState(ExpenseDraft.fromExpense(corrected).copy(amount = "2"),
+                    submitting = true, expenseId = corrected.id, original = corrected, editing = true).toBundle()))
         }
-        assertEquals(corrected, success(app.repository.snapshot(savedPeriod)).expenses.single())
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.interrupted == true }
+        screen.onActivity {
+            assertFalse(rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.saveExpenseDetails).isEnabled)
+            assertNull(controller.submitExpenseCreation())
+            assertNull(controller.confirmExpenseDeletion())
+        }
+        assertEquals(corrected, success(app.repository.expense(corrected.id)))
     }
 
     @Test fun failedExpenseWritePreservesInputAndUnknownRestoreCannotSubmit() = runBlocking {
@@ -703,7 +719,7 @@ class BudgetLifecycleTest {
             assertFalse(it.findViewById<View>(R.id.previousMonth).isEnabled)
             assertFalse(it.findViewById<View>(R.id.nextMonth).isEnabled)
         }
-        success(app.repository.correctExpenseAmount(first.id, 400))
+        success(app.repository.updateExpense(first.id, NewExpense(400, first.date, first.sourceId, first.categoryId, first.note)))
         awaitUi(screen) { rowAmount(it, R.id.categorySummaryRows, catA.id) == money(it, 400) }
         screen.onActivity {
             assertEquals(BudgetAmounts.number(900, it.resources.configuration.locales[0]), it.findViewById<TextView>(R.id.homeTotal).text.toString())
@@ -770,7 +786,7 @@ class BudgetLifecycleTest {
         val populated = success(app.repository.snapshot())
         screen.onActivity {
             var retries = 0
-            val renderer = SummaryBreakdownUi(it.findViewById(R.id.summaryPage)) { retries++ }
+            val renderer = SummaryBreakdownUi(it.findViewById(R.id.summaryPage), onRetry = { retries++ })
             renderer.render(PersistentDataState.Loading)
             assertEquals(it.getString(R.string.expenses_loading), it.findViewById<TextView>(R.id.categorySummaryEmpty).text)
             assertEquals(0, it.findViewById<android.widget.LinearLayout>(R.id.sourceSummaryRows).childCount)
@@ -820,7 +836,7 @@ class BudgetLifecycleTest {
                 dialog = androidx.appcompat.app.AlertDialog.Builder(themed).setView(android.widget.ScrollView(themed).apply { addView(content) }).create()
                 dialog.showWithRoundedSurface()
                 dialog.window!!.setLayout((320 * activity.resources.displayMetrics.density).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
-                SummaryBreakdownUi(content) {}.render(PersistentDataState.Ready(snapshot.copy(
+                SummaryBreakdownUi(content, onRetry = {}).render(PersistentDataState.Ready(snapshot.copy(
                     categories = listOf(category.copy(name = longName)),
                     sources = snapshot.sources.map { it.copy(source = it.source.copy(name = longName)) })))
             }
@@ -828,7 +844,8 @@ class BudgetLifecycleTest {
             screen.onActivity {
                 for (container in listOf(R.id.categorySummaryRows, R.id.sourceSummaryRows)) {
                     val row = content.findViewById<android.widget.LinearLayout>(container).getChildAt(0)
-                    assertFalse(row.isClickable)
+                    assertTrue(row.isClickable)
+                    assertTrue(row.isFocusable)
                     assertTrue(row.contentDescription.contains(longName))
                     for (id in listOf(R.id.breakdownName, R.id.breakdownAmount, R.id.breakdownCount)) {
                         val text = row.findViewById<TextView>(id)
@@ -844,6 +861,249 @@ class BudgetLifecycleTest {
 
     /** Protected system broadcasts cannot be sent by an app. Invoke the registered receiver's
      * callback with a simulated event; never change the user's device clock/zone. */
+    @Test fun groupDetailsMoveOutOfFilterButStayOpenAndBackRestoresSummary(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
+        val otherSource = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
+        val category = success(app.repository.createCategory("Same"))
+        val otherCategory = success(app.repository.createCategory("Same"))
+        val first = success(app.repository.createExpense(NewExpense(100, period.start, source.id, category.id)))
+        success(app.repository.createExpense(NewExpense(200, period.start, otherSource.id, otherCategory.id)))
+        success(app.repository.createExpense(NewExpense(50, period.start, source.id)))
+        val screen = launch()
+        val controller = model(screen)
+        screen.onActivity { it.findViewById<View>(R.id.menuButton).performClick() }
+        awaitUi(screen) { rootWith(R.id.nav1) != null }
+        screen.onActivity { rootWith(R.id.nav1)!!.findViewById<View>(R.id.nav1).performClick() }
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows).childCount == 3 }
+        var originScroll = 0
+        screen.onActivity {
+            val scroll = it.findViewById<android.widget.ScrollView>(R.id.pageScroll)
+            scroll.scrollTo(0, 70); originScroll = scroll.scrollY
+            val rows = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
+            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == category.id }.performClick()
+        }
+        awaitUi(screen) { it.findViewById<View>(R.id.expenseGroupPage).isShown &&
+            it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 1 }
+        assertEquals(category.id, controller.expenseGroup.value!!.id)
+        assertEquals(originScroll, controller.expenseGroup.value!!.originScroll)
+        screen.onActivity { it.findViewById<View>(R.id.expenseGroupBack).performClick() }
+        awaitUi(screen) { it.findViewById<View>(R.id.summaryPage).isShown &&
+            it.findViewById<android.widget.ScrollView>(R.id.pageScroll).scrollY == originScroll }
+        screen.onActivity {
+            val rows = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
+            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == category.id }.performClick()
+        }
+        awaitUi(screen) { it.findViewById<View>(R.id.expenseGroupPage).isShown &&
+            it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 1 }
+        screen.onActivity { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).getChildAt(0).performClick() }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.original?.id == first.id }
+        val window = rootWith(R.id.expenseDetailsTitle)
+        screen.onActivity {
+            val root = rootWith(R.id.expenseDetailsTitle)!!
+            assertEquals(View.GONE, (root.findViewById<View>(R.id.expenseDetailsNoteValue).parent as View).visibility)
+            assertFalse(controller.expenseCreationState.value!!.editing)
+            root.findViewById<View>(R.id.editExpenseDetails).performClick()
+            assertEquals("", root.findViewById<EditText>(R.id.expenseDetailsNote).text.toString())
+            root.findViewById<EditText>(R.id.expenseDetailsAmount).setText("1.23")
+            root.findViewById<EditText>(R.id.expenseDetailsNote).setText("Edited")
+            controller.updateExpenseDraft(controller.expenseCreationState.value!!.draft.copy(
+                sourceId = otherSource.id, date = period.endExclusive))
+            root.findViewById<View>(R.id.expenseDetailsNewCategory).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.categoryNameInput) != null }
+        val beforeCategory = controller.expenseCreationState.value!!.draft
+        screen.onActivity {
+            rootWith(R.id.categoryNameInput)!!.findViewById<EditText>(R.id.categoryNameInput).setText("Created from details")
+            controller.submitCategoryCreation()
+        }
+        awaitUi(screen) { controller.categoryCreation.value == null &&
+            controller.expenseCreationState.value?.draft?.categoryId != category.id }
+        val selected = controller.expenseCreationState.value!!.draft
+        assertEquals(beforeCategory.copy(categoryId = selected.categoryId), selected)
+        screen.onActivity {
+            controller.updateExpenseDraft(selected.copy(categoryId = null))
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.deleteExpenseDetails).performClick()
+        }
+        awaitUi(screen) { rootWith(android.R.id.button1) != null && controller.expenseCreationState.value?.confirmingDelete == true }
+        val draft = controller.expenseCreationState.value!!.draft
+        screen.onActivity { rootWith(android.R.id.button2)!!.findViewById<View>(android.R.id.button2).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.confirmingDelete == false }
+        assertEquals(draft, controller.expenseCreationState.value!!.draft)
+        assertTrue(window === rootWith(R.id.expenseDetailsTitle))
+        // Saved-data invalidation updates the saved record, never this dirty draft.
+        success(app.repository.updateExpense(first.id, NewExpense(110, first.date, first.sourceId, first.categoryId, "External")))
+        awaitUi(screen) { controller.expenseCreationState.value?.original?.amountMinor == 110L }
+        assertEquals(draft, controller.expenseCreationState.value!!.draft)
+        screen.recreate()
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.editing == true }
+        assertEquals(draft, controller.expenseCreationState.value!!.draft)
+        screen.onActivity { rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.saveExpenseDetails).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.editing == false &&
+            controller.expenseCreationState.value?.original?.date == period.endExclusive }
+        assertNotNull(rootWith(R.id.expenseDetailsTitle))
+        assertEquals(first.copy(amountMinor = 123, date = period.endExclusive, sourceId = otherSource.id,
+            categoryId = null, note = "Edited"), success(app.repository.expense(first.id)))
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 0 }
+        screen.onActivity {
+            assertEquals(View.GONE, rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.expenseDetailsAmount).visibility)
+            assertTrue(rootWith(R.id.expenseDetailsTitle)!!.findViewById<TextView>(R.id.expenseDetailsNoteValue).text.contains("Edited"))
+        }
+        app.clock.now = period.endExclusive.atTime(12, 0).atZone(app.clock.zone).toInstant()
+        screen.onActivity { controller.refresh() }
+        awaitUi(screen) { (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.period?.start == period.endExclusive }
+        assertEquals(period, controller.expenseGroup.value!!.period)
+        screen.onActivity { detailsBack(it) }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) == null }
+        screen.onActivity {
+            assertEquals(it.getString(R.string.group_expenses_empty), it.findViewById<TextView>(R.id.expenseGroupEmpty).text)
+            it.findViewById<View>(R.id.expenseGroupBack).performClick()
+        }
+        awaitUi(screen) { it.findViewById<View>(R.id.summaryPage).isShown }
+        screen.onActivity {
+            assertTrue(it.findViewById<View>(R.id.categoryTab).isSelected)
+            val scroll = it.findViewById<android.widget.ScrollView>(R.id.pageScroll)
+            val available = (scroll.getChildAt(0).height - scroll.height + scroll.paddingTop + scroll.paddingBottom).coerceAtLeast(0)
+            assertEquals(minOf(originScroll, available), scroll.scrollY)
+            assertFalse(it.findViewById<View>(R.id.previousMonth).isEnabled)
+        }
+    }
+
+    @Test fun sourceAndNullGroupDetailsDeleteWithFailureRecreationAndMissingRecord(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createSourceWithInitialAllocation("Same", period, 100))
+        val otherSource = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
+        val category = success(app.repository.createCategory("Food"))
+        val first = success(app.repository.createExpense(NewExpense(30, period.start, source.id)))
+        val second = success(app.repository.createExpense(NewExpense(20, period.start, source.id, category.id)))
+        val other = success(app.repository.createExpense(NewExpense(10, period.start, otherSource.id)))
+        val screen = launch()
+        val controller = model(screen)
+        screen.onActivity { it.findViewById<View>(R.id.menuButton).performClick() }
+        awaitUi(screen) { rootWith(R.id.nav1) != null }
+        screen.onActivity { rootWith(R.id.nav1)!!.findViewById<View>(R.id.nav1).performClick() }
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.sourceSummaryRows).childCount == 2 }
+        screen.onActivity {
+            it.findViewById<View>(R.id.sourceTab).performClick()
+            val rows = it.findViewById<android.widget.LinearLayout>(R.id.sourceSummaryRows)
+            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == source.id }.performClick()
+        }
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 2 }
+        screen.onActivity {
+            val rows = it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows)
+            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == first.id }.performClick()
+        }
+        awaitUi(screen) { controller.expenseCreationState.value?.original?.id == first.id }
+        screen.onActivity {
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.editExpenseDetails).performClick()
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<EditText>(R.id.expenseDetailsNote).setText("Dirty")
+            controller.requestExpenseDeletion()
+        }
+        val draft = controller.expenseCreationState.value!!.draft
+        awaitUi(screen) { rootWith(android.R.id.button1) != null }
+        app.database.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_delete_ui BEFORE DELETE ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
+        screen.onActivity { rootWith(android.R.id.button1)!!.findViewById<View>(android.R.id.button1).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.error is DataError.StorageFailure }
+        assertTrue(controller.expenseCreationState.value!!.editing)
+        assertEquals(draft, controller.expenseCreationState.value!!.draft)
+        assertEquals(first, success(app.repository.expense(first.id)))
+        app.database.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_delete_ui")
+        screen.onActivity { controller.requestExpenseDeletion() }
+        val (release, held) = gate()
+        try {
+            screen.onActivity {
+                controller.confirmExpenseDeletion()
+                assertNull(controller.confirmExpenseDeletion()); assertNull(controller.submitExpenseCreation())
+            }
+            screen.recreate()
+            awaitUi(screen) { rootWith(android.R.id.button1) != null && controller.expenseCreationState.value?.submitting == true }
+            assertEquals(draft, controller.expenseCreationState.value!!.draft)
+            screen.onActivity {
+                assertFalse(rootWith(android.R.id.button1)!!.findViewById<View>(android.R.id.button1).isEnabled)
+                assertNull(controller.confirmExpenseDeletion())
+            }
+        } finally { release.complete(Unit); held.join() }
+        awaitUi(screen) { controller.expenseCreationState.value == null &&
+            it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 1 }
+        assertNull(rootWith(R.id.expenseDetailsTitle))
+        assertEquals(setOf(second.id, other.id), success(app.repository.snapshot()).expenses.map { it.id }.toSet())
+        screen.onActivity {
+            it.findViewById<View>(R.id.expenseGroupBack).performClick()
+            assertTrue(it.findViewById<View>(R.id.sourceTab).isSelected)
+            it.findViewById<View>(R.id.categoryTab).performClick()
+            val rows = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
+            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == null }.performClick()
+        }
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 1 }
+        assertNull(controller.expenseGroup.value!!.id)
+        screen.onActivity { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).getChildAt(0).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.original?.id == other.id }
+        assertFalse(controller.expenseCreationState.value!!.editing)
+        success(app.repository.deleteExpense(other.id))
+        awaitUi(screen) { controller.expenseCreationState.value?.error is DataError.MissingEntity }
+        screen.onActivity {
+            assertEquals(View.GONE, rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.editExpenseDetails).visibility)
+            detailsBack(it)
+        }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) == null &&
+            it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 0 }
+        assertEquals(listOf(second), success(app.repository.snapshot()).expenses)
+        assertEquals(100L, success(app.repository.snapshot()).totalAllocatedMinor)
+    }
+
+    @Test fun detailsActionsFollowLocaleAndFitNarrowLightAndDarkWindows(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createSourceWithInitialAllocation("Long source name ".repeat(4), period, 0))
+        val category = success(app.repository.createCategory("Long category name ".repeat(4)))
+        val record = success(app.repository.createExpense(NewExpense(123, period.start, source.id, category.id)))
+        val screen = launch()
+        for (language in listOf("he", "en", "ru")) for (dark in listOf(false, true)) {
+            app.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE).edit().putBoolean("dark", dark).commit()
+            screen.recreate()
+            awaitUi(screen) { (it.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO }
+            lateinit var window: ExpenseDetailsDialog
+            screen.onActivity { activity ->
+                val config = Configuration(activity.resources.configuration).apply {
+                    val locale = java.util.Locale.forLanguageTag(language); setLocale(locale); setLayoutDirection(locale)
+                }
+                val themed = androidx.appcompat.view.ContextThemeWrapper(activity, R.style.AppTheme).apply { applyOverrideConfiguration(config) }
+                window = ExpenseDetailsDialog(themed, {}, {}, {}, {}, {}, {}, {}, {}, {}, {})
+                window.show()
+                val state = ExpenseCreationState(ExpenseDraft.fromExpense(record), expenseId = record.id, original = record)
+                window.render(state, CategoryListState.Ready(listOf(category)), SourceListState.Ready(listOf(source)), false)
+                val note = window.dialog.findViewById<TextView>(R.id.expenseDetailsNoteValue)!!
+                assertEquals(View.GONE, (note.parent as View).visibility)
+                assertEquals(View.GONE, window.dialog.findViewById<View>(R.id.expenseDetailsAmount)!!.visibility)
+                window.render(state.copy(editing = true), CategoryListState.Ready(listOf(category)), SourceListState.Ready(listOf(source)), true)
+                window.dialog.window!!.setLayout((320 * activity.resources.displayMetrics.density).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+                assertEquals("", window.dialog.findViewById<EditText>(R.id.expenseDetailsNote)!!.text.toString())
+            }
+            awaitUi(screen) { window.dialog.findViewById<View>(R.id.expenseDetailsActions)?.width != 0 }
+            screen.onActivity { activity ->
+                val primary = window.dialog.findViewById<View>(R.id.expenseDetailsPrimaryActions)!!
+                val delete = window.dialog.findViewById<TextView>(R.id.deleteExpenseDetails)!!
+                val primaryPosition = IntArray(2); val deletePosition = IntArray(2)
+                primary.getLocationOnScreen(primaryPosition); delete.getLocationOnScreen(deletePosition)
+                if (language == "he") assertTrue(primaryPosition[0] >= deletePosition[0] + delete.width)
+                else assertTrue(primaryPosition[0] + primary.width <= deletePosition[0])
+                for (id in listOf(R.id.saveExpenseDetails, R.id.cancelExpenseDetails, R.id.deleteExpenseDetails)) {
+                    val button = window.dialog.findViewById<TextView>(id)!!
+                    assertTrue(button.height >= (48 * activity.resources.displayMetrics.density).toInt())
+                    assertTrue(button.width > 0)
+                    assertTrue(button.layout.getLineBottom(button.layout.lineCount - 1) <=
+                        button.height - button.compoundPaddingTop - button.compoundPaddingBottom)
+                }
+                window.dispose()
+            }
+        }
+    }
+
+    private fun detailsBack(activity: MainActivity) {
+        val field = MainActivity::class.java.getDeclaredField("expenseDetailsDialog").apply { isAccessible = true }
+        (field.get(activity) as ExpenseDetailsDialog).dialog.onBackPressedDispatcher.onBackPressed()
+    }
+
     private fun dispatchDate(screen: ActivityScenario<MainActivity>, action: String) {
         screen.onActivity {
             val field = MainActivity::class.java.getDeclaredField("dateChanges").apply { isAccessible = true }

@@ -103,5 +103,18 @@
   "expenses_load_error": "Could not load expenses. Tap to retry.",
   "breakdown_pending": "Breakdown is not available yet",
   "source_remaining": "%1$s · remaining",
-  "breakdown_expense_count": "Expenses: %1$s"
+  "breakdown_expense_count": "Expenses: %1$s",
+  "edit_expense": "Edit expense",
+  "save_expense_changes": "Save changes",
+  "delete_expense": "Delete expense",
+  "delete_expense_question": "Delete this expense?",
+  "delete_expense_details": "This will delete the following saved expense:",
+  "expense_missing_record": "This expense no longer exists. Close and review saved data.",
+  "expense_edit_loading": "Loading expense…",
+  "expense_edit_retry": "Could not load the expense. Tap to retry.",
+  "group_expenses_empty": "No expenses in this group for the selected period.",
+  "open_group_expenses": "Open group expenses",
+  "expense_deleted": "Expense deleted",
+  "expense_details": "Expense details",
+  "edit": "Edit"
 }

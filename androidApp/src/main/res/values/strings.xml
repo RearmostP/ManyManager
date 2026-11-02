@@ -116,4 +116,17 @@
     <string name="breakdown_pending">הפירוט אינו זמין עדיין</string>
     <string name="source_remaining">%1$s · נותר</string>
     <string name="breakdown_expense_count">הוצאות: %1$s</string>
+    <string name="edit_expense">עריכת הוצאה</string>
+    <string name="save_expense_changes">שמירת שינויים</string>
+    <string name="delete_expense">מחיקת הוצאה</string>
+    <string name="delete_expense_question">למחוק את ההוצאה?</string>
+    <string name="delete_expense_details">המחיקה תסיר את ההוצאה הבאה:</string>
+    <string name="expense_missing_record">ההוצאה אינה קיימת עוד. אפשר לסגור ולבדוק את הנתונים השמורים.</string>
+    <string name="expense_edit_loading">טוען את ההוצאה…</string>
+    <string name="expense_edit_retry">טעינת ההוצאה נכשלה. לחצו לניסיון חוזר.</string>
+    <string name="group_expenses_empty">אין הוצאות בקבוצה זו בתקופה שנבחרה.</string>
+    <string name="open_group_expenses">פתיחת הוצאות הקבוצה</string>
+    <string name="expense_deleted">ההוצאה נמחקה</string>
+    <string name="expense_details">פרטי הוצאה</string>
+    <string name="edit">עריכה</string>
 </resources>

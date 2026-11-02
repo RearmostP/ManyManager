@@ -1,0 +1,129 @@
+<!doctype html><meta charset="utf-8"><base href="../"><title>Expense details checks</title>
+<h1>Expense details, full updates, groups and confirmed deletion</h1><pre id="results">Running…</pre>
+<script type="module">
+import {previewModel,addCategory,addSource,createExpense,updateExpense,deleteExpense,snapshotFor,observePreview} from "../js/preview-model.js";
+import {state,savedExpenseDraft,closeOverlay} from "../js/state.js";
+import {expenseDetails} from "../js/components/expense-details.js";
+import {loadLanguage} from "../js/i18n.js";
+import {periodFor,civilDate} from "../js/budget-period.js";
+const results=[],check=(value,label)=>{if(!value)throw Error(label);results.push("PASS "+label)};
+try {
+ await loadLanguage("en");state.language="en";
+ const start=new Date(2026,10,10),before=new Date(2026,10,9),future=new Date(2026,11,10);
+ const a=addSource("Same",start,100),b=addSource("Same",start,0),c=addCategory("Same"),d=addCategory("Same");
+ const first=createExpense({amountMinor:29,date:"2026-11-09",sourceId:a.id,categoryId:c.id,note:"Old"});
+ const id=first.id;
+ check(updateExpense(id,{amountMinor:123,date:"2026-11-10",sourceId:b.id,categoryId:d.id,note:"New"}),"all fields update");
+ check(first.id===id&&previewModel.expenses.length===1&&first.note==="New"&&first.sourceId===b.id&&first.categoryId===d.id,"identity/count retained");
+ check(snapshotFor(before).spent===0&&snapshotFor(start).spent===123,"both periods update across 9/10");
+ check(snapshotFor(start).allocated===100&&snapshotFor(start).remaining===-23&&snapshotFor(start).sources[1].remaining===-123,"zero source negative balance allocations unchanged");
+ check(snapshotFor(start).categoryBreakdown[0].id===d.id&&snapshotFor(start).sourceBreakdown[0].id===b.id,"groups use stable IDs");
+ check(updateExpense(id,{...first,categoryId:null,note:""}),"clear category and note");
+ check(first.categoryId===null&&!first.note,"optional values clear");
+ const saved=JSON.stringify(previewModel.expenses);
+ for(const input of [{...first,amountMinor:0},{...first,amountMinor:-1},{...first,sourceId:"missing"},{...first,categoryId:"missing"},{...first,date:"2026-02-30"}]){
+   check(!updateExpense(id,input)&&JSON.stringify(previewModel.expenses)===saved,"invalid update atomic "+JSON.stringify(input));
+ }
+ const max=createExpense({amountMinor:Number.MAX_SAFE_INTEGER,date:"2026-12-10",sourceId:a.id});
+ check(!updateExpense(id,{...first,date:"2026-12-10"})&&first.date==="2026-11-10"&&max.amountMinor===Number.MAX_SAFE_INTEGER,"destination overflow rollback");
+ let observed=0;const stop=observePreview(()=>observed++);
+ check(updateExpense(id,{...first,amountMinor:124}),"valid update after rejection");
+ await Promise.resolve();check(observed===1,"saved-data observers notified once per mutation");stop();
+ state.expenseEditId=id;state.expenseDraft=savedExpenseDraft(first);state.expenseEditing=false;state.overlay="expense-details";
+ const host=document.createElement("div");host.innerHTML=expenseDetails();
+ check(!host.querySelector("input,textarea,select")&&host.querySelector('[data-action="begin-expense-edit"]'),"details ordinary display text");
+ check(!host.querySelector('[data-field="note"]'),"missing note hidden");
+ state.expenseEditing=true;host.innerHTML=expenseDetails();
+ check(host.querySelector("#details-note").value===""&&host.querySelector("#details-categoryId").value==="","empty note/category editable");
+ state.expenseDraft.note="Discard";closeOverlay();
+ check(!state.expenseEditing&&state.expenseDraft.note===""&&state.overlay==="expense-details","Back cancels draft before closing");
+ closeOverlay();check(state.overlay===null,"Back from read-only closes");
+ for(const language of ["he","en","ru"]){await loadLanguage(language);state.language=language;state.expenseEditing=true;host.innerHTML=expenseDetails();
+   check(!host.textContent.includes("save_expense_changes")&&host.querySelector('[data-action="delete-expense"]'),language+" actions localized");
+ }
+ const parents=previewModel.sources.length,allocation=snapshotFor(start).allocated;
+ check(deleteExpense(id)&&previewModel.expenses.length===1,"delete exactly one record");
+ check(!deleteExpense(id)&&previewModel.sources.length===parents&&snapshotFor(start).allocated===allocation&&snapshotFor(start).categoryBreakdown.length===0,"missing deletion explicit and parents/allocations preserved");
+
+ const frame=document.createElement("iframe");frame.src="index.html";frame.style="width:320px;height:850px";document.body.append(frame);
+ const wait=async fn=>{const end=performance.now()+15000;while(!fn()){if(performance.now()>end)throw Error("event timeout");await new Promise(resolve=>setTimeout(resolve,20))}};
+ await wait(()=>frame.contentDocument?.querySelector('[data-action="expense"]'));
+ const doc=frame.contentDocument,win=frame.contentWindow;
+ const click=selector=>{const element=doc.querySelector(selector);if(!element)throw Error("Missing "+selector);element.click()};
+ const type=(selector,value)=>{const input=doc.querySelector(selector);if(!input)throw Error("Missing "+selector);input.value=value;input.dispatchEvent(new win.Event("input",{bubbles:true}))};
+ const nav=index=>{click("#menu-button");click('[data-action="navigate"][data-index="'+index+'"]')};
+ nav(3);
+ for(let i=0;i<2;i++){click('[data-action="add-source"]');type("#source-name","Same");type("#source-initial",i?"0":"10");click('[data-action="confirm-add-source"]')}
+ const sourceIds=[...doc.querySelectorAll('[data-action="edit-source"]')].map(item=>item.dataset.id);
+ const dates=periodFor(new Date()),date=civilDate(dates.start),newDate=civilDate(dates.endExclusive);
+ async function add(amount,sourceId,categoryName){
+   nav(0);click('[data-action="expense"]');type("#amount",amount);type("#expense-date",date);
+   click('[data-action="expense-source"][data-id="'+sourceId+'"]');
+   if(categoryName){click('[data-action="add-category"]');type("#category-name",categoryName);click('[data-action="confirm-category"]')}
+   click('[data-action="save-expense"]');await Promise.resolve();
+ }
+ await add("1",sourceIds[0],"Same");await add("2",sourceIds[1],"Same");await add("0.5",sourceIds[0],null);
+ nav(1);
+ check(doc.querySelectorAll('[data-action="expense-group"]').length===3,"duplicate category names and null remain distinct");
+ const firstCard=[...doc.querySelectorAll('[data-action="expense-group"][data-kind="category"][data-id]:not([data-id=""])')].at(-1);
+ const categoryId=firstCard.dataset.id;firstCard.click();
+ check(doc.querySelectorAll('[data-expense-group-rows] [data-action="view-expense"]').length===1,"one-expense group still opens list");
+ const rowId=doc.querySelector('[data-action="view-expense"]').dataset.id;click('[data-action="view-expense"]');
+ const panel=doc.querySelector("#expense-details");
+ check(panel&&!panel.querySelector("input,textarea,select"),"filtered row opens read-only details");
+ check(!panel.querySelector('[data-field="note"]'),"real details hide absent note");
+ click('[data-action="begin-expense-edit"]');
+ check(panel===doc.querySelector("#expense-details")&&doc.querySelector("#details-note").value==="","same window edits empty note");
+ type("#details-amount","90071992547409.91");type("#details-note","Keep on failure");
+ click('[data-action="save-expense-details"]');
+ check(doc.querySelector("#details-note").value==="Keep on failure"&&doc.querySelector("#details-amount").value==="90071992547409.91"&&!doc.querySelector("#expense-details-error").hidden,"failed save preserves full draft in edit mode");
+ type("#details-amount","1.23");type("#details-note","Dirty");type("#details-sourceId",sourceIds[1]);type("#details-categoryId","");type("#details-date",newDate);
+ click('[data-action="delete-expense"]');
+ check(doc.querySelector('[role="alertdialog"]')&&doc.querySelector("#expense-details")===panel,"delete only opens confirmation");
+ click('[role="alertdialog"] [data-action="close-overlay"]');
+ check(doc.querySelector("#details-note").value==="Dirty"&&doc.querySelector("#details-date").value===newDate&&doc.querySelector("#details-sourceId").value===sourceIds[1]&&doc.querySelector("#details-categoryId").value==="","confirmation cancel preserves every draft field");
+ click('[data-action="cancel-expense-edit"]');
+ check(panel===doc.querySelector("#expense-details")&&!panel.querySelector("input")&&!panel.textContent.includes("Dirty"),"Cancel returns saved values in same view");
+ click('[data-action="begin-expense-edit"]');type("#details-note","Back discard");
+ doc.dispatchEvent(new win.KeyboardEvent("keydown",{key:"Escape",bubbles:true}));
+ check(!panel.querySelector("textarea")&&!panel.textContent.includes("Back discard"),"Escape editing is Cancel");
+ click('[data-action="begin-expense-edit"]');
+ type("#details-amount","1.23");type("#details-note","Saved");type("#details-sourceId",sourceIds[1]);type("#details-categoryId","");type("#details-date",newDate);
+ click('[data-action="save-expense-details"]');
+ check(panel===doc.querySelector("#expense-details")&&!panel.querySelector("input")&&panel.textContent.includes("Saved")&&panel.textContent.includes("1.23"),"Save returns updated read-only details same node");
+ check(doc.querySelectorAll('[data-expense-group-rows] [data-action="view-expense"]').length===0,"moved final row leaves captured group");
+ check(panel.querySelector('[data-value="sourceId"]').textContent==="Same","saved details by ID survive group membership change");
+ click('#expense-details [data-action="close-overlay"]');
+ check(!doc.querySelector("#expense-details")&&doc.querySelector("[data-expense-group-rows]"),"read-only Back returns originating group");
+ click('[data-action="back"]');
+ check(doc.querySelector('.tab.selected').dataset.index==="0"&&!doc.querySelector('[data-breakdown-id="'+categoryId+'"]'),"Back restores originating tab with removed card");
+ click('[data-action="tab"][data-index="1"]');
+ click('[data-action="expense-group"][data-id="'+sourceIds[0]+'"]');
+ check(doc.querySelectorAll('[data-action="view-expense"]').length===1,"source group filters by stable ID after move");
+ click('[data-action="view-expense"]');check(!doc.querySelector("#expense-details input"),"source entry opens read-only");
+ click('[data-action="begin-expense-edit"]');click('[data-action="delete-expense"]');click('[data-action="confirm-delete-expense"]');
+ check(!doc.querySelector("#expense-details")&&doc.querySelectorAll('[data-action="view-expense"]').length===0,"confirmed deletion closes to useful empty filtered list");
+ click('[data-action="back"]');check(doc.querySelector('.tab.selected').dataset.index==="1","source Back restores source tab");
+ click('[data-action="tab"][data-index="2"]');click('[data-action="view-expense"]');
+ check(!doc.querySelector("#expense-details input"),"All Expenses entry opens read-only");
+ click('#expense-details [data-action="close-overlay"]');
+ for(const language of ["he","en","ru"]){
+   nav(2);click('[data-action="toggle-setting"][data-key="language"]');
+   click('[data-action="language"][data-value="'+language+'"]');
+   await wait(()=>doc.documentElement.lang===language);
+   for(const theme of ["light","dark"]){
+     nav(2);
+     if(!doc.querySelector('[data-action="theme"][data-value="'+theme+'"]'))click('[data-action="toggle-setting"][data-key="theme"]');
+     click('[data-action="theme"][data-value="'+theme+'"]');
+     nav(1);click('[data-action="tab"][data-index="2"]');click('[data-action="view-expense"]');click('[data-action="begin-expense-edit"]');
+     await new Promise(resolve=>setTimeout(resolve,50));
+     const primary=doc.querySelector(".expense-details-primary-actions").getBoundingClientRect(),destructive=doc.querySelector(".expense-details-actions .detail-delete").getBoundingClientRect();
+     check(language==="he"?primary.left>=destructive.right:primary.right<=destructive.left,language+" "+theme+" start/end actions correctly mirrored");
+     check([...doc.querySelectorAll(".expense-details-actions button")].every(button=>button.getBoundingClientRect().height>=48&&button.scrollWidth<=button.clientWidth),language+" "+theme+" narrow labels fit");
+     click('[data-action="cancel-expense-edit"]');click('#expense-details [data-action="close-overlay"]');
+   }
+ }
+ frame.remove();
+ document.getElementById("results").textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
+}catch(error){document.getElementById("results").textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}
+</script>

@@ -18,3 +18,13 @@ captures
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
 /ui-reference.zip
+# Release artifacts and local signing material must never enter Git.
+*.apk
+*.aab
+*.jks
+*.keystore
+*.p12
+/signing.properties
+/release-signing.properties
+/release-credential.clixml
+/private-release/

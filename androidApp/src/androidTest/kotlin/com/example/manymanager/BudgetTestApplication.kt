@@ -14,7 +14,10 @@ class BudgetTestApplication : ManyManagerApplication() {
     override val database by lazy {
         Room.inMemoryDatabaseBuilder(this, ManyManagerDatabase::class.java).build()
     }
-    override val repository by lazy { ManyManagerRepository(database, databaseInitialization, clock) }
+    private val memoryRepository by lazy { ManyManagerRepository(database, databaseInitialization, clock) }
+    // Only the file-reopen acceptance fixture replaces this; production has no such switch.
+    var fileTestRepository: ManyManagerRepository? = null
+    override val repository get() = fileTestRepository ?: memoryRepository
 
     override fun getSharedPreferences(name: String, mode: Int): SharedPreferences =
         super.getSharedPreferences("stage7-test-" + name, mode)

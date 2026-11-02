@@ -8,7 +8,10 @@ import android.view.inspector.WindowInspector
 import android.widget.EditText
 import android.widget.TextView
 import androidx.lifecycle.ViewModelProvider
+import androidx.room.Room
 import androidx.room.withTransaction
+import com.example.manymanager.data.ManyManagerRepository
+import com.example.manymanager.data.local.ManyManagerDatabase
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -93,6 +96,85 @@ class BudgetLifecycleTest {
         }
         withTimeout(10_000) { entered.await() }
         return release to job
+    }
+
+    @Test fun fileBackedRecordsReopenAndDisplayInFreshActivity(): Unit = runBlocking {
+        val name = "acceptance-ui-${java.util.UUID.randomUUID()}.db"
+        fun openFile() = Room.databaseBuilder(
+            app, ManyManagerDatabase::class.java, name
+        ).build()
+        var disk = openFile()
+        try {
+            suspend fun repository(): ManyManagerRepository {
+                val calculator = disk.dao().initializeLocalCalculator()
+                return ManyManagerRepository(
+                    disk, CompletableDeferred(Result.success(calculator)), app.clock
+                )
+            }
+            val writer = repository()
+            val period = success(writer.currentPeriod())
+            assertTrue(success(writer.snapshot()).expenses.isEmpty())
+            val category = success(writer.createCategory("Reopened category"))
+            val source = success(writer.createSourceWithInitialAllocation("Reopened source", period, 10000))
+            val zero = success(writer.createSourceWithInitialAllocation("Zero source", period, 0))
+            val categorized = success(writer.createExpense(NewExpense(1250, period.start, source.id, category.id, "Saved note")))
+            val uncategorized = success(writer.createExpense(NewExpense(250, period.start, zero.id)))
+            val saved = success(writer.snapshot())
+            disk.close()
+            disk = openFile()
+            val reader = repository()
+            assertEquals(saved, success(reader.snapshot()))
+            app.fileTestRepository = reader
+
+            // A new Activity/ViewModel reads the reopened file, not an in-memory copy.
+            val screen = launch()
+            val controller = model(screen)
+            awaitUi(screen) {
+                val ready = controller.activeBudget.value as? PersistentDataState.Ready
+                ready?.snapshot == saved &&
+                    it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).childCount == 2 &&
+                    it.findViewById<android.widget.LinearLayout>(R.id.sourceSummaryRows).childCount == 2
+            }
+            screen.onActivity { activity ->
+                val snapshot = (controller.activeBudget.value as PersistentDataState.Ready).snapshot
+                assertEquals(listOf(category), snapshot.categories)
+                assertEquals(setOf(source.id, zero.id), snapshot.sources.map { it.source.id }.toSet())
+                assertEquals(10000L, snapshot.totalAllocatedMinor)
+                assertEquals(1500L, snapshot.totalSpentMinor)
+                assertEquals(8500L, snapshot.remainingMinor)
+                assertEquals(setOf(categorized, uncategorized), snapshot.expenses.toSet())
+                assertEquals(2, snapshot.expenseCount)
+                fun money(value: Long) = activity.getString(R.string.ils_amount,
+                    BudgetAmounts.number(value, activity.resources.configuration.locales[0]))
+                assertEquals(BudgetAmounts.number(1500, activity.resources.configuration.locales[0]),
+                    activity.findViewById<TextView>(R.id.homeTotal).text.toString())
+                assertEquals(money(8500), activity.findViewById<TextView>(R.id.homeBudgetRemaining).text.toString())
+                assertEquals(money(10000), activity.findViewById<TextView>(R.id.budgetAllocatedTotal).text.toString())
+                fun rowText(container: Int, id: String?): String {
+                    val rows = activity.findViewById<android.widget.LinearLayout>(container)
+                    val row = (0 until rows.childCount).map(rows::getChildAt).single { it.tag == id }
+                    return if (row is TextView) row.text.toString()
+                        else row.findViewById<TextView>(R.id.breakdownAmount).text.toString()
+                }
+                assertEquals(money(1250), rowText(R.id.categorySummaryRows, category.id))
+                assertEquals(money(250), rowText(R.id.categorySummaryRows, null))
+                assertEquals(money(1250), rowText(R.id.sourceSummaryRows, source.id))
+                assertEquals(money(250), rowText(R.id.sourceSummaryRows, zero.id))
+                assertTrue(rowText(R.id.expenseRows, categorized.id).contains("Reopened category"))
+                assertTrue(rowText(R.id.expenseRows, categorized.id).contains("Reopened source"))
+                assertTrue(rowText(R.id.expenseRows, categorized.id).contains("Saved note"))
+                assertTrue(rowText(R.id.expenseRows, uncategorized.id).contains("Zero source"))
+            }
+            screen.recreate()
+            awaitUi(screen) { it.findViewById<TextView>(R.id.homeTotal).text.toString() ==
+                BudgetAmounts.number(1500, it.resources.configuration.locales[0]) }
+        } finally {
+            scenario?.close()
+            scenario = null
+            app.fileTestRepository = null
+            disk.close()
+            app.deleteDatabase(name) // Only this UUID fixture, never production storage.
+        }
     }
 
     @Test fun creationSurvivesRecreateAndConfigurationRebuildWithoutSecondWrite() = runBlocking {

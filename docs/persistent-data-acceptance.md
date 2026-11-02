@@ -6,8 +6,9 @@
 
 ההיקף המקומי המוסכם ממומש. שלבים 1–9 הושלמו; ניקוי ותיעוד שלב 10 הושלמו,
 ובהרצה חוזרת לאחר חזרת החיבור **כל 61 בדיקות המכשיר עברו**, כולל שימור הסכמה המחוזק.
-הכשלים הקודמים נשארים מתועדים. תרחיש רציף יחיד של file reopen→UI עדיין לא בוצע;
-לכן אין להציג את כל קבלת שלב 10 כמלאה.
+הכשלים הקודמים נשארים מתועדים. בהכנת release ‏0.1.0 נוסף והושלם גם התרחיש הרציף
+file reopen→UI: כל 62 בדיקות המכשיר עברו (37 Repository/controller, 12 מסד ו־13 Activity).
+עשרת שלבי ההיקף המקומי המוסכם הושלמו, בכפוף למגבלות האימות המפורשות להלן.
 
 ## יכולות וכללים מאושרים
 
@@ -79,7 +80,7 @@ identityHash: `bafcc93374123a999f237711f0f81500`. אין diff בסכמה ואי�
 | --- | --- |
 | assembleDebug, testDebugUnitTest, lintDebug | עברו; משימות שלא השתנו היו UP-TO-DATE. דוחות 32 בדיקות JVM קיימות: 0 failures/errors/skipped |
 | assembleDebugAndroidTest ו־lintDebug אחרי שינוי הבדיקה | קומפילציית הבדיקה, אריזת APK ו־lint הסתיימו בהצלחה |
-| connectedDebugAndroidTest | ניסיון שלישי עבר: 61 tests, 0 failures/errors/skipped, SM-S928B / Android 17. ראשון: כשל התקנה ו־tests=0 למרות exit=0; שני: exit=1, No connected devices! |
+| connectedDebugAndroidTest | ניסיון שלישי עבר עם 61 tests; בהכנת 0.1.0 עברו כל 62 tests כולל reopen→UI, ללא failures/errors/skipped, SM-S928B / Android 17. הכשלים הקודמים מתועדים להלן. |
 | browser tests/stage6.html | ALL 27 PASSED ב־Edge headless, פרופיל זמני נפרד |
 | browser tests/stage8.html | ALL 32 PASSED באותה שיטה, פרופיל נפרד |
 | browser tests/stage9.html | ALL 35 PASSED באותה שיטה, כולל אירועי app אמיתיים ב־iframe |
@@ -112,15 +113,22 @@ identityHash: `bafcc93374123a999f237711f0f81500`. אין diff בסכמה ואי�
 | קטגוריה מתוך טיוטה מלאה, cancellation, invalid input, failure/retry | expenseSaveRecreationCategoryDraftAndAmountCorrection, failedExpenseWritePreservesInputAndUnknownRestoreCannotSubmit, בדיקות טרנזקציות ו־busy guard |
 | stale preview וכתיבה בזמן שינוי תצורה | latestPreviewDisablesInvalidInputAndAdjustmentCannotBeAppliedTwice ובדיקות BudgetLifecycleTest |
 
-זהו כיסוי משולב בכמה fixtures: לא בוצעה כעת הרצה אחת רציפה מ־file reopen ועד UI חדש
-מאותו קובץ. בדיקות ה־Activity משתמשות ב־Room in-memory; בדיקות file reopen נפרדות.
-תרחיש רציף זה נותר פתוח בקבלה הסופית; בדיקת השימור המחוזקת עצמה עברה.
+בהכנת release ‏0.1.0 נוספה fileBackedRecordsReopenAndDisplayInFreshActivity ב־BudgetLifecycleTest:
+היא פותחת acceptance-ui-UUID.db ריק, מאתחלת מחשבון, יוצרת דרך Repository קטגוריה,
+שני מקורות (אחד באפס), הקצאה ושתי הוצאות עם/בלי קטגוריה; סוגרת Room ופותחת אותו מחדש.
+Repository חדש על אותו קובץ מוזרק רק ל־BudgetTestApplication, ואז נוצרת MainActivity חדשה
+עם ViewModel חדש. נבדקים אותם IDs, שדות ושמות, הקצאה 10000, spending ‏1500,
+יתרה 8500, שורות שתי קבוצות הסיכום ורשימת ההוצאות, ומוצג סכום הבית גם לאחר recreate נוסף.
+הקובץ נמחק רק בניקוי ה־UUID של אותה בדיקה. העדפות הבדיקה נשארות עם prefix מבודד.
+הבדיקה עברה בתוך סוויטה מלאה של 62 tests, ללא failures/errors/skipped, ב־SM-S928B / Android 17.
+זהו reopen אמיתי של קובץ ואחריו UI חדשה באותו תהליך; לא בדיקת מות תהליך או restore מגיבוי.
 
 ## בטיחות בדיקות ותקרית ההתקנה
 
 לפני instrumentation נקרא ואומת `android.injected.androidTest.leaveApksInstalledAfterRun=true`.
 DatabaseTestRunner מחליף Application ב־BudgetTestApplication: Room in-memory והעדפות
-עם prefix ייעודי. בדיקות קובץ משתמשות בשמות UUID ומוחקות רק קבצים שהן עצמן יצרו.
+עם prefix ייעודי. בדיקת reopen→UI מחליפה זמנית את ה־Repository רק ב־Application של הבדיקות.
+בדיקות קובץ משתמשות בשמות UUID ומוחקות רק קבצים שהן עצמן יצרו.
 הבדיקות אינן פותחות את many-manager.db. נבדקו fixtures וה־runner לפני ההרצה.
 
 בדיקת ADB הראשונית לא מצאה מכשיר ולכן לא ניתן היה לתעד מצב התקנה התחלתי.
@@ -153,15 +161,16 @@ pixel parity Android/HTML, restore מגיבוי, חצות/zone אמיתיים, �
 ולא נמצאו כללי גיבוי שמחריגים את המסד. Room משתמש במיקום databases רגיל ולא ב־noBackupFilesDir.
 מכאן שהמסד **עשוי להיכלל** בגיבוי Android או בהעברת מכשיר, בהתאם למערכת ולהגדרות.
 אין בפרויקט הצפנת מסד/ניהול מפתחות. app-private אינו הצפנה או הבטחה לגיבוי.
-לא נבדקו backup/restore או העברה, ולא שונתה המדיניות. בחירת מדיניות הגיבוי היא follow-up מוצר מפורש.
+החלטת מוצר לקראת release ‏0.1.0: לשמור על זכאות לגיבוי Android אוטומטי ולהעברת מכשיר,
+עם allowBackup=true וללא החרגת המסד. לא נבדקו backup/restore או העברה בפועל.
+הצפנה נשארת מחוץ להיקף; זכאות אינה הבטחה שגיבוי יבוצע או שישוחזר.
 
 ## חסמים לעומת הרחבות עתידיות
 
-פער הקבלה שנותר: השלמת תרחיש file reopen→UI עם אותם נתוני בדיקה ברצף אחד.
-חסם החיבור והרצת instrumentation הוסר: 61 בדיקות עברו ושתי החבילות נשארו מותקנות.
-אין אימות של רשומות הייצור; fixtures נשארו מבודדים.
-אין כשל עסקי ידוע שנמצא בסקירה; אין להמיר את החסמים הללו בהצהרת קבלה מלאה.
+פער file reopen→UI הושלם בבדיקה המבודדת המתוארת לעיל. כל 62 בדיקות המכשיר עברו
+ושתי החבילות נשארו מותקנות; אין חסם קבלה ידוע שנותר בהיקף ההתמדה המוסכם.
+אין אימות של רשומות הייצור; fixtures נשארו מבודדים. מגבלות האימות לעיל נשארות בתוקף.
 
 מחוץ להיקף: מחיקת הוצאות, החזרים/לא־חיוביות, עריכת שדות נוספים, Summary היסטורי,
-ריבוי מחשבונים ב־UI, חשבונות, הצפנה, cloud sync או export. מדיניות גיבוי ושינוי עתידי של
-יום תחילת תקופה דורשים החלטת מוצר לפני מימוש. אלה אינם תוספות שבוצעו בשלב זה.
+ריבוי מחשבונים ב־UI, חשבונות, הצפנה, cloud sync או export. שינוי עתידי של יום תחילת תקופה
+דורש החלטת מוצר. זכאות לגיבוי/העברה נשמרת בהחלטה מפורשת; הביצוע בפועל לא נבדק.

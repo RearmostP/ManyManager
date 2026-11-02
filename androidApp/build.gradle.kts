@@ -1,3 +1,4 @@
+import java.io.File
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -38,7 +39,41 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// Credentials are supplied only to the local Gradle process; never put values in source control.
+val releaseSigningEnvironment = listOf(
+    "MANYMANAGER_RELEASE_STORE_FILE", "MANYMANAGER_RELEASE_STORE_PASSWORD",
+    "MANYMANAGER_RELEASE_KEY_ALIAS", "MANYMANAGER_RELEASE_KEY_PASSWORD",
+).associateWith { providers.environmentVariable(it).orNull }
+
+val validatePrivateReleaseSigning = tasks.register("validatePrivateReleaseSigning") {
+    doLast {
+        val missing = listOf(
+            "MANYMANAGER_RELEASE_STORE_FILE", "MANYMANAGER_RELEASE_STORE_PASSWORD",
+            "MANYMANAGER_RELEASE_KEY_ALIAS", "MANYMANAGER_RELEASE_KEY_PASSWORD",
+        ).filter { System.getenv(it).isNullOrBlank() }
+        check(missing.isEmpty()) {
+            "Release signing credentials are missing: ${missing.joinToString()}. Use scripts/release.ps1; see docs/release.md."
+        }
+        check(File(System.getenv("MANYMANAGER_RELEASE_STORE_FILE")).isFile) {
+            "Release keystore does not exist. See docs/release.md."
+        }
+    }
+}
+tasks.configureEach {
+    if (name == "preReleaseBuild") dependsOn(validatePrivateReleaseSigning)
+}
+
 android {
+    signingConfigs {
+        if (releaseSigningEnvironment.values.all { !it.isNullOrBlank() }) {
+            create("privateRelease") {
+                storeFile = file(releaseSigningEnvironment.getValue("MANYMANAGER_RELEASE_STORE_FILE")!!)
+                storePassword = releaseSigningEnvironment.getValue("MANYMANAGER_RELEASE_STORE_PASSWORD")
+                keyAlias = releaseSigningEnvironment.getValue("MANYMANAGER_RELEASE_KEY_ALIAS")
+                keyPassword = releaseSigningEnvironment.getValue("MANYMANAGER_RELEASE_KEY_PASSWORD")
+            }
+        }
+    }
     sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
     namespace = "com.example.manymanager"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -48,7 +83,7 @@ android {
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
-        versionName = "1.0"
+        versionName = "0.1.0"
         testInstrumentationRunner = "com.example.manymanager.DatabaseTestRunner"
     }
     packaging {
@@ -58,6 +93,7 @@ android {
     }
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("privateRelease")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

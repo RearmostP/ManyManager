@@ -6,7 +6,9 @@ The agreed local persistence scope is implemented: categories, budget sources, a
 
 Android uses Room schema 1 in app-private `databases/many-manager.db`. Business operations go through `ManyManagerRepository`, observed through `PersistentDataViewModel`. No sample business data is seeded. Settings remain outside Room. Core operations require no network; the merged debug manifest has no INTERNET permission.
 
-The stage-10 instrumentation rerun passed all 61 tests on SM-S928B / Android 17 (37 repository/controller, 12 database, 12 Activity/dialog), including the strengthened schema-1 preservation test. Both APKs remained installed. Earlier connection/install failures remain documented. Final acceptance still lacks a single continuous file-reopen-to-fresh-UI scenario; other verification limits remain explicit. See the [acceptance report](docs/persistent-data-acceptance.md) and [ten-stage plan/results](docs/persistent-data-plan.md).
+The stage-10 instrumentation rerun passed all 61 tests on SM-S928B / Android 17 (37 repository/controller, 12 database, 12 Activity/dialog), including the strengthened schema-1 preservation test. Both APKs remained installed. Earlier connection/install failures remain documented. Release preparation added and passed the continuous file-reopen-to-fresh-UI acceptance scenario; the full device suite now passes 62 tests. Other verification limits remain explicit. See the [acceptance report](docs/persistent-data-acceptance.md) and [ten-stage plan/results](docs/persistent-data-plan.md).
+
+See [the private signed release guide](docs/release.md) for building and installing version 0.1.0, local signing and key backup.
 
 ## Build and checks
 
@@ -22,7 +24,7 @@ Before instrumentation, verify `android.injected.androidTest.leaveApksInstalledA
 
 ## Storage limits
 
-The project does not encrypt its data. App-private storage is neither encryption nor a guaranteed backup. `allowBackup=true`, with no explicit database exclusions, means Android backup/device transfer may include the database. Restore is untested and backup policy remains a product decision.
+The project does not encrypt its data. App-private storage is neither encryption nor a guaranteed backup. `allowBackup=true`, with no explicit database exclusions, means Android backup/device transfer may include the database. Product decision for 0.1.0: keep automatic Android backup and device-transfer eligibility, without excluding the database. Actual backup/restore remains untested.
 
 There is no expense deletion, refund/nonpositive expense, editing of other expense fields, historical Summary navigation, multiple-calculator UI, account, cloud sync, encryption or export. Bundle restoration is not durable draft recovery or exactly-once writing across arbitrary process death.
 

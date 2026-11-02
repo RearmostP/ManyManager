@@ -6,7 +6,7 @@ The agreed local persistence scope is implemented: categories, budget sources, a
 
 Android uses Room schema 1 in app-private `databases/many-manager.db`. Business operations go through `ManyManagerRepository`, observed through `PersistentDataViewModel`. No sample business data is seeded. Settings remain outside Room. Core operations require no network; the merged debug manifest has no INTERNET permission.
 
-Final device acceptance is **partially blocked**: the stage-10 instrumentation attempt could not install the APK after the wireless device disconnected, and executed zero tests despite Gradle reporting success. Earlier successful device evidence is retained, not presented as a new run. See the [acceptance report](docs/persistent-data-acceptance.md) and [ten-stage plan/results](docs/persistent-data-plan.md).
+The stage-10 instrumentation rerun passed all 61 tests on SM-S928B / Android 17 (37 repository/controller, 12 database, 12 Activity/dialog), including the strengthened schema-1 preservation test. Both APKs remained installed. Earlier connection/install failures remain documented. Final acceptance still lacks a single continuous file-reopen-to-fresh-UI scenario; other verification limits remain explicit. See the [acceptance report](docs/persistent-data-acceptance.md) and [ten-stage plan/results](docs/persistent-data-plan.md).
 
 ## Build and checks
 

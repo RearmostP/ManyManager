@@ -205,7 +205,7 @@ class ManyManagerDatabaseTest {
         assertEquals(1L, count("calculators"))
     }
 
-    @Test fun duplicateNamesAndUnresolvedExpenseAmountSignsRemainUnconstrained() = runBlocking {
+    @Test fun schemaOneAllowsDuplicateNamesAndLeavesAmountValidationToRepository() = runBlocking {
         seedRelationships()
         database.dao().insertCategory(category.copy(id = "category-b"))
         database.dao().insertSource(source.copy(id = "source-b"))
@@ -220,14 +220,27 @@ class ManyManagerDatabaseTest {
 
     @Test fun exportedVersionOneSchemaOpensAndValidatesAgainstEntities() = runBlocking {
         val name = newTestFile()
-        // Build SQLite from the checked-in JSON, then let generated Room code validate it.
-        schemaHelper.createDatabase(name, 1).close()
+        // Populate the exported schema before Room opens it: validation must preserve old facts.
+        schemaHelper.createDatabase(name, 1).use { saved ->
+            saved.execSQL("INSERT INTO calculators VALUES (?, 15, 'EUR')", arrayOf(owner))
+            saved.execSQL("INSERT INTO categories VALUES (?, ?, ?)", arrayOf(owner, category.id, category.name))
+            saved.execSQL("INSERT INTO budget_sources VALUES (?, ?, ?)", arrayOf(owner, source.id, source.name))
+            saved.execSQL("INSERT INTO budget_allocations VALUES (?, ?, ?, 12345)", arrayOf<Any>(owner, source.id, period))
+            saved.execSQL("INSERT INTO expenses VALUES (?, 'schema', 12345, ?, ?, ?, 'Test note')",
+                arrayOf<Any>(owner, date, category.id, source.id))
+            saved.execSQL("INSERT INTO expenses VALUES (?, 'schema-null', 12345, ?, NULL, ?, 'Test note')",
+                arrayOf<Any>(owner, date, source.id))
+        }
         database.close()
         database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).build()
-        seedRelationships()
-        val record = expense("schema", categoryId = null)
-        database.dao().insertExpense(record)
-        assertEquals(record, database.dao().expense(owner, record.id))
+        assertEquals(CalculatorEntity(owner, 15, "EUR"), database.dao().initializeLocalCalculator())
+        assertEquals(listOf(category), database.dao().categories(owner))
+        assertEquals(listOf(source), database.dao().sources(owner))
+        assertEquals(BudgetAllocationEntity(owner, source.id, period, 12345),
+            database.dao().allocation(owner, source.id, period))
+        assertEquals(expense("schema"), database.dao().expense(owner, "schema"))
+        assertEquals(expense("schema-null", categoryId = null), database.dao().expense(owner, "schema-null"))
+        assertEquals(2L, count("expenses"))
     }
 
     private suspend fun seedRelationships() {

@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.graphics.Rect
 import android.graphics.drawable.InsetDrawable

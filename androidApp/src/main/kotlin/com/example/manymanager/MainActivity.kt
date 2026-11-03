@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.app.Dialog
 import android.content.res.Configuration
@@ -23,15 +23,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
+import androidx.core.widget.doAfterTextChanged
 import androidx.core.view.doOnAttach
 import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import com.example.manymanager.domain.BudgetPeriod
-import com.example.manymanager.domain.BudgetSource
-import com.example.manymanager.domain.DataResult
+import com.example.simple.manymanager.domain.BudgetPeriod
+import com.example.simple.manymanager.domain.BudgetSource
+import com.example.simple.manymanager.domain.DataResult
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.min
@@ -55,6 +56,8 @@ class MainActivity : AppCompatActivity() {
     private var allExpensesUi: AllExpensesUi? = null
     private var summaryBreakdownUi: SummaryBreakdownUi? = null
     private var categoryDialog: CategoryCreationDialog? = null
+    private var periodBudgetDialog: androidx.appcompat.app.AlertDialog? = null
+    private var periodBudgetInput: android.widget.EditText? = null
     private var sourceCreationDialog: SourceCreationDialog? = null
     private var sourceEditingDialog: SourceEditingDialog? = null
     private var homeBudgetUi: BudgetHomeUi? = null
@@ -95,6 +98,7 @@ class MainActivity : AppCompatActivity() {
                 launch { persistentViewModel.categoryCreation.collect(::renderCategoryCreation) }
                 launch { persistentViewModel.sourceCreationState.collect(::renderSourceCreation) }
                 launch { persistentViewModel.sourceEditingState.collect(::renderSourceEditing) }
+                launch { persistentViewModel.periodBudgetDraft.collect(::renderPeriodBudget) }
                 launch { persistentViewModel.expenseCreationState.collect(::renderExpenseCreation) }
             }
         }
@@ -251,7 +255,12 @@ class MainActivity : AppCompatActivity() {
             persistentViewModel::selectPreviousPeriod,
             persistentViewModel::selectNextPeriod,
             ::showAddSource,
-            ::showEditSource
+            ::showEditSource,
+            { period, amount ->
+                dismissActiveDialogImmediately()
+                persistentViewModel.beginPeriodBudget(period, amount)
+                renderPeriodBudget(persistentViewModel.periodBudgetDraft.value)
+            }
         )
         categoryManagementUi = CategoryManagementUi(
             findViewById(R.id.categoriesPage), ::navigateBack, ::showAddCategory,
@@ -292,6 +301,9 @@ class MainActivity : AppCompatActivity() {
         savedInstanceState?.getBundle("sourceEditing")?.let {
             SourceEditingState.fromBundle(it)?.let(persistentViewModel::restoreSourceEditing)
         }
+        savedInstanceState?.getBundle("periodBudget")?.let {
+            persistentViewModel.restorePeriodBudget(PersistentDataViewModel.PeriodBudgetDraft.fromBundle(it))
+        }
         renderedConfiguration = Configuration(resources.configuration)
         contentReady = true
         renderPersistentDataState(persistentViewModel.state.value)
@@ -302,6 +314,7 @@ class MainActivity : AppCompatActivity() {
         renderCategoryCreation(persistentViewModel.categoryCreation.value)
         renderSourceCreation(persistentViewModel.sourceCreationState.value)
         renderSourceEditing(persistentViewModel.sourceEditingState.value)
+        renderPeriodBudget(persistentViewModel.periodBudgetDraft.value)
         finishAppearanceTransition(savedInstanceState)
     }
 
@@ -469,15 +482,61 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    private fun renderPeriodBudget(state: PersistentDataViewModel.PeriodBudgetDraft?) {
+        if (!contentReady || isFinishing || isDestroyed) return
+        if (state == null || state.saved) {
+            periodBudgetDialog?.dismiss()
+            if (activeDialog === periodBudgetDialog) activeDialog = null
+            periodBudgetDialog = null
+            periodBudgetInput = null
+            if (state?.saved == true) persistentViewModel.closePeriodBudget()
+            return
+        }
+        if (periodBudgetDialog == null) {
+            val input = android.widget.EditText(this).apply {
+                inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                setHint(R.string.monthly_budget)
+                id = R.id.periodBudgetAmount
+                textDirection = View.TEXT_DIRECTION_LTR
+                setText(state.text)
+                doAfterTextChanged { persistentViewModel.updatePeriodBudget(it.toString()) }
+            }
+            periodBudgetInput = input
+            val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(getString(R.string.budget_for_month, BudgetPeriodFormatter.format(this, state.period)))
+                .setView(input).setPositiveButton(R.string.update_budget, null)
+                .setNegativeButton(R.string.cancel, null).create()
+            dialog.setCanceledOnTouchOutside(false)
+            periodBudgetDialog = dialog
+            activeDialog = dialog
+            dialog.setOnCancelListener { persistentViewModel.closePeriodBudget() }
+            dialog.setOnShowListener {
+                dialog.getButton(-1).setOnClickListener { persistentViewModel.submitPeriodBudget() }
+                dialog.getButton(-2).setOnClickListener { persistentViewModel.closePeriodBudget() }
+            }
+            dialog.showWithRoundedSurface()
+        }
+        periodBudgetInput?.isEnabled = !state.submitting && !state.interrupted
+        periodBudgetInput?.error = when {
+            state.interrupted -> getString(R.string.source_save_interrupted)
+            state.error is com.example.simple.manymanager.domain.DataError.StorageFailure -> getString(R.string.source_save_error)
+            state.error != null -> getString(R.string.budget_invalid_amount)
+            else -> null
+        }
+        periodBudgetDialog?.setCancelable(!state.submitting)
+        periodBudgetDialog?.getButton(-1)?.isEnabled = !state.submitting && !state.interrupted
+        periodBudgetDialog?.getButton(-2)?.isEnabled = !state.submitting
+    }
+
     private fun showAddSource(period: BudgetPeriod) {
         dismissActiveDialogImmediately()
         persistentViewModel.beginSourceCreation(period)
         renderSourceCreation(persistentViewModel.sourceCreationState.value)
     }
 
-    private fun showEditSource(source: BudgetSource, period: BudgetPeriod, currentAllocation: Long) {
+    private fun showEditSource(source: BudgetSource, period: BudgetPeriod) {
         dismissActiveDialogImmediately()
-        persistentViewModel.beginSourceEditing(source, period, currentAllocation)
+        persistentViewModel.beginSourceEditing(source, period)
         renderSourceEditing(persistentViewModel.sourceEditingState.value)
     }
 
@@ -502,7 +561,6 @@ class MainActivity : AppCompatActivity() {
         if (sourceCreationDialog == null) {
             val window = SourceCreationDialog(this,
                 persistentViewModel::updateSourceCreationName,
-                persistentViewModel::updateSourceCreationAmount,
                 { persistentViewModel.submitSourceCreation() },
                 persistentViewModel::cancelSourceCreation
             )
@@ -534,7 +592,6 @@ class MainActivity : AppCompatActivity() {
         if (sourceEditingDialog == null) {
             val window = SourceEditingDialog(this,
                 persistentViewModel::updateSourceEditingName,
-                persistentViewModel::updateSourceEditingAdjustment,
                 { persistentViewModel.submitSourceEditing() },
                 persistentViewModel::cancelSourceEditing
             )
@@ -608,6 +665,10 @@ class MainActivity : AppCompatActivity() {
         expenseDetailsDialog = null
         categoryDialog?.dispose()
         categoryDialog = null
+        periodBudgetDialog?.setOnCancelListener(null)
+        periodBudgetDialog?.dismiss()
+        periodBudgetDialog = null
+        periodBudgetInput = null
         sourceCreationDialog?.dispose()
         sourceCreationDialog = null
         sourceEditingDialog?.dispose()
@@ -705,7 +766,7 @@ class MainActivity : AppCompatActivity() {
         expenseDialog?.renderOperation(state, persistentViewModel.canSaveExpense())
     }
 
-    private fun showExpenseEditor(expense: com.example.manymanager.domain.Expense) {
+    private fun showExpenseEditor(expense: com.example.simple.manymanager.domain.Expense) {
         dismissActiveDialogImmediately()
         summaryDialogScroll = findViewById<ScrollView>(R.id.pageScroll).scrollY
         persistentViewModel.openExpenseDetails(expense.id)
@@ -719,6 +780,7 @@ class MainActivity : AppCompatActivity() {
         persistentViewModel.expenseCreationState.value?.let {
             outState.putBundle("expenseCreation", it.toBundle())
         }
+        persistentViewModel.periodBudgetDraft.value?.let { outState.putBundle("periodBudget", it.toBundle()) }
         outState.putStringArrayList("expandedSummaryGroups", ArrayList(expandedSummaryGroups))
         summaryDialogScroll?.let { outState.putInt("summaryDialogScroll", it) }
         persistentViewModel.categoryCreation.value?.let {

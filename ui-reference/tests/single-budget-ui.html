@@ -1,0 +1,40 @@
+<!doctype html><meta charset="utf-8"><title>Single budget UI checks</title>
+<h1>Single budget UI checks</h1><pre id="results">Running…</pre>
+<script type="module">
+const results=[],check=(value,label)=>{if(!value)throw Error(label);results.push("PASS "+label)};
+const frame=document.createElement("iframe");frame.src="../index.html";frame.style="width:320px;height:850px";document.body.append(frame);
+const wait=async fn=>{const limit=performance.now()+10000;while(!fn()){if(performance.now()>limit)throw Error("event timeout");await new Promise(resolve=>setTimeout(resolve,20))}};
+try{
+ await wait(()=>frame.contentDocument?.querySelector('[data-action="expense"]'));
+ const doc=frame.contentDocument,click=s=>{const el=doc.querySelector(s);if(!el)throw Error("Missing "+s);el.click()};
+ const type=(s,value)=>{const el=doc.querySelector(s);el.value=value;el.dispatchEvent(new frame.contentWindow.Event("input",{bubbles:true}))};
+ const navigate=i=>{click("#menu-button");click('[data-action="navigate"][data-index="'+i+'"]')};
+ navigate(3);click('[data-action="edit-budget"]');type("#period-budget","20000");click('[data-action="confirm-budget"]');
+ check(doc.querySelector(".budget-card .total").textContent.includes("20,000"),"one total budget saved");
+ for(const name of ["Cash","Card"]){
+  click('[data-action="add-source"]');
+  check(doc.querySelectorAll(".dialog-panel input").length===1&&!doc.querySelector("#source-initial"),"method creation asks name only: "+name);
+  type("#source-name",name);click('[data-action="confirm-add-source"]');
+ }
+ check(doc.querySelectorAll(".source-row").length===2&&!doc.querySelector(".source-row [dir=ltr]"),"method rows have no allocations");
+ for(const [index,amount] of [[0,"100"],[1,"250"]]){
+  navigate(0);click('[data-action="expense"]');type("#amount",amount);
+  doc.querySelectorAll('[data-action="expense-source"]')[index].click();click('[data-action="save-expense"]');
+ }
+ await wait(()=>!doc.querySelector(".sheet"));
+ check(doc.querySelector(".budget-toggle").textContent.includes("19,650"),"home shows 19650 remaining");
+ navigate(3);click('[data-action="edit-source"]');
+ check(doc.querySelectorAll(".dialog-panel input").length===1&&!doc.querySelector("#source-adjustment"),"rename asks name only");
+ type("#source-name","Wallet");click('[data-action="confirm-edit-source"]');
+ check(doc.querySelector(".source-row").textContent.includes("Wallet")&&doc.querySelector(".budget-card .total").textContent.includes("20,000"),"rename leaves budget unchanged");
+ navigate(1);click('[data-action="tab"][data-index="1"]');
+ check(doc.querySelectorAll("[data-breakdown-id]").length===2&&doc.querySelector("#page").textContent.includes("Wallet"),"summary retains method breakdown");
+ click('[data-action="expense-group"]');
+ check(doc.querySelector('[data-action="view-expense"]'),"method group expands expense rows");
+ navigate(3);click('[data-action="budget-next"]');
+ check(!doc.querySelector(".budget-card .total").textContent.includes("20,000")&&doc.querySelectorAll(".source-row").length===2,"new period zero budget retains methods");
+ click('[data-action="edit-budget"]');type("#period-budget","999");click('.dialog-actions [data-action="close-overlay"]');
+ check(!doc.querySelector(".budget-card .total").textContent.includes("999"),"budget cancel discards entry");
+ document.getElementById("results").textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
+}catch(error){document.getElementById("results").textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}
+</script>

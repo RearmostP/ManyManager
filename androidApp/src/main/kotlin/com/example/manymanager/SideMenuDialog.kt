@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.animation.ValueAnimator
 import android.app.Activity

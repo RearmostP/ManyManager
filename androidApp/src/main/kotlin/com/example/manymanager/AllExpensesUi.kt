@@ -1,10 +1,10 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.view.View
 import android.view.LayoutInflater
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.example.manymanager.domain.Expense
+import com.example.simple.manymanager.domain.Expense
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -36,7 +36,7 @@ class AllExpensesUi(private val root: View, private val onCorrect: (Expense) -> 
     }
 
     /** Shared non-scrolling rows for All Expenses and inline Summary groups. */
-    fun renderRows(rows: LinearLayout, snapshot: com.example.manymanager.domain.BudgetSnapshot, expenses: List<Expense>, groupCategory: Boolean? = null) {
+    fun renderRows(rows: LinearLayout, snapshot: com.example.simple.manymanager.domain.BudgetSnapshot, expenses: List<Expense>, groupCategory: Boolean? = null) {
         rows.removeAllViews()
         val categories = snapshot.categories.associateBy { it.id }
         val sources = snapshot.sources.associateBy { it.source.id }

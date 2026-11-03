@@ -1,4 +1,4 @@
-package com.example.manymanager.domain
+package com.example.simple.manymanager.domain
 
 import java.time.LocalDate
 import org.junit.Assert.*
@@ -22,13 +22,13 @@ class BudgetCalculationsTest {
         val snapshot = snapshot(listOf(
             expense("1", 30, category = "cat"), expense("2", 20, source = "b"),
             expense("3", 10, source = "b"),
-        ), mapOf("a" to 100, "b" to 0))
+        ), 100)
         assertEquals(60L, snapshot.totalSpentMinor)
         assertEquals(100L, snapshot.totalAllocatedMinor)
         assertEquals(40L, snapshot.remainingMinor)
         assertEquals(3, snapshot.expenseCount)
-        assertEquals(70L, snapshot.sources[0].remainingMinor)
-        assertEquals(-30L, snapshot.sources[1].remainingMinor)
+        assertEquals(30L, snapshot.sources[0].spentMinor)
+        assertEquals(30L, snapshot.sources[1].spentMinor)
         assertEquals(CategorySummary(null, 30L, 2),
             snapshot.categoryBreakdown.single { it.categoryId == null })
         assertEquals(CategorySummary("cat", 30L, 1),
@@ -40,7 +40,7 @@ class BudgetCalculationsTest {
         assertEquals(2, snapshot.sources.size)
         assertEquals(0L, snapshot.totalAllocatedMinor)
         assertEquals(-500L, snapshot.remainingMinor)
-        assertEquals(0L, snapshot.sources[1].remainingMinor)
+        assertEquals(0L, snapshot.sources[1].spentMinor)
     }
 
     @Test fun finalSumOverflowIsExplicit() {
@@ -76,16 +76,16 @@ class BudgetCalculationsTest {
         val expenses = listOf(expense("1", 29, "b", "b"), expense("2", 11, "a", "a"),
             expense("3", 18, "a", "a"), expense("4", 29, "b"))
         val result = BudgetCalculations.snapshot(calculator, period, categories, sources,
-            emptyMap(), expenses)
+            0L, expenses)
         assertEquals(listOf(null, "a", "b"), result.categoryBreakdown.map { it.categoryId })
         assertEquals(listOf("b", "a"), result.sourceBreakdown.map { it.source.id })
         assertEquals(result.totalSpentMinor, BudgetCalculations.sum(result.categoryBreakdown.map { it.spentMinor }))
         assertEquals(result.totalSpentMinor, BudgetCalculations.sum(result.sourceBreakdown.map { it.spentMinor }))
         assertEquals(result.expenseCount, result.categoryBreakdown.sumOf { it.expenseCount })
         assertEquals(result.expenseCount, result.sourceBreakdown.sumOf { it.expenseCount })
-        assertEquals(0L, result.sourceBreakdown.first().allocatedMinor)
+        assertEquals(58L, result.sourceBreakdown.first().spentMinor)
         val reversed = BudgetCalculations.snapshot(calculator, period, categories.reversed(),
-            sources.reversed(), emptyMap(), expenses.reversed())
+            sources.reversed(), 0L, expenses.reversed())
         assertEquals(result.categoryBreakdown, reversed.categoryBreakdown)
         assertEquals(result.sourceBreakdown, reversed.sourceBreakdown)
         val empty = snapshot(emptyList())
@@ -93,6 +93,6 @@ class BudgetCalculationsTest {
         assertTrue(empty.sourceBreakdown.isEmpty())
     }
 
-    private fun snapshot(expenses: List<Expense>, allocations: Map<String, Long> = emptyMap()) =
-        BudgetCalculations.snapshot(calculator, period, emptyList(), sources, allocations, expenses)
+    private fun snapshot(expenses: List<Expense>, budget: Long = 0L) =
+        BudgetCalculations.snapshot(calculator, period, emptyList(), sources, budget, expenses)
 }

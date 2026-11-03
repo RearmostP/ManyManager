@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter

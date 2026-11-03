@@ -1,7 +1,7 @@
 <!doctype html><meta charset="utf-8"><meta name="google" content="notranslate"><base href="../">
 <title>Summary consistency checks — stage 9</title><h1>Summary consistency checks — stage 9</h1><pre id="results">Running…</pre>
 <script type="module">
-import {previewModel,addCategory,addSource,createExpense,updateExpense,snapshotFor,updateSource} from "../js/preview-model.js";
+import {previewModel,addCategory,addSource,createExpense,updateExpense,snapshotFor,updateSource,setBudget} from "../js/preview-model.js";
 import {state} from "../js/state.js";
 import {summary} from "../js/screens/summary.js";
 import {home} from "../js/screens/home.js";
@@ -14,7 +14,8 @@ const render=tab=>{state.tab=tab;host.innerHTML=summary();return [...host.queryS
 const sum=rows=>rows.reduce((total,row)=>total+row.spent,0);
 try{
  await loadLanguage("en");state.language="en";state.currentDate=new Date(2026,10,10);
- const date=state.currentDate,a=addSource("Same",date,500),b=addSource("Same",date,0),unused=addSource("Unused",date,0);
+ const date=state.currentDate,a=addSource("Same"),b=addSource("Same"),unused=addSource("Unused");
+ setBudget(date,500);
  const ca=addCategory("Same"),cb=addCategory("Same");addCategory("Unused");
  for(const tab of [0,1]){check(render(tab).length===0&&host.textContent.includes("No expenses"),"successful empty tab "+tab)}
  const first=createExpense({amountMinor:29,date:"2026-11-10",sourceId:a.id,categoryId:ca.id});
@@ -37,15 +38,15 @@ try{
  check(updateAmount(first.id,30),"amount correction succeeds");
  snap=snapshotFor(date);check(snap.spent===59&&sum(snap.categoryBreakdown)===59&&sum(snap.sourceBreakdown)===59&&snap.expenses.length===3,"correction updates groups without changing count");
  const moneyBefore=snap.sourceBreakdown.map(row=>row.spent).join(",");
- check(updateSource(b.id,"Renamed",date,0),"source rename");
+ check(updateSource(b.id,"Renamed"),"source rename");
  snap=snapshotFor(date);check(snap.sourceBreakdown.find(row=>row.id===b.id).name==="Renamed"&&snap.spent===59,"renamed label stable spending");
  check(snap.sourceBreakdown.map(row=>row.spent).join(",")===moneyBefore&&snap.allocated===500,"rename leaves money unchanged");
- check(updateSource(b.id,"Renamed",date,100),"allocation adjustment");
+ check(setBudget(date,600),"period budget replacement");
  snap=snapshotFor(date);check(snap.allocated===600&&snap.remaining===541&&snap.spent===59,"budget adjustment changes only allocation and remaining");
  state.budgetMonth=new Date(2026,11,10);check(render(1).length===2&&home().includes("0.59"),"historical management selection does not change home or summary");
  const next=snapshotFor(state.budgetMonth);check(next.spent===0&&next.allocated===0&&next.categoryBreakdown.length===0&&next.sourceBreakdown.length===0&&next.sources.length===3,"new period empty with retained sources no carry");
  state.expenseDraft={amount:"1.23",date:"2026-11-10",note:"Keep",categoryId:ca.id,sourceId:b.id};
- const draft=JSON.stringify(state.expenseDraft);addCategory("New");addSource("New",date,0);expense();
+ const draft=JSON.stringify(state.expenseDraft);addCategory("New");addSource("New");expense();
  check(JSON.stringify(state.expenseDraft)===draft,"observed choice refresh preserves entire draft");
  for(const language of ["he","ru","en"]){
   await loadLanguage(language);state.language=language;
@@ -56,7 +57,7 @@ try{
  const wait=async fn=>{const limit=performance.now()+10000;while(!fn()){if(performance.now()>limit)throw Error("event timeout");await new Promise(resolve=>setTimeout(resolve,20))}};
  await wait(()=>frame.contentDocument?.querySelector('[data-action="expense"]'));
  const doc=frame.contentDocument,click=selector=>doc.querySelector(selector).click(),type=(selector,value)=>{const input=doc.querySelector(selector);input.value=value;input.dispatchEvent(new frame.contentWindow.Event("input",{bubbles:true}))};
- click("#menu-button");click('[data-action="navigate"][data-index="3"]');click('[data-action="add-source"]');type("#source-name","Preview source");type("#source-initial","0");click('[data-action="confirm-add-source"]');
+ click("#menu-button");click('[data-action="navigate"][data-index="3"]');click('[data-action="add-source"]');type("#source-name","Preview source");click('[data-action="confirm-add-source"]');
  click("#menu-button");click('[data-action="navigate"][data-index="0"]');click('[data-action="expense"]');type("#amount","1.23");click('[data-action="expense-source"]');click('[data-action="save-expense"]');
  click("#menu-button");click('[data-action="navigate"][data-index="1"]');
  check(doc.querySelectorAll("[data-breakdown-id]").length===1,"real app uncategorized group after save");

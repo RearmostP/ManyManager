@@ -1,4 +1,4 @@
-package com.example.manymanager.data.local
+package com.example.simple.manymanager.data.local
 
 import androidx.room.Entity
 import androidx.room.ForeignKey
@@ -36,20 +36,18 @@ data class BudgetSourceEntity(val calculatorId: String, val id: String, val name
 
 /** Civil period start, supplied by the caller; no calendar-month or day-10 calculation here. */
 @Entity(
-    tableName = "budget_allocations",
-    primaryKeys = ["calculatorId", "sourceId", "periodStartEpochDay"],
+    tableName = "period_budgets",
+    primaryKeys = ["calculatorId", "periodStartEpochDay"],
     foreignKeys = [ForeignKey(
-        entity = BudgetSourceEntity::class,
-        parentColumns = ["calculatorId", "id"], childColumns = ["calculatorId", "sourceId"],
+        entity = CalculatorEntity::class,
+        parentColumns = ["id"], childColumns = ["calculatorId"],
         onDelete = ForeignKey.RESTRICT,
     )],
-    indices = [Index(value = ["calculatorId", "periodStartEpochDay"])],
 )
-data class BudgetAllocationEntity(
+data class PeriodBudgetEntity(
     val calculatorId: String,
-    val sourceId: String,
     val periodStartEpochDay: Long,
-    val allocatedMinor: Long,
+    val amountMinor: Long,
 )
 
 /** Money is integer minor units; dates are civil epoch days. Null category means uncategorized. */

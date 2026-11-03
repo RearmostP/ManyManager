@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.view.View
 import android.widget.LinearLayout

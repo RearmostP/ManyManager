@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.app.DatePickerDialog
 import android.view.Gravity
@@ -8,7 +8,7 @@ import android.view.WindowManager
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.core.widget.doAfterTextChanged
-import com.example.manymanager.domain.*
+import com.example.simple.manymanager.domain.*
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle

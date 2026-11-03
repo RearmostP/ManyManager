@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.content.Intent
 import android.content.res.Configuration
@@ -10,15 +10,16 @@ import android.widget.TextView
 import androidx.lifecycle.ViewModelProvider
 import androidx.room.Room
 import androidx.room.withTransaction
-import com.example.manymanager.data.ManyManagerRepository
-import com.example.manymanager.data.local.ManyManagerDatabase
+import com.example.simple.manymanager.data.ManyManagerRepository
+import com.example.simple.manymanager.data.local.ManyManagerDatabase
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.example.manymanager.domain.*
+import com.example.simple.manymanager.domain.*
 import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -84,7 +85,6 @@ class BudgetLifecycleTest {
         screen.onActivity {
             val root = rootWith(R.id.addSourceName)!!
             root.findViewById<EditText>(R.id.addSourceName).setText(name)
-            root.findViewById<EditText>(R.id.addSourceAmount).setText(amount)
         }
     }
 
@@ -115,8 +115,8 @@ class BudgetLifecycleTest {
             val period = success(writer.currentPeriod())
             assertTrue(success(writer.snapshot()).expenses.isEmpty())
             val category = success(writer.createCategory("Reopened category"))
-            val source = success(writer.createSourceWithInitialAllocation("Reopened source", period, 10000))
-            val zero = success(writer.createSourceWithInitialAllocation("Zero source", period, 0))
+            val source = success(writer.seedMethodAndBudget("Reopened source", period, 10000))
+            val zero = success(writer.seedMethodAndBudget("Zero source", period, 0))
             val categorized = success(writer.createExpense(NewExpense(1250, period.start, source.id, category.id, "Saved note")))
             val uncategorized = success(writer.createExpense(NewExpense(250, period.start, zero.id)))
             val saved = success(writer.snapshot())
@@ -177,193 +177,9 @@ class BudgetLifecycleTest {
         }
     }
 
-    @Test fun creationSurvivesRecreateAndConfigurationRebuildWithoutSecondWrite() = runBlocking {
-        val screen = launch()
-        openBudget(screen)
-        val controller = model(screen)
-        val historical = (controller.state.value as PersistentDataState.Ready).snapshot.period
-        screen.onActivity { controller.selectPreviousPeriod() }
-        awaitUi(screen) { controller.selectedPeriod != null &&
-            (controller.state.value as? PersistentDataState.Ready)?.snapshot?.period == controller.selectedPeriod }
-        val selected = controller.selectedPeriod!!
-        assertNotEquals(historical, selected)
-        addForm(screen, "Saved form", "12.34")
-        val (release, lock) = gate()
-        try {
-            screen.onActivity {
-                rootWith(R.id.addSourceName)!!.findViewById<View>(android.R.id.button1).performClick()
-                assertTrue(controller.sourceCreationState.value!!.submitting)
-            }
-            screen.recreate()
-            assertSame(controller, model(screen))
-            awaitUi(screen) { rootWith(R.id.addSourceName) != null }
-            screen.onActivity {
-                val root = rootWith(R.id.addSourceName)!!
-                assertEquals("Saved form", root.findViewById<EditText>(R.id.addSourceName).text.toString())
-                assertEquals("12.34", root.findViewById<EditText>(R.id.addSourceAmount).text.toString())
-                assertFalse(root.findViewById<View>(android.R.id.button1).isEnabled)
-                assertFalse(root.findViewById<View>(android.R.id.button2).isEnabled)
-                assertEquals(selected, controller.sourceCreationState.value!!.period)
-                assertEquals(selected, controller.selectedPeriod)
-                // Exercise the app's existing view-rebuild path without changing device settings.
-                val config = Configuration(it.resources.configuration)
-                config.uiMode = config.uiMode xor Configuration.UI_MODE_NIGHT_MASK
-                it.onConfigurationChanged(config)
-            }
-            awaitUi(screen) { rootWith(R.id.addSourceName) != null }
-        } finally { release.complete(Unit); lock.join() }
-        awaitUi(screen) { controller.sourceCreationState.value == null && rootWith(R.id.addSourceName) == null }
-        val saved = success(app.repository.snapshot(selected))
-        assertEquals(1, saved.sources.size)
-        assertEquals(1234L, saved.totalAllocatedMinor)
-        screen.recreate()
-        awaitUi(screen) { controller.state.value is PersistentDataState.Ready }
-        assertNull(controller.sourceCreationState.value)
-        assertEquals(1, success(app.repository.snapshot(selected)).sources.size)
-    }
 
-    @Test fun editingPreviewAndWriteSurviveRecreateAndFailuresPreserveInput() = runBlocking {
-        val period = success(app.repository.currentPeriod())
-        success(app.repository.createSourceWithInitialAllocation("Original", period, 1000))
-        val screen = launch()
-        openBudget(screen)
-        val controller = model(screen)
-        screen.onActivity {
-            (it.findViewById<android.widget.LinearLayout>(R.id.budgetSourceRows).getChildAt(0)).performClick()
-        }
-        awaitUi(screen) { rootWith(R.id.editSourceName) != null }
-        val (releasePreview, previewLock) = gate()
-        try {
-            screen.onActivity {
-                val root = rootWith(R.id.editSourceName)!!
-                root.findViewById<EditText>(R.id.editSourceName).setText("Edited")
-                root.findViewById<EditText>(R.id.sourceAdjustment).setText("99")
-                root.findViewById<View>(R.id.sourceMinus).performClick()
-                root.findViewById<EditText>(R.id.sourceAdjustment).setText("2")
-            }
-            screen.recreate()
-            awaitUi(screen) { rootWith(R.id.editSourceName) != null }
-            screen.onActivity {
-                val root = rootWith(R.id.editSourceName)!!
-                assertEquals("2", root.findViewById<EditText>(R.id.sourceAdjustment).text.toString())
-                assertTrue(root.findViewById<View>(R.id.sourceMinus).isSelected)
-                assertFalse(root.findViewById<View>(android.R.id.button1).isEnabled)
-                assertNull(controller.sourceEditingState.value!!.previewResult)
-            }
-        } finally { releasePreview.complete(Unit); previewLock.join() }
-        awaitUi(screen) {
-            (controller.sourceEditingState.value?.previewResult as? DataResult.Success)?.value?.resultingAllocatedMinor == 800L
-        }
-        app.database.openHelper.writableDatabase.execSQL("""
-            CREATE TRIGGER stage7_fail_update BEFORE UPDATE ON budget_allocations
-            BEGIN SELECT RAISE(ABORT, 'isolated fixture'); END
-        """.trimIndent())
-        screen.onActivity { rootWith(R.id.editSourceName)!!.findViewById<View>(android.R.id.button1).performClick() }
-        awaitUi(screen) { controller.sourceEditingState.value?.submitResult is DataResult.Failure }
-        screen.onActivity {
-            val root = rootWith(R.id.editSourceName)!!
-            assertEquals("Edited", root.findViewById<EditText>(R.id.editSourceName).text.toString())
-            assertEquals("2", root.findViewById<EditText>(R.id.sourceAdjustment).text.toString())
-            assertNotNull(root.findViewById<EditText>(R.id.sourceAdjustment).error)
-        }
-        assertEquals("Original", success(app.repository.snapshot(period)).sources.single().source.name)
-        assertEquals(1000L, success(app.repository.snapshot(period)).totalAllocatedMinor)
-        app.database.openHelper.writableDatabase.execSQL("DROP TRIGGER stage7_fail_update")
-        val (releaseWrite, writeLock) = gate()
-        try {
-            screen.onActivity { rootWith(R.id.editSourceName)!!.findViewById<View>(android.R.id.button1).performClick() }
-            screen.recreate()
-            awaitUi(screen) { rootWith(R.id.editSourceName) != null }
-            screen.onActivity {
-                val root = rootWith(R.id.editSourceName)!!
-                assertFalse(root.findViewById<View>(android.R.id.button1).isEnabled)
-                assertFalse(root.findViewById<View>(android.R.id.button2).isEnabled)
-                assertNull(controller.submitSourceEditing())
-            }
-        } finally { releaseWrite.complete(Unit); writeLock.join() }
-        awaitUi(screen) { controller.sourceEditingState.value == null }
-        val saved = success(app.repository.snapshot(period))
-        assertEquals("Edited", saved.sources.single().source.name)
-        assertEquals(800L, saved.totalAllocatedMinor)
-    }
 
-    @Test fun rolloverAndTimezoneRefreshKeepHistoricalSelectionAndCapturedForm() = runBlocking {
-        val old = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Persistent", old, 500))
-        val screen = launch()
-        openBudget(screen)
-        val controller = model(screen)
-        screen.onActivity { if (controller.selectedPeriod != old) controller.selectPeriod(old) }
-        androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().waitForIdleSync()
-        awaitUi(screen) { it.findViewById<View>(R.id.budgetAddSource).isEnabled &&
-            (controller.state.value as? PersistentDataState.Ready)?.snapshot?.period == old }
-        addForm(screen, "Captured", "7")
-        app.clock.now = Instant.parse("2026-11-09T22:01:00Z") // Jerusalem: November 10, 00:01.
-        dispatchDate(screen, Intent.ACTION_DATE_CHANGED)
-        awaitUi(screen) {
-            val home = controller.activeBudget.value as? PersistentDataState.Ready
-            home != null && home.snapshot.period.start != old.start
-        }
-        val home = (controller.activeBudget.value as PersistentDataState.Ready).snapshot
-        assertEquals(0L, home.totalAllocatedMinor)
-        assertEquals(source.id, home.sources.single().source.id)
-        assertEquals(old, controller.selectedPeriod)
-        assertEquals(old, controller.sourceCreationState.value!!.period)
-        screen.onActivity { rootWith(R.id.addSourceName)!!.findViewById<View>(android.R.id.button1).performClick() }
-        awaitUi(screen) { controller.sourceCreationState.value == null }
-        assertEquals(1200L, success(app.repository.snapshot(old)).totalAllocatedMinor)
-        assertEquals(0L, success(app.repository.snapshot()).totalAllocatedMinor)
-        // Same instant, different injected zone. No device clock or zone is changed.
-        app.clock.currentZone = ZoneId.of("America/Los_Angeles")
-        dispatchDate(screen, Intent.ACTION_TIMEZONE_CHANGED)
-        awaitUi(screen) {
-            (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.period == old
-        }
-        assertEquals(old, controller.selectedPeriod)
-    }
 
-    @Test fun unknownOutcomeRestorationCannotResubmitAndReviewShowsCapturedPeriod() = runBlocking {
-        val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Already committed", period, 1200))
-        val screen = launch()
-        openBudget(screen)
-        val controller = model(screen)
-        val restored = SourceEditingState.fromBundle(SourceEditingState(source, period, 1000,
-            name = "Already committed", adjustmentText = "2", submitting = true).toBundle())!!
-        screen.onActivity { controller.restoreSourceEditing(restored) }
-        awaitUi(screen) { rootWith(R.id.editSourceName) != null }
-        screen.recreate()
-        screen.onActivity {
-            val root = rootWith(R.id.editSourceName)!!
-            assertFalse(root.findViewById<View>(android.R.id.button1).isEnabled)
-            assertFalse(root.findViewById<View>(R.id.sourceAdjustment).isEnabled)
-            assertNull(controller.submitSourceEditing())
-            assertTrue(root.findViewById<TextView>(R.id.sourcePreview).text.contains(
-                it.getString(R.string.source_save_interrupted)))
-            root.findViewById<View>(android.R.id.button2).performClick()
-        }
-        awaitUi(screen) { controller.sourceEditingState.value == null && controller.state.value is PersistentDataState.Ready }
-        assertEquals(period, controller.selectedPeriod)
-        assertEquals(1200L, success(app.repository.snapshot(period)).totalAllocatedMinor)
-        val uncertainCreation = SourceCreationState.fromBundle(SourceCreationState(period,
-            name = "Maybe committed", initialAmountText = "5", submitting = true).toBundle())!!
-        screen.onActivity { controller.restoreSourceCreation(uncertainCreation) }
-        awaitUi(screen) { rootWith(R.id.addSourceName) != null }
-        screen.onActivity {
-            val root = rootWith(R.id.addSourceName)!!
-            assertFalse(root.findViewById<View>(android.R.id.button1).isEnabled)
-            assertFalse(root.findViewById<View>(R.id.addSourceName).isEnabled)
-            controller.updateSourceCreationName("Cannot erase uncertainty")
-            assertEquals("Maybe committed", controller.sourceCreationState.value!!.name)
-            assertNull(controller.submitSourceCreation())
-            root.findViewById<View>(android.R.id.button2).performClick()
-        }
-        awaitUi(screen) { controller.sourceCreationState.value == null }
-        assertEquals(1, success(app.repository.snapshot(period)).sources.size)
-        val past = BudgetPeriod(java.time.LocalDate.of(1960, 11, 10), java.time.LocalDate.of(1960, 12, 10))
-        assertEquals(past, SourceCreationState.fromBundle(SourceCreationState(past).toBundle())!!.period)
-        assertEquals(past, SourceEditingState.fromBundle(SourceEditingState(source, past, 0).toBundle())!!.period)
-    }
 
     @Test fun backPreservesHistoryAndLateNavigationCannotOverwriteNewSelection() = runBlocking {
         val screen = launch()
@@ -403,75 +219,10 @@ class BudgetLifecycleTest {
         }
     }
 
-    @Test fun localizedDialogsFitPhoneWidthAndExposeSelectedAdjustmentAndErrors() = runBlocking {
-        val period = BudgetPeriod(java.time.LocalDate.of(2026, 12, 10), java.time.LocalDate.of(2027, 1, 10))
-        val source = BudgetSource("local-calculator", "matrix", "Source")
-        val screen = launch()
-        for (language in listOf("he", "ru", "en")) for (night in listOf(false, true)) {
-            // AppCompat dialogs inherit the Activity night mode. Use isolated appearance preferences
-            // and recreate the real Activity instead of pretending a wrapper alone changes its theme.
-            app.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE).edit()
-                .putBoolean("dark", night).commit()
-            screen.recreate()
-            awaitUi(screen) {
-                it.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
-                    if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
-            }
-            lateinit var form: SourceEditingDialog
-            screen.onActivity { activity ->
-                val locale = java.util.Locale.forLanguageTag(language)
-                val config = Configuration(activity.resources.configuration).apply {
-                    setLocale(locale); setLayoutDirection(locale)
-                    uiMode = (uiMode and Configuration.UI_MODE_NIGHT_MASK.inv()) or
-                        if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
-                }
-                val themed = androidx.appcompat.view.ContextThemeWrapper(activity, R.style.AppTheme).apply {
-                    applyOverrideConfiguration(config)
-                }
-                form = SourceEditingDialog(themed, {}, { _, _ -> }, {}, {})
-                form.show()
-                form.dialog.window!!.setLayout((320 * activity.resources.displayMetrics.density).toInt(),
-                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
-                form.render(SourceEditingState(source, period, 1000, adjustmentText = "2", isAdd = false,
-                    previewResult = DataResult.Success(BudgetAdjustmentPreview(source.id, period, 1000, -200, 800))))
-            }
-            awaitUi(screen) { form.dialog.findViewById<TextView>(R.id.editSourceMonth)?.layout != null }
-            screen.onActivity {
-                assertEquals(if (night) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO,
-                    form.dialog.context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK)
-                val label = form.dialog.findViewById<TextView>(R.id.editSourceMonth)!!
-                assertTrue(label.text.contains("2026"))
-                assertTrue(label.text.contains("2027"))
-                assertTrue(label.contentDescription.contains("2026"))
-                for (id in listOf(R.id.editSourceMonth, R.id.currentSourceBudget, R.id.sourcePreview)) {
-                    val text = form.dialog.findViewById<TextView>(id)!!
-                    assertTrue("$language/$night clipped height: " + text.text,
-                        text.layout.height <= text.height - text.compoundPaddingTop - text.compoundPaddingBottom)
-                    for (line in 0 until text.lineCount) assertTrue("$language/$night clipped width: " + text.text,
-                        text.layout.getLineWidth(line) <= text.width - text.compoundPaddingLeft - text.compoundPaddingRight + 1)
-                }
-                val minus = form.dialog.findViewById<View>(R.id.sourceMinus)!!
-                val plus = form.dialog.findViewById<View>(R.id.sourcePlus)!!
-                assertTrue(minus.createAccessibilityNodeInfo().isSelected)
-                assertFalse(plus.createAccessibilityNodeInfo().isSelected)
-                assertTrue(minus.contentDescription.isNotBlank())
-                assertTrue(plus.contentDescription.isNotBlank())
-                assertEquals(if (language == "he") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR,
-                    label.layoutDirection)
-                form.render(SourceEditingState(source, period, 1000, adjustmentText = "2",
-                    previewResult = DataResult.Failure(DataError.StorageFailure(IllegalStateException("fixture")))))
-                val preview = form.dialog.findViewById<TextView>(R.id.sourcePreview)!!
-                assertEquals(form.dialog.context.getString(R.string.budget_preview_error), preview.text.toString())
-                assertTrue(preview.isClickable)
-                assertFalse(form.dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).isEnabled)
-                form.dispose()
-            }
-        }
-    }
 
     @Test fun financialReadFailureOffersRetryAndKeepsSourceChoicesAndExpenseDraft() = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Available", period, 0))
+        val source = success(app.repository.seedMethodAndBudget("Available", period, 0))
         val screen = launch()
         val controller = model(screen)
         awaitUi(screen) { controller.activeBudget.value is PersistentDataState.Ready }
@@ -483,9 +234,9 @@ class BudgetLifecycleTest {
             root.findViewById<EditText>(R.id.expenseNote).setText("Keep note")
             root.findViewById<android.widget.LinearLayout>(R.id.expenseSourceChoices).getChildAt(0).performClick()
         }
-        app.database.dao().insertExpense(com.example.manymanager.data.local.ExpenseEntity(
+        app.database.dao().insertExpense(com.example.simple.manymanager.data.local.ExpenseEntity(
             source.calculatorId, "read-overflow-a", Long.MAX_VALUE, period.startEpochDay, null, source.id))
-        app.database.dao().insertExpense(com.example.manymanager.data.local.ExpenseEntity(
+        app.database.dao().insertExpense(com.example.simple.manymanager.data.local.ExpenseEntity(
             source.calculatorId, "read-overflow-b", 1, period.startEpochDay, null, source.id))
         awaitUi(screen) { controller.activeBudget.value is PersistentDataState.Failed }
         screen.recreate()
@@ -514,7 +265,7 @@ class BudgetLifecycleTest {
 
     @Test fun expenseSaveRecreationCategoryDraftAndAmountCorrection() = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Cash", period, 0))
+        val source = success(app.repository.seedMethodAndBudget("Cash", period, 0))
         val screen = launch()
         val controller = model(screen)
         awaitUi(screen) { controller.sources.value is SourceListState.Ready && controller.categories.value is CategoryListState.Ready }
@@ -648,7 +399,7 @@ class BudgetLifecycleTest {
 
     @Test fun failedExpenseWritePreservesInputAndUnknownRestoreCannotSubmit() = runBlocking {
         val period = success(app.repository.currentPeriod())
-        success(app.repository.createSourceWithInitialAllocation("Cash", period, 0))
+        success(app.repository.seedMethodAndBudget("Cash", period, 0))
         val screen = launch()
         val controller = model(screen)
         awaitUi(screen) { controller.sources.value is SourceListState.Ready }
@@ -693,8 +444,8 @@ class BudgetLifecycleTest {
 
     @Test fun summaryHomeManagementAndDraftConvergeOnSameCommittedFacts(): Unit = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val a = success(app.repository.createSourceWithInitialAllocation("Same", period, 500))
-        val b = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
+        val a = success(app.repository.seedMethodAndBudget("Same", period, 500))
+        val b = success(app.repository.seedMethodAndBudget("Same", period, 0))
         val catA = success(app.repository.createCategory("Same"))
         val catB = success(app.repository.createCategory("Same"))
         val first = success(app.repository.createExpense(NewExpense(100, period.start, a.id, catA.id)))
@@ -727,7 +478,8 @@ class BudgetLifecycleTest {
             assertEquals(money(it, -400), it.findViewById<TextView>(R.id.homeBudgetRemaining).text.toString())
             assertEquals(3, rows(it, R.id.expenseRows).childCount)
         }
-        success(app.repository.updateSourceAndAdjustAllocation(a.id, "Renamed", period, 100))
+        success(app.repository.renameSource(a.id, "Renamed"))
+        success(app.repository.setPeriodBudget(period, 600))
         awaitUi(screen) {
             val group = rows(it, R.id.sourceSummaryRows).getChildAt(0)
             group.findViewById<TextView>(R.id.breakdownName).text.toString() == "Renamed" &&
@@ -739,8 +491,8 @@ class BudgetLifecycleTest {
             assertEquals(money(it, 600), it.findViewById<TextView>(R.id.budgetAllocatedTotal).text.toString())
             val homeRows = rows(it, R.id.budgetBreakdownRows)
             assertTrue((homeRows.getChildAt(0) as android.widget.LinearLayout).getChildAt(0).let { view -> (view as TextView).text.contains("Renamed") })
-            assertEquals(money(it, -100), ((homeRows.getChildAt(0) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
-            assertEquals(money(it, -200), ((homeRows.getChildAt(1) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
+            assertEquals(money(it, 700), ((homeRows.getChildAt(0) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
+            assertEquals(money(it, 200), ((homeRows.getChildAt(1) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
             val list = rows(it, R.id.expenseRows)
             val correctedRow = (0 until list.childCount).map(list::getChildAt).single { view -> view.tag == first.id }
             assertTrue(correctedRow.findViewById<TextView>(R.id.summaryExpenseAmount).text.contains(money(it, 400)))
@@ -775,7 +527,7 @@ class BudgetLifecycleTest {
 
     @Test fun financialPanelsOwnLoadingEmptyErrorAndIgnoreChoiceListFailures(): Unit = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 0))
+        val source = success(app.repository.seedMethodAndBudget("Source", period, 0))
         val category = success(app.repository.createCategory("Category"))
         val screen = launch()
         val controller = model(screen)
@@ -809,7 +561,7 @@ class BudgetLifecycleTest {
 
     @Test fun breakdownRowsWrapLongNamesAtPhoneWidthInAllLocalesAndThemes() = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 0))
+        val source = success(app.repository.seedMethodAndBudget("Source", period, 0))
         val category = success(app.repository.createCategory("Category"))
         success(app.repository.createExpense(NewExpense(12345, period.start, source.id, category.id, "Long note · הערה ארוכה · Длинная заметка ".repeat(40))))
         val snapshot = success(app.repository.snapshot())
@@ -887,7 +639,7 @@ class BudgetLifecycleTest {
 
     @Test fun unifiedCardsKeepSeparateActionsAndContextualExpenseRows(): Unit = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 0))
+        val source = success(app.repository.seedMethodAndBudget("Source", period, 0))
         val category = success(app.repository.createCategory("Category"))
         success(app.repository.createExpense(NewExpense(120, period.start, source.id, category.id, "Full note")))
         success(app.repository.createExpense(NewExpense(30, period.start, source.id)))
@@ -958,8 +710,8 @@ class BudgetLifecycleTest {
      * callback with a simulated event; never change the user's device clock/zone. */
     @Test fun inlineGroupDetailsStayAboveSummaryAfterMoveAndRecreation(): Unit = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
-        val otherSource = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
+        val source = success(app.repository.seedMethodAndBudget("Same", period, 0))
+        val otherSource = success(app.repository.seedMethodAndBudget("Same", period, 0))
         val category = success(app.repository.createCategory("Same"))
         val otherCategory = success(app.repository.createCategory("Same"))
         val first = success(app.repository.createExpense(NewExpense(100, period.start, source.id, category.id)))
@@ -1070,8 +822,8 @@ class BudgetLifecycleTest {
 
     @Test fun sourceAndNullGroupDetailsDeleteWithFailureRecreationAndMissingRecord(): Unit = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Same", period, 100))
-        val otherSource = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
+        val source = success(app.repository.seedMethodAndBudget("Same", period, 100))
+        val otherSource = success(app.repository.seedMethodAndBudget("Same", period, 0))
         val category = success(app.repository.createCategory("Food"))
         val first = success(app.repository.createExpense(NewExpense(30, period.start, source.id)))
         val second = success(app.repository.createExpense(NewExpense(20, period.start, source.id, category.id)))
@@ -1150,7 +902,7 @@ class BudgetLifecycleTest {
 
     @Test fun longInlineListKeepsSummaryScrollAndExpansionUnderDetails(): Unit = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 0))
+        val source = success(app.repository.seedMethodAndBudget("Source", period, 0))
         val category = success(app.repository.createCategory("Same"))
         val otherCategory = success(app.repository.createCategory("Same"))
         repeat(45) { success(app.repository.createExpense(NewExpense(10, period.start, source.id, category.id, "Row $it"))) }
@@ -1231,7 +983,7 @@ class BudgetLifecycleTest {
 
     @Test fun detailsActionsFollowLocaleAndFitNarrowLightAndDarkWindows(): Unit = runBlocking {
         val period = success(app.repository.currentPeriod())
-        val source = success(app.repository.createSourceWithInitialAllocation("Long source name ".repeat(4), period, 0))
+        val source = success(app.repository.seedMethodAndBudget("Long source name ".repeat(4), period, 0))
         val category = success(app.repository.createCategory("Long category name ".repeat(4)))
         val record = success(app.repository.createExpense(NewExpense(123, period.start, source.id, category.id)))
         val screen = launch()
@@ -1292,5 +1044,50 @@ class BudgetLifecycleTest {
     private fun <T> success(result: DataResult<T>): T {
         assertTrue("Expected success, got $result", result is DataResult.Success)
         return (result as DataResult.Success).value
+    }
+
+    private suspend fun ManyManagerRepository.seedMethodAndBudget(name: String, period: BudgetPeriod, amount: Long): DataResult<BudgetSource> {
+        success(setPeriodBudget(period, Math.addExact(success(snapshot(period)).totalAllocatedMinor, amount)))
+        return createPaymentMethod(name)
+    }
+
+    @Test fun singleBudgetAndNameOnlyMethodsSurviveRecreation() = runBlocking {
+        val screen = launch()
+        openBudget(screen)
+        val controller = model(screen)
+        screen.onActivity { it.findViewById<View>(R.id.budgetEditTotal).performClick() }
+        awaitUi(screen) { controller.periodBudgetDraft.value != null }
+        screen.onActivity {
+            controller.updatePeriodBudget("20000")
+            controller.submitPeriodBudget()
+        }
+        awaitUi(screen) { controller.periodBudgetDraft.value == null }
+        addForm(screen, "Cash", "")
+        screen.onActivity { rootWith(R.id.addSourceName)!!.findViewById<View>(android.R.id.button1).performClick() }
+        awaitUi(screen) { controller.sourceCreationState.value == null }
+        val cash = success(app.repository.observeSources().first()).single()
+        val card = success(app.repository.createPaymentMethod("Card"))
+        val period = success(app.repository.currentPeriod())
+        success(app.repository.createExpense(NewExpense(10000, period.start, cash.id)))
+        success(app.repository.createExpense(NewExpense(25000, period.start, card.id)))
+        awaitUi(screen) {
+            (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.remainingMinor == 1965000L
+        }
+        screen.recreate()
+        awaitUi(screen) {
+            it.findViewById<TextView>(R.id.homeBudgetRemaining).text.toString().contains(
+                BudgetAmounts.number(1965000, it.resources.configuration.locales[0]))
+        }
+        screen.onActivity {
+            it.findViewById<android.widget.LinearLayout>(R.id.budgetSourceRows).getChildAt(0).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.editSourceName) != null }
+        screen.onActivity {
+            rootWith(R.id.editSourceName)!!.findViewById<EditText>(R.id.editSourceName).setText("Wallet")
+            rootWith(R.id.editSourceName)!!.findViewById<View>(android.R.id.button1).performClick()
+        }
+        awaitUi(screen) { controller.sourceEditingState.value == null }
+        assertEquals(1965000L, success(app.repository.snapshot()).remainingMinor)
+        assertEquals("Wallet", success(app.repository.observeSources().first()).first().name)
     }
 }

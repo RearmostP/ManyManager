@@ -1,72 +1,29 @@
-<!doctype html>
-<meta charset="utf-8">
-<meta name="google" content="notranslate">
-<base href="../">
-<title>Budget companion checks — stages 6–7</title>
-<h1>Budget companion checks — stages 6–7</h1>
-<pre id="results">Running…</pre>
+<!doctype html><meta charset="utf-8"><title>Single budget checks</title>
+<h1>Single budget checks</h1><pre id="results">Running…</pre>
 <script type="module">
-import {periodFor,periodKey,adjacentPeriod} from "../js/budget-period.js";
-import {previewModel,addSource,amountFor,totalFor,updateSource,previewAdjustment} from "../js/preview-model.js";
-import {state,closeOverlay,changePage} from "../js/state.js";
-import {beginCategoryCreation,confirmCategoryCreation} from "../js/components/category-dialog.js";
-import {expense} from "../js/components/expense-sheet.js";
-import {home} from "../js/screens/home.js";
-import {canConfirmSourceEdit} from "../js/components/source-dialog.js";
-import {loadLanguage} from "../js/i18n.js";
-import {periodLabel,periodDescription} from "../js/render-helpers.js";
-const results=[];
-function check(condition,label){if(!condition)throw Error(label);results.push("PASS "+label)}
+import {periodKey,adjacentPeriod} from "../js/budget-period.js";
+import {previewModel,addSource,setBudget,totalFor,updateSource,createExpense,updateExpense,deleteExpense,snapshotFor} from "../js/preview-model.js";
+const results=[],check=(value,label)=>{if(!value)throw Error(label);results.push("PASS "+label)};
 try{
- await loadLanguage("en");state.language="en";
  const before=new Date(2026,10,9),after=new Date(2026,10,10);
- check(periodKey(before)==="2026-10"&&periodKey(after)==="2026-11","before/after 10th");
- check(periodFor(after).endExclusive.getMonth()===11,"November 10 to December 9");
- check(periodKey(adjacentPeriod(new Date(2026,11,31),1))==="2027-01","year navigation without date overflow");
- const a=addSource(" Same ",after,1200),b=addSource("Same",after,0);
- check(a.id!==b.id&&a.name===b.name,"duplicate names retain distinct IDs");
- check(amountFor(after,a.id)===1200,"initial allocation");
- check(previewAdjustment(after,a.id,200)===1400&&amountFor(after,a.id)===1200,"preview never writes");
- check(!updateSource(a.id,"Wrong",after,-1300)&&a.name==="Same"&&amountFor(after,a.id)===1200,"invalid edit is atomic");
- check(updateSource(a.id,"Renamed",after,200)&&a.id===previewModel.sources[0].id,"rename preserves ID");
- const next=adjacentPeriod(after,1);
- check(totalFor(next)===0&&previewModel.sources.length===2,"period isolation retains zero-allocation sources");
- state.currentDate=before;state.budgetMonth=after;
- changePage(3,{scrollTop:0});
- check(periodKey(state.budgetMonth)==="2026-10","management entry selects active period before 10th");
- state.dialogMonth=after;state.sourceDraft={sourceId:a.id,name:"Renamed",adjustment:"99",operation:"deduct"};
- check(!canConfirmSourceEdit(),"negative allocation cannot confirm");
- state.sourceDraft.adjustment="";
- check(canConfirmSourceEdit(),"empty adjustment means zero");
- state.overlay="expense";
- state.expenseDraft={amount:"12.34",date:"09/11/2026",note:"Keep me",categoryId:null,sourceId:b.id};
- const beforeDraft=JSON.stringify(state.expenseDraft);
- addSource("Third",next,0);expense();
- check(JSON.stringify(state.expenseDraft)===beforeDraft,"source refresh preserves entire draft");
- const host=document.createElement("div");host.innerHTML=expense();
- check(host.querySelectorAll('[data-action="expense-source"]').length===3,"zero-allocation sources offered");
- check(host.querySelector('[data-action="expense-source"].selected').dataset.id===b.id,"selection uses source ID");
- beginCategoryCreation();state.categoryDraft="Food";check(confirmCategoryCreation(),"category creation succeeds");
- check(state.overlay==="expense"&&state.expenseDraft.categoryId&&state.expenseDraft.sourceId===b.id&&state.expenseDraft.amount==="12.34"&&state.expenseDraft.note==="Keep me"&&state.expenseDraft.date==="09/11/2026","category return preserves draft");
- const categoryId=state.expenseDraft.categoryId;
- beginCategoryCreation();closeOverlay();
- check(state.expenseDraft.categoryId===categoryId&&state.overlay==="expense","category cancellation");
- state.currentDate=after;state.budgetMonth=next;
- check(home().includes("Renamed")&&home().includes("14"),"home follows active period independently of management");
- const crossing=new Date(2026,11,10);
- for(const language of ["he","ru","en"]){
-   await loadLanguage(language);
-   const label=periodLabel(language,crossing);
-   check(label.includes("2026")&&label.includes("2027"),language+" year-crossing label includes both years");
-   check(periodDescription(language,crossing).includes("2026"),language+" accessible full period description");
- }
- state.language="en";
- state.dialogMonth=after;
- state.sourceDraft={sourceId:a.id,name:"Captured period",adjustment:"1",operation:"add"};
- state.currentDate=next;state.budgetMonth=next;
- check(updateSource(a.id,state.sourceDraft.name,state.dialogMonth,100)&&amountFor(after,a.id)===1500&&amountFor(next,a.id)===0,"confirmation after rollover affects captured period only");
- const saved=amountFor(after,a.id);state.overlay="edit-source";closeOverlay();
- check(amountFor(after,a.id)===saved,"cancel never changes allocation");
+ check(periodKey(before)==="2026-10"&&periodKey(after)==="2026-11","9th and 10th use distinct periods");
+ const cash=addSource("Cash"),card=addSource("Card"),unused=addSource("Unused");
+ check(totalFor(after)===0,"methods never create budgets");
+ check(setBudget(after,2000000),"set one period budget");
+ const a=createExpense({amountMinor:10000,date:"2026-11-10",sourceId:cash.id});
+ const b=createExpense({amountMinor:25000,date:"2026-11-10",sourceId:card.id});
+ let s=snapshotFor(after);
+ check(s.remaining===1965000&&s.spent===35000,"20000 minus 100 cash and 250 card leaves 19650");
+ check(s.sourceBreakdown.find(x=>x.id===cash.id).spent===10000&&s.sourceBreakdown.find(x=>x.id===card.id).spent===25000,"payment breakdown");
+ check(updateSource(cash.id,"Wallet")&&a.sourceId===cash.id&&snapshotFor(after).remaining===1965000,"rename preserves identity and money");
+ check(totalFor(adjacentPeriod(after,1))===0&&previewModel.sources.length===3,"new period zero budget, methods retained");
+ check(createExpense({amountMinor:100,date:"2026-11-09",sourceId:unused.id})&&snapshotFor(before).remaining===-100,"zero budget and negative remaining allowed");
+ check(updateExpense(a.id,{...a,amountMinor:20000})&&snapshotFor(after).remaining===1955000,"edit recalculates");
+ check(updateExpense(a.id,{...a,date:"2026-11-09"})&&snapshotFor(after).remaining===1975000&&snapshotFor(before).remaining===-20100,"move across boundary recalculates both periods");
+ check(updateExpense(a.id,{...a,date:"2026-11-10"})&&snapshotFor(before).remaining===-100,"move 9th to 10th");
+ check(deleteExpense(b.id)&&snapshotFor(after).remaining===1980000,"delete recalculates");
+ check(!setBudget(after,-1)&&totalFor(after)===2000000,"negative budget rejected");
+ check(!createExpense({amountMinor:1,date:"2026-11-10",sourceId:"missing"}),"method required");
  document.getElementById("results").textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
 }catch(error){document.getElementById("results").textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}
 </script>

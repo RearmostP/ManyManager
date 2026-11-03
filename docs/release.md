@@ -1,8 +1,8 @@
 # ManyManager Simple release guide
 
-This guide targets `original`: use `simple-v<VERSION>` and `ManyManager-Simple-<VERSION>.apk` for this branch. The current implementation and signing configuration retain the shared baseline; a separate package identity has not been implemented.
+This guide targets `original`: use `simple-v<VERSION>` and `ManyManager-Simple-<VERSION>.apk` for this branch. Simple uses its own package identity, `com.example.simple.manymanager`, and retains the existing signing configuration.
 
-Run commands from the repository root, using a clean, reviewed commit and a compatible JDK. The current checked-in configuration on this branch is `com.example.manymanager`, versionName `0.2.0`, versionCode `2`. Recheck [androidApp/build.gradle.kts](../androidApp/build.gradle.kts) before each release; this is not a claim that an APK was published.
+Run commands from the repository root, using a clean, reviewed commit and a compatible JDK. The current checked-in configuration on this branch is `com.example.simple.manymanager`, versionName `0.1.0`, versionCode `1`. Recheck [androidApp/build.gradle.kts](../androidApp/build.gradle.kts) before each release; this is not a claim that an APK was published.
 
 ## Independent releases
 
@@ -13,7 +13,7 @@ Run commands from the repository root, using a clean, reviewed commit and a comp
 
 Each application can advance and publish independently. Each release contains only its own APK and its tag points to the exact build commit. Filter tags by application prefix rather than GitHub's global “Latest”. Preserve historical tags/releases, including `0.1.0`.
 
-Both branches currently retain the same package identity; package separation has not been implemented. Distinct package identities are required before distributing divergent applications side by side. Thereafter, versionCode can advance independently for each package. Normal updates require the same applicationId and signing identity and a versionCode higher than every previously distributed build for that package; update versionName accordingly.
+Simple (`com.example.simple.manymanager`) and the personal edition (`com.example.manymanager`) have distinct package identities and can be installed side by side. Each package has separate app-private data; changing applicationId does not automatically transfer the previous package’s database or preferences. VersionCode can advance independently for each package. Normal updates require the same applicationId and signing identity and a versionCode higher than every previously distributed build for that package; update versionName accordingly.
 
 ## Build and verify
 
@@ -38,7 +38,7 @@ git rev-parse HEAD
 
 Confirm package/version, non-debuggable/non-testOnly manifest, backup settings, valid signature and the same release certificate as a trusted previous APK/key. A debug-signed installation cannot be updated by a differently signed release; stop and inspect rather than uninstalling or clearing data.
 
-Copy only the verified APK to the ignored `private-release/` directory using the table's filename (for example `ManyManager-Simple-0.2.0.apk`). Do not overwrite an existing delivery file without investigating. Hash the delivered copy too and record its checksum, certificate and build commit. Never include signing material with the APK. Tag/publish/upload only when authorized, using the exact build commit and naming above.
+Copy only the verified APK to the ignored `private-release/` directory using the table's filename (for example `ManyManager-Simple-0.1.0.apk`). Do not overwrite an existing delivery file without investigating. Hash the delivered copy too and record its checksum, certificate and build commit. Never include signing material with the APK. Tag/publish/upload only when authorized, using the exact build commit and naming above.
 
 ## Signing configuration and continuity
 

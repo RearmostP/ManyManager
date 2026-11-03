@@ -1,8 +1,8 @@
-package com.example.manymanager.data
+package com.example.simple.manymanager.data
 
 import androidx.room.withTransaction
-import com.example.manymanager.data.local.*
-import com.example.manymanager.domain.*
+import com.example.simple.manymanager.data.local.*
+import com.example.simple.manymanager.domain.*
 import java.time.Clock
 import java.time.DateTimeException
 import java.time.LocalDate
@@ -51,7 +51,7 @@ class ManyManagerRepository(
      * Callers restart/refresh on resume or civil-date changes; no background scheduler is installed.
      */
     fun observeSnapshot(period: BudgetPeriod? = null): Flow<DataResult<BudgetSnapshot>> =
-        observe(arrayOf("calculators", "categories", "budget_sources", "budget_allocations", "expenses")) {
+        observe(arrayOf("calculators", "categories", "budget_sources", "period_budgets", "expenses")) {
             snapshot(period)
         }
 
@@ -62,13 +62,13 @@ class ManyManagerRepository(
         }
 
     private suspend fun readSnapshot(calculator: CalculatorEntity, selected: BudgetPeriod): BudgetSnapshot {
-            val allocations = dao.allocations(calculator.id, selected.startEpochDay)
-            if (allocations.any { it.allocatedMinor < 0 }) reject(DataError.NegativeAllocatedBudget)
+            val budget = dao.periodBudget(calculator.id, selected.startEpochDay)?.amountMinor ?: 0L
+            if (budget < 0) reject(DataError.NegativeAllocatedBudget)
             return BudgetCalculations.snapshot(
                 calculator.domain(), selected,
                 dao.categories(calculator.id).map { it.domain() },
                 dao.sources(calculator.id).map { it.domain() },
-                allocations.associate { it.sourceId to it.allocatedMinor },
+                budget,
                 dao.expenses(calculator.id, selected.startEpochDay, selected.endExclusiveEpochDay)
                     .map { it.domain() },
             )
@@ -137,20 +137,20 @@ class ManyManagerRepository(
         category.domain()
     }
 
-    suspend fun createSourceWithInitialAllocation(
-        name: String, period: BudgetPeriod, initialMinor: Long
-    ): DataResult<BudgetSource> = execute { calculator ->
-        val clean = cleanName(name)
-        val selected = resolvePeriod(calculator, period)
-        if (initialMinor < 0) reject(DataError.NegativeAllocatedBudget)
-        val source = BudgetSourceEntity(calculator.id, UUID.randomUUID().toString(), clean)
-        validateAllocationTotal(calculator.id, selected, source.id, initialMinor)
+    suspend fun createPaymentMethod(name: String): DataResult<BudgetSource> = execute { calculator ->
+        val source = BudgetSourceEntity(calculator.id, UUID.randomUUID().toString(), cleanName(name))
         dao.insertSource(source)
-        dao.insertAllocation(BudgetAllocationEntity(
-            calculator.id, source.id, selected.startEpochDay, initialMinor
-        ))
         source.domain()
     }
+
+    suspend fun setPeriodBudget(period: BudgetPeriod, amountMinor: Long): DataResult<Unit> =
+        execute { calculator ->
+            val selected = resolvePeriod(calculator, period)
+            if (amountMinor < 0) reject(DataError.NegativeAllocatedBudget)
+            dao.putBudget(PeriodBudgetEntity(calculator.id, selected.startEpochDay, amountMinor))
+            readSnapshot(calculator, selected)
+            Unit
+        }
 
     suspend fun renameSource(sourceId: String, name: String): DataResult<BudgetSource> =
         execute { calculator ->
@@ -159,42 +159,6 @@ class ManyManagerRepository(
             check(dao.renameSource(calculator.id, sourceId, clean) == 1)
             source.copy(name = clean).domain()
         }
-
-    /** A signed preview may be negative, as in the existing editor; preview never writes. */
-    suspend fun previewBudgetAdjustment(
-        sourceId: String, period: BudgetPeriod, deltaMinor: Long
-    ): DataResult<BudgetAdjustmentPreview> = execute { calculator ->
-        val selected = resolvePeriod(calculator, period)
-        requireSource(calculator.id, sourceId)
-        val current = dao.allocation(calculator.id, sourceId, selected.startEpochDay)?.allocatedMinor ?: 0L
-        val result = Math.addExact(current, deltaMinor)
-        validateAllocationTotal(calculator.id, selected, sourceId, result)
-        BudgetAdjustmentPreview(sourceId, selected, current, deltaMinor, result)
-    }
-
-    /** Read the latest allocation and commit name + adjustment together, never using a stale preview. */
-    suspend fun updateSourceAndAdjustAllocation(
-        sourceId: String, name: String, period: BudgetPeriod, deltaMinor: Long
-    ): DataResult<BudgetAdjustmentPreview> = execute { calculator ->
-        val clean = cleanName(name)
-        val selected = resolvePeriod(calculator, period)
-        requireSource(calculator.id, sourceId)
-        val current = dao.allocation(calculator.id, sourceId, selected.startEpochDay)?.allocatedMinor ?: 0L
-        val result = Math.addExact(current, deltaMinor)
-        if (result < 0) reject(DataError.NegativeAllocatedBudget)
-        validateAllocationTotal(calculator.id, selected, sourceId, result)
-        check(dao.renameSource(calculator.id, sourceId, clean) == 1)
-        dao.putAllocation(BudgetAllocationEntity(calculator.id, sourceId, selected.startEpochDay, result))
-        BudgetAdjustmentPreview(sourceId, selected, current, deltaMinor, result)
-    }
-
-    private suspend fun validateAllocationTotal(
-        calculatorId: String, period: BudgetPeriod, sourceId: String, replacement: Long
-    ) {
-        val others = dao.allocations(calculatorId, period.startEpochDay)
-            .filter { it.sourceId != sourceId }.map { it.allocatedMinor }
-        BudgetCalculations.sum(others + replacement)
-    }
 
     private suspend fun requireSource(calculatorId: String, sourceId: String): BudgetSourceEntity =
         dao.source(calculatorId, sourceId)

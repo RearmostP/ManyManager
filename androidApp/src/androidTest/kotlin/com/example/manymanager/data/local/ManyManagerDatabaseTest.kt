@@ -1,4 +1,4 @@
-package com.example.manymanager.data.local
+package com.example.simple.manymanager.data.local
 
 import android.content.Context
 import android.database.sqlite.SQLiteConstraintException
@@ -51,7 +51,7 @@ class ManyManagerDatabaseTest {
         assertEquals(CalculatorEntity(owner, 10, "ILS"), first)
         assertEquals(first, database.dao().initializeLocalCalculator())
         assertEquals(1L, count("calculators"))
-        listOf("categories", "budget_sources", "budget_allocations", "expenses").forEach {
+        listOf("categories", "budget_sources", "period_budgets", "expenses").forEach {
             assertEquals(0L, count(it))
         }
     }
@@ -75,36 +75,37 @@ class ManyManagerDatabaseTest {
     @Test fun recordsSurviveClosingAndReopeningFileDatabase() = runBlocking {
         val name = newTestFile()
         database.close()
-        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).build()
+        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
         seedRelationships()
-        val allocation = BudgetAllocationEntity(owner, source.id, period, 12345L)
+        val allocation = PeriodBudgetEntity(owner, period, 12345L)
         val categorized = expense("categorized")
         val uncategorized = expense("uncategorized", categoryId = null)
-        database.dao().insertAllocation(allocation)
+        database.dao().insertBudget(allocation)
         database.dao().insertExpense(categorized)
         database.dao().insertExpense(uncategorized)
         database.close()
 
-        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).build()
+        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
         assertEquals(CalculatorEntity(owner), database.dao().initializeLocalCalculator())
         assertEquals(1L, count("calculators"))
-        assertEquals(allocation, database.dao().allocation(owner, source.id, period))
+        assertEquals(allocation, database.dao().periodBudget(owner, period))
         assertEquals(categorized, database.dao().expense(owner, categorized.id))
         assertEquals(uncategorized, database.dao().expense(owner, uncategorized.id))
         assertEquals(1L, count("categories"))
         assertEquals(1L, count("budget_sources"))
     }
 
-    @Test fun duplicateAllocationAbortsAndPreservesOriginal() = runBlocking {
+    @Test fun duplicatePeriodBudgetAbortsAndPreservesOriginal() = runBlocking {
         seedRelationships()
-        val original = BudgetAllocationEntity(owner, source.id, period, 100L)
-        database.dao().insertAllocation(original)
-        expectConstraint { database.dao().insertAllocation(original.copy(allocatedMinor = 999L)) }
-        assertEquals(original, database.dao().allocation(owner, source.id, period))
-        database.dao().insertAllocation(original.copy(
+        val original = PeriodBudgetEntity(owner, period, 100L)
+        database.dao().insertBudget(original)
+        expectConstraint { database.dao().insertBudget(original.copy(amountMinor = 999L)) }
+        assertEquals(original, database.dao().periodBudget(owner, period))
+        database.dao().insertBudget(original.copy(
             periodStartEpochDay = LocalDate.of(2026, 12, 10).toEpochDay()
         ))
-        assertEquals(2L, count("budget_allocations"))
+        assertEquals(2L, count("period_budgets"))
     }
 
     @Test fun validRelationshipsAndNullCategoryAreAccepted() = runBlocking {
@@ -116,7 +117,7 @@ class ManyManagerDatabaseTest {
         assertEquals(categorized, database.dao().expense(owner, "one"))
         assertEquals(uncategorized, database.dao().expense(owner, "two"))
         // Neither source existence nor spending requires a budget allocation.
-        assertEquals(0L, count("budget_allocations"))
+        assertEquals(0L, count("period_budgets"))
     }
 
     @Test fun unknownCategoryAndSourceAreRejected() = runBlocking {
@@ -132,7 +133,7 @@ class ManyManagerDatabaseTest {
                 categoryId = null, sourceId = "missing"))
         }
         expectConstraint {
-            database.dao().insertAllocation(BudgetAllocationEntity(owner, "missing", period, 100L))
+            database.dao().insertBudget(PeriodBudgetEntity("missing", period, 100L))
         }
         assertEquals(0L, count("expenses"))
     }
@@ -149,9 +150,6 @@ class ManyManagerDatabaseTest {
         }
         expectConstraint {
             database.dao().insertExpense(expense("cross-source", sourceId = "other-source"))
-        }
-        expectConstraint {
-            database.dao().insertAllocation(BudgetAllocationEntity(owner, "other-source", period, 0L))
         }
         val validOther = ExpenseEntity("other", "valid-other", 50L, date,
             "other-category", "other-source")
@@ -232,12 +230,13 @@ class ManyManagerDatabaseTest {
                 arrayOf<Any>(owner, date, source.id))
         }
         database.close()
-        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).build()
+        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
         assertEquals(CalculatorEntity(owner, 15, "EUR"), database.dao().initializeLocalCalculator())
         assertEquals(listOf(category), database.dao().categories(owner))
         assertEquals(listOf(source), database.dao().sources(owner))
-        assertEquals(BudgetAllocationEntity(owner, source.id, period, 12345),
-            database.dao().allocation(owner, source.id, period))
+        assertEquals(PeriodBudgetEntity(owner, period, 12345),
+            database.dao().periodBudget(owner, period))
         assertEquals(expense("schema"), database.dao().expense(owner, "schema"))
         assertEquals(expense("schema-null", categoryId = null), database.dao().expense(owner, "schema-null"))
         assertEquals(2L, count("expenses"))

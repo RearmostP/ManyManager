@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.animation.ValueAnimator
 import android.app.Activity
@@ -159,7 +159,7 @@ class ExpenseSheetDialog(
                 state.interrupted -> R.string.expense_save_interrupted
                 state.error != null -> expenseErrorMessage(state.error)
                 draft.date == null -> R.string.expense_invalid_date
-                draft.amount.isNotEmpty() && parsed is com.example.manymanager.domain.DataResult.Failure ->
+                draft.amount.isNotEmpty() && parsed is com.example.simple.manymanager.domain.DataResult.Failure ->
                     expenseErrorMessage(parsed.error)
                 else -> null
             }

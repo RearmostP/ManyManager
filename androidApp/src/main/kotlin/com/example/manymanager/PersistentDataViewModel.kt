@@ -1,11 +1,11 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.os.Bundle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.manymanager.data.ManyManagerRepository
-import com.example.manymanager.domain.*
+import com.example.simple.manymanager.data.ManyManagerRepository
+import com.example.simple.manymanager.domain.*
 import java.time.LocalDate
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
@@ -30,7 +30,6 @@ sealed interface PersistentDataState {
 data class SourceCreationState(
     val period: BudgetPeriod,
     val name: String = "",
-    val initialAmountText: String = "0",
     val submitting: Boolean = false,
     val result: DataResult<BudgetSource>? = null,
     val interrupted: Boolean = false,
@@ -39,32 +38,17 @@ data class SourceCreationState(
         putLong("startEpochDay", period.startEpochDay)
         putLong("endExclusiveEpochDay", period.endExclusiveEpochDay)
         putString("name", name)
-        putString("initialAmountText", initialAmountText)
-        putBoolean("submitting", submitting)
-        putBoolean("interrupted", interrupted)
-        (result as? DataResult.Success)?.value?.let {
-            putString("createdId", it.id)
-            putString("createdOwner", it.calculatorId)
-            putString("createdName", it.name)
-        }
+        putBoolean("interrupted", submitting || interrupted)
+        (result as? DataResult.Success)?.value?.let { putString("committedId", it.id); putString("owner", it.calculatorId) }
     }
-
     companion object {
         fun fromBundle(bundle: Bundle): SourceCreationState? {
-            if (!bundle.containsKey("startEpochDay") || !bundle.containsKey("endExclusiveEpochDay")) return null
-            val startEpoch = bundle.getLong("startEpochDay")
-            val endEpoch = bundle.getLong("endExclusiveEpochDay")
-            val period = BudgetPeriod(LocalDate.ofEpochDay(startEpoch), LocalDate.ofEpochDay(endEpoch))
-            val source = bundle.getString("createdId")?.let { id ->
-                BudgetSource(checkNotNull(bundle.getString("createdOwner")), id, bundle.getString("createdName").orEmpty())
-            }
+            if (!bundle.containsKey("startEpochDay")) return null
+            val name = bundle.getString("name").orEmpty()
             return SourceCreationState(
-                period = period,
-                name = bundle.getString("name").orEmpty(),
-                initialAmountText = bundle.getString("initialAmountText", "0"),
-                result = source?.let { DataResult.Success(it) },
-                interrupted = bundle.getBoolean("submitting") || bundle.getBoolean("interrupted"),
-            )
+                BudgetPeriod(LocalDate.ofEpochDay(bundle.getLong("startEpochDay")), LocalDate.ofEpochDay(bundle.getLong("endExclusiveEpochDay"))),
+                name, result = bundle.getString("committedId")?.let { DataResult.Success(BudgetSource(bundle.getString("owner").orEmpty(), it, name)) },
+                interrupted = bundle.getBoolean("interrupted") || bundle.getBoolean("submitting"))
         }
     }
 }
@@ -72,55 +56,27 @@ data class SourceCreationState(
 data class SourceEditingState(
     val source: BudgetSource,
     val period: BudgetPeriod,
-    val currentAllocationMinor: Long,
     val name: String = source.name,
-    val adjustmentText: String = "",
-    val isAdd: Boolean = true,
     val submitting: Boolean = false,
-    val previewResult: DataResult<BudgetAdjustmentPreview>? = null,
-    val submitResult: DataResult<BudgetAdjustmentPreview>? = null,
+    val submitResult: DataResult<BudgetSource>? = null,
     val interrupted: Boolean = false,
 ) {
     fun toBundle() = Bundle().apply {
-        putString("sourceId", source.id)
-        putString("sourceOwner", source.calculatorId)
-        putString("sourceName", source.name)
-        putLong("startEpochDay", period.startEpochDay)
-        putLong("endExclusiveEpochDay", period.endExclusiveEpochDay)
-        putLong("currentAllocationMinor", currentAllocationMinor)
-        putString("name", name)
-        putString("adjustmentText", adjustmentText)
-        putBoolean("isAdd", isAdd)
-        (submitResult as? DataResult.Success)?.value?.let {
-            putLong("committedCurrent", it.currentAllocatedMinor)
-            putLong("committedDelta", it.deltaMinor)
-            putLong("committedResult", it.resultingAllocatedMinor)
-        }
-        putBoolean("submitting", submitting)
-        putBoolean("interrupted", interrupted)
+        putString("sourceId", source.id); putString("sourceOwner", source.calculatorId)
+        putString("sourceName", source.name); putString("name", name)
+        putLong("startEpochDay", period.startEpochDay); putLong("endExclusiveEpochDay", period.endExclusiveEpochDay)
+        putBoolean("committed", submitResult is DataResult.Success)
+        putBoolean("interrupted", submitting || interrupted)
     }
-
     companion object {
         fun fromBundle(bundle: Bundle): SourceEditingState? {
-            val sourceId = bundle.getString("sourceId") ?: return null
-            if (!bundle.containsKey("startEpochDay") || !bundle.containsKey("endExclusiveEpochDay")) return null
-            val startEpoch = bundle.getLong("startEpochDay")
-            val endEpoch = bundle.getLong("endExclusiveEpochDay")
-            val source = BudgetSource(bundle.getString("sourceOwner").orEmpty(), sourceId, bundle.getString("sourceName").orEmpty())
-            val period = BudgetPeriod(LocalDate.ofEpochDay(startEpoch), LocalDate.ofEpochDay(endEpoch))
-            return SourceEditingState(
-                source = source,
-                period = period,
-                currentAllocationMinor = bundle.getLong("currentAllocationMinor"),
-                name = bundle.getString("name").orEmpty(),
-                adjustmentText = bundle.getString("adjustmentText").orEmpty(),
-                isAdd = bundle.getBoolean("isAdd", true),
-                submitResult = if (bundle.containsKey("committedResult")) DataResult.Success(
-                    BudgetAdjustmentPreview(source.id, period, bundle.getLong("committedCurrent"),
-                        bundle.getLong("committedDelta"), bundle.getLong("committedResult"))
-                ) else null,
-                interrupted = bundle.getBoolean("submitting") || bundle.getBoolean("interrupted"),
-            )
+            val id = bundle.getString("sourceId") ?: return null
+            val source = BudgetSource(bundle.getString("sourceOwner").orEmpty(), id, bundle.getString("sourceName").orEmpty())
+            val name = bundle.getString("name").orEmpty()
+            return SourceEditingState(source,
+                BudgetPeriod(LocalDate.ofEpochDay(bundle.getLong("startEpochDay")), LocalDate.ofEpochDay(bundle.getLong("endExclusiveEpochDay"))),
+                name, submitResult = if (bundle.getBoolean("committed")) DataResult.Success(source.copy(name = name)) else null,
+                interrupted = bundle.getBoolean("interrupted") || bundle.getBoolean("submitting"))
         }
     }
 }
@@ -236,13 +192,6 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         }
     }
 
-    fun updateSourceCreationAmount(amountText: String) {
-        sourceCreation.update { current ->
-            if (current == null || current.submitting || current.interrupted || current.result is DataResult.Success || current.initialAmountText == amountText) current
-            else current.copy(initialAmountText = amountText, result = null)
-        }
-    }
-
     fun cancelSourceCreation() {
         sourceCreation.value?.takeIf { it.interrupted }?.let {
             selectPeriod(it.period)
@@ -260,36 +209,19 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
     fun submitSourceCreation(): Job? {
         val current = sourceCreation.value ?: return null
         if (current.submitting || current.interrupted || current.result is DataResult.Success) return null
-        val parsed = BudgetAmounts.parse(current.initialAmountText)
-        if (parsed == null) {
-            sourceCreation.value = current.copy(result = DataResult.Failure(DataError.AmountOverflow))
-            return null
-        }
         sourceCreation.value = current.copy(submitting = true, result = null, interrupted = false)
         return viewModelScope.launch {
-            val result = repository.createSourceWithInitialAllocation(current.name, current.period, parsed)
+            val result = repository.createPaymentMethod(current.name)
             currentCoroutineContext().ensureActive()
             sourceCreation.value = current.copy(result = result, interrupted = false)
         }
     }
 
-    private var previewJob: Job? = null
-    private var previewRevision = 0L
-
-    fun beginSourceEditing(source: BudgetSource, period: BudgetPeriod, currentAllocationMinor: Long) {
-        if (sourceEditing.value == null) {
-            val state = SourceEditingState(source, period, currentAllocationMinor)
-            sourceEditing.value = state
-            updateSourceEditingAdjustment("", isAdd = true)
-        }
+    fun beginSourceEditing(source: BudgetSource, period: BudgetPeriod) {
+        if (sourceEditing.value == null) sourceEditing.value = SourceEditingState(source, period)
     }
-
     fun restoreSourceEditing(restored: SourceEditingState) {
-        if (sourceEditing.value == null) {
-            sourceEditing.value = restored
-            if (!restored.interrupted && restored.submitResult !is DataResult.Success)
-                updateSourceEditingAdjustment(restored.adjustmentText, restored.isAdd)
-        }
+        if (sourceEditing.value == null) sourceEditing.value = restored
     }
 
     fun updateSourceEditingName(name: String) {
@@ -299,41 +231,8 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         }
     }
 
-    fun updateSourceEditingAdjustment(text: String, isAdd: Boolean) {
-        val current = sourceEditing.value ?: return
-        if (current.submitting || current.interrupted || current.submitResult is DataResult.Success) return
-        val revision = ++previewRevision
-        val updated = current.copy(adjustmentText = text, isAdd = isAdd, submitResult = null, previewResult = null)
-        sourceEditing.value = updated
-
-        previewJob?.cancel()
-        val parsed = if (text.isBlank()) 0L else BudgetAmounts.parse(text)
-        if (parsed == null) {
-            sourceEditing.update { it?.copy(previewResult = DataResult.Failure(DataError.AmountOverflow)) }
-            return
-        }
-        val delta = if (isAdd) parsed else -parsed
-        previewJob = viewModelScope.launch {
-            val result = repository.previewBudgetAdjustment(current.source.id, current.period, delta)
-            ensureActive()
-            sourceEditing.update {
-                if (revision == previewRevision && it?.source?.id == current.source.id)
-                    it.copy(previewResult = result) else it
-            }
-        }
-    }
-
     fun cancelSourceEditing() {
-        sourceEditing.value?.takeIf { it.interrupted }?.let {
-            selectPeriod(it.period)
-            refresh()
-        }
-        ++previewRevision
-        previewJob?.cancel()
-        previewJob = null
-        sourceEditing.update { current ->
-            if (current?.submitting == true || current?.submitResult is DataResult.Success) current else null
-        }
+        sourceEditing.update { if (it?.submitting == true || it?.submitResult is DataResult.Success) it else null }
     }
 
     fun acknowledgeSourceEditing() {
@@ -343,16 +242,10 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
     fun submitSourceEditing(): Job? {
         val current = sourceEditing.value ?: return null
         if (current.submitting || current.interrupted || current.submitResult is DataResult.Success) return null
-        val parsed = if (current.adjustmentText.isBlank()) 0L else BudgetAmounts.parse(current.adjustmentText)
-        val preview = (current.previewResult as? DataResult.Success)?.value
-        if (current.name.isBlank() || parsed == null || preview == null ||
-            preview.resultingAllocatedMinor < 0) return null
-        val delta = if (current.isAdd) parsed else -parsed
+        if (current.name.isBlank()) return null
         sourceEditing.value = current.copy(submitting = true, submitResult = null, interrupted = false)
         return viewModelScope.launch {
-            val result = repository.updateSourceAndAdjustAllocation(
-                current.source.id, current.name, current.period, delta
-            )
+            val result = repository.renameSource(current.source.id, current.name)
             currentCoroutineContext().ensureActive()
             sourceEditing.value = current.copy(submitResult = result, interrupted = false)
         }
@@ -500,6 +393,54 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
             val missing = error is DataError.MissingEntity && error.kind == EntityKind.EXPENSE
             expenseCreation.value = current.copy(confirmingDelete = false, saved = result is DataResult.Success,
                 error = error, original = if (missing) null else current.original, editing = current.editing && !missing)
+        }
+    }
+
+    data class PeriodBudgetDraft(
+        val period: BudgetPeriod, val text: String, val submitting: Boolean = false,
+        val error: DataError? = null, val saved: Boolean = false, val interrupted: Boolean = false,
+    ) {
+        fun toBundle() = Bundle().apply {
+            putLong("start", period.startEpochDay); putLong("end", period.endExclusiveEpochDay)
+            putString("text", text); putBoolean("saved", saved)
+            putBoolean("interrupted", submitting || interrupted)
+        }
+        companion object {
+            fun fromBundle(bundle: Bundle) = PeriodBudgetDraft(
+                BudgetPeriod(LocalDate.ofEpochDay(bundle.getLong("start")), LocalDate.ofEpochDay(bundle.getLong("end"))),
+                bundle.getString("text").orEmpty(), saved = bundle.getBoolean("saved"),
+                interrupted = bundle.getBoolean("interrupted"))
+        }
+    }
+    private val budgetDraft = MutableStateFlow<PeriodBudgetDraft?>(null)
+    val periodBudgetDraft: StateFlow<PeriodBudgetDraft?> = budgetDraft
+    fun restorePeriodBudget(draft: PeriodBudgetDraft) {
+        if (budgetDraft.value == null) budgetDraft.value = draft
+    }
+    fun beginPeriodBudget(period: BudgetPeriod, amount: Long) {
+        if (budgetDraft.value == null) budgetDraft.value =
+            PeriodBudgetDraft(period, java.math.BigDecimal.valueOf(amount, 2).toPlainString())
+    }
+    fun updatePeriodBudget(text: String) {
+        budgetDraft.update { if (it?.submitting == true || it?.interrupted == true) it else it?.copy(text = text, error = null) }
+    }
+    fun closePeriodBudget() {
+        if (budgetDraft.value?.submitting != true) budgetDraft.value = null
+    }
+    fun submitPeriodBudget() {
+        val draft = budgetDraft.value ?: return
+        if (draft.submitting || draft.saved || draft.interrupted) return
+        val amount = BudgetAmounts.parse(draft.text)
+        if (amount == null) {
+            budgetDraft.value = draft.copy(error = DataError.InvalidAmount)
+            return
+        }
+        budgetDraft.value = draft.copy(submitting = true)
+        viewModelScope.launch {
+            val result = repository.setPeriodBudget(draft.period, amount)
+            currentCoroutineContext().ensureActive()
+            budgetDraft.value = draft.copy(saved = result is DataResult.Success,
+                error = (result as? DataResult.Failure)?.error)
         }
     }
 

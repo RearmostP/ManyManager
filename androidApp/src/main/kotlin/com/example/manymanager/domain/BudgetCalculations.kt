@@ -1,4 +1,4 @@
-package com.example.manymanager.domain
+package com.example.simple.manymanager.domain
 
 import java.math.BigInteger
 
@@ -11,18 +11,16 @@ object BudgetCalculations {
         period: BudgetPeriod,
         categories: List<Category>,
         sources: List<BudgetSource>,
-        allocations: Map<String, Long>,
+        budgetMinor: Long,
         expenses: List<Expense>,
     ): BudgetSnapshot {
         val bySource = expenses.groupBy { it.sourceId }
         val sourceBudgets = sources.map { source ->
             val rows = bySource[source.id].orEmpty()
-            val allocated = allocations[source.id] ?: 0L
             val spent = exactSum(rows.map { it.amountMinor })
-            SourceBudget(source, allocated, spent.checkedLong(),
-                BigInteger.valueOf(allocated).subtract(spent).checkedLong(), rows.size)
+            SourceBudget(source, spent.checkedLong(), rows.size)
         }
-        val allocated = exactSum(allocations.values)
+        val allocated = BigInteger.valueOf(budgetMinor)
         val spent = exactSum(expenses.map { it.amountMinor })
         val breakdown = expenses.groupBy { it.categoryId }.map { (id, rows) ->
             CategorySummary(id, sum(rows.map { it.amountMinor }), rows.size)

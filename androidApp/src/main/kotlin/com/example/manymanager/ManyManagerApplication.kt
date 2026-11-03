@@ -1,13 +1,13 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.app.Application
 import android.util.Log
-import com.example.manymanager.data.ManyManagerRepository
+import com.example.simple.manymanager.data.ManyManagerRepository
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId
-import com.example.manymanager.data.local.CalculatorEntity
-import com.example.manymanager.data.local.ManyManagerDatabase
+import com.example.simple.manymanager.data.local.CalculatorEntity
+import com.example.simple.manymanager.data.local.ManyManagerDatabase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred

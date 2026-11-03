@@ -75,16 +75,16 @@ android {
         }
     }
     sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")
-    namespace = "com.example.manymanager"
+    namespace = "com.example.simple.manymanager"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.example.manymanager"
+        applicationId = "com.example.simple.manymanager"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 2
-        versionName = "0.2.0"
-        testInstrumentationRunner = "com.example.manymanager.DatabaseTestRunner"
+        versionCode = 1
+        versionName = "0.1.0"
+        testInstrumentationRunner = "com.example.simple.manymanager.DatabaseTestRunner"
     }
     packaging {
         resources {

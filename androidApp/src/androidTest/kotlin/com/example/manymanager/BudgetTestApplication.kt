@@ -1,9 +1,9 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.content.SharedPreferences
 import androidx.room.Room
-import com.example.manymanager.data.ManyManagerRepository
-import com.example.manymanager.data.local.ManyManagerDatabase
+import com.example.simple.manymanager.data.ManyManagerRepository
+import com.example.simple.manymanager.data.local.ManyManagerDatabase
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneId

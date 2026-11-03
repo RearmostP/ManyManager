@@ -1,7 +1,7 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.os.Bundle
-import com.example.manymanager.domain.*
+import com.example.simple.manymanager.domain.*
 import java.time.LocalDate
 
 /** Raw amount text and a civil date; never a locale-dependent date string. */

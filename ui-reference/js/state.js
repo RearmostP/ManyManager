@@ -8,7 +8,7 @@ export const state={
   expenseDraft:{amount:"",date:"",note:"",categoryId:null,sourceId:null},
   expenseEditId:null,expenseOriginal:null,expandedSummaryGroups:new Set(),expenseEditing:false,expenseDetailsError:null,
   categoryDraft:"",categoryReturnOverlay:null,
-  sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
+  sourceDraft:{name:"",sourceId:null},budgetDraft:"",
   dialogMonth:null
 };
 export function changePage(index,scrollElement){

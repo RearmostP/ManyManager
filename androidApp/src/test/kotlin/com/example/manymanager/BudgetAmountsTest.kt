@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import org.junit.Assert.*
 import org.junit.Test
@@ -6,12 +6,12 @@ import java.util.Locale
 
 class BudgetAmountsTest {
     @Test fun expenseAmountErrorsDistinguishInvalidNonpositiveAndOverflow() {
-        fun error(value: String) = (BudgetAmounts.positive(value) as com.example.manymanager.domain.DataResult.Failure).error
-        assertEquals(com.example.manymanager.domain.DataError.NonPositiveAmount, error("0"))
-        assertEquals(com.example.manymanager.domain.DataError.NonPositiveAmount, error("-1"))
-        assertEquals(com.example.manymanager.domain.DataError.InvalidAmount, error("1.234"))
-        assertEquals(com.example.manymanager.domain.DataError.AmountOverflow, error("92233720368547758.08"))
-        assertEquals(com.example.manymanager.domain.DataResult.Success(29L), BudgetAmounts.positive("0.29"))
+        fun error(value: String) = (BudgetAmounts.positive(value) as com.example.simple.manymanager.domain.DataResult.Failure).error
+        assertEquals(com.example.simple.manymanager.domain.DataError.NonPositiveAmount, error("0"))
+        assertEquals(com.example.simple.manymanager.domain.DataError.NonPositiveAmount, error("-1"))
+        assertEquals(com.example.simple.manymanager.domain.DataError.InvalidAmount, error("1.234"))
+        assertEquals(com.example.simple.manymanager.domain.DataError.AmountOverflow, error("92233720368547758.08"))
+        assertEquals(com.example.simple.manymanager.domain.DataResult.Success(29L), BudgetAmounts.positive("0.29"))
     }
 
     @Test fun acceptsZeroAndExactDecimalAmounts() {

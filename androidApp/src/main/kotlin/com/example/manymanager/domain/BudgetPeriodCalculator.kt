@@ -1,4 +1,4 @@
-package com.example.manymanager.domain
+package com.example.simple.manymanager.domain
 
 import java.time.Clock
 import java.time.LocalDate

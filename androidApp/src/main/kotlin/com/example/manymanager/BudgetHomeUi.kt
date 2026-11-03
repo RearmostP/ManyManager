@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
@@ -16,7 +16,7 @@ import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.ViewCompat
 import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.core.view.doOnPreDraw
-import com.example.manymanager.domain.BudgetSnapshot
+import com.example.simple.manymanager.domain.BudgetSnapshot
 
 /** Backward-compatible layout placeholder. */
 class BudgetOverviewLayout @JvmOverloads constructor(
@@ -104,14 +104,14 @@ class BudgetHomeUi(
                     )
 
                     addView(TextView(context, null, 0, R.style.Text).apply {
-                        text = context.getString(R.string.source_remaining, sourceBudget.source.name)
+                        text = sourceBudget.source.name
                         textSize = 14f
                         setTextColor(context.getColor(R.color.text))
                         layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                     })
 
                     addView(TextView(context, null, 0, R.style.Text).apply {
-                        text = money(sourceBudget.remainingMinor)
+                        text = money(sourceBudget.spentMinor)
                         textSize = 14f
                         setTextColor(context.getColor(R.color.muted))
                         textDirection = View.TEXT_DIRECTION_LTR

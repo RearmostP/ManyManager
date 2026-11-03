@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.view.LayoutInflater
 import android.view.View
@@ -8,7 +8,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.doOnPreDraw
-import com.example.manymanager.domain.Expense
+import com.example.simple.manymanager.domain.Expense
 import java.text.NumberFormat
 
 /** Both panels and their inline rows consume the containing Summary financial revision. */

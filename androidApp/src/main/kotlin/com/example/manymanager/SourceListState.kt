@@ -1,7 +1,7 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
-import com.example.manymanager.domain.BudgetSource
-import com.example.manymanager.domain.DataError
+import com.example.simple.manymanager.domain.BudgetSource
+import com.example.simple.manymanager.domain.DataError
 
 sealed interface SourceListState {
     data object Loading : SourceListState

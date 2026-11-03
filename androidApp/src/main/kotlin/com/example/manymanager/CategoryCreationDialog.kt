@@ -1,4 +1,4 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.content.Context
 import android.content.DialogInterface
@@ -6,8 +6,8 @@ import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doAfterTextChanged
-import com.example.manymanager.domain.DataError
-import com.example.manymanager.domain.DataResult
+import com.example.simple.manymanager.domain.DataError
+import com.example.simple.manymanager.domain.DataResult
 
 /** Window lifetime only. The ViewModel owns the form and operation across recreation. */
 class CategoryCreationDialog(

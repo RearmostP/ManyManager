@@ -1,26 +1,30 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.example.manymanager.domain.BudgetPeriod
-import com.example.manymanager.domain.BudgetSnapshot
-import com.example.manymanager.domain.BudgetSource
+import com.example.simple.manymanager.domain.BudgetPeriod
+import com.example.simple.manymanager.domain.BudgetSnapshot
+import com.example.simple.manymanager.domain.BudgetSource
 
-/** Displays the selected period's allocations from persistent storage. */
+/** One selected-period budget, with independent name-only payment methods. */
 class BudgetManagementUi(
     private val root: View,
     private val onPreviousPeriod: () -> Unit,
     private val onNextPeriod: () -> Unit,
     private val onAddSource: (BudgetPeriod) -> Unit,
-    private val onEditSource: (BudgetSource, BudgetPeriod, Long) -> Unit,
+    private val onEditSource: (BudgetSource, BudgetPeriod) -> Unit,
+    private val onEditBudget: (BudgetPeriod, Long) -> Unit,
 ) {
     private val context = root.context
     private val locale get() = context.resources.configuration.locales[0]
     private var currentSnapshot: BudgetSnapshot? = null
 
     init {
+        root.findViewById<View>(R.id.budgetEditTotal).setOnClickListener {
+            currentSnapshot?.let { onEditBudget(it.period, it.totalAllocatedMinor) }
+        }
         root.findViewById<View>(R.id.budgetPreviousMonth).setOnClickListener {
             onPreviousPeriod()
         }
@@ -36,7 +40,7 @@ class BudgetManagementUi(
         context.getString(R.string.ils_amount, BudgetAmounts.number(amount, locale))
 
     fun renderState(state: PersistentDataState, onRetry: () -> Unit) {
-        listOf(R.id.budgetPreviousMonth, R.id.budgetNextMonth, R.id.budgetAddSource).forEach {
+        listOf(R.id.budgetPreviousMonth, R.id.budgetNextMonth, R.id.budgetAddSource, R.id.budgetEditTotal).forEach {
             root.findViewById<View>(it).isEnabled = state is PersistentDataState.Ready
         }
         if (state is PersistentDataState.Ready) {
@@ -78,14 +82,11 @@ class BudgetManagementUi(
         rows.removeAllViews()
         sources.forEach { sourceBudget ->
             val source = sourceBudget.source
-            val allocated = sourceBudget.allocatedMinor
             val row = LayoutInflater.from(context).inflate(R.layout.row_budget_source, rows, false)
             row.findViewById<TextView>(R.id.budgetSourceName).text = source.name
-            row.findViewById<TextView>(R.id.budgetSourceAmount).text = money(allocated)
-            row.contentDescription = context.getString(
-                R.string.budget_amount_for_source, source.name
-            ) + ": " + money(allocated)
-            row.setOnClickListener { onEditSource(source, period, allocated) }
+            row.findViewById<TextView>(R.id.budgetSourceAmount).visibility = View.GONE
+            row.contentDescription = source.name
+            row.setOnClickListener { onEditSource(source, period) }
             rows.addView(row)
         }
     }

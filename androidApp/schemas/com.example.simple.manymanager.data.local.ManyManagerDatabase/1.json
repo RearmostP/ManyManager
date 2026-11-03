@@ -1,0 +1,320 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "bafcc93374123a999f237711f0f81500",
+    "entities": [
+      {
+        "tableName": "calculators",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `periodStartDay` INTEGER NOT NULL, `currencyCode` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "periodStartDay",
+            "columnName": "periodStartDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "currencyCode",
+            "columnName": "currencyCode",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "categories",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`calculatorId` TEXT NOT NULL, `id` TEXT NOT NULL, `name` TEXT NOT NULL, PRIMARY KEY(`calculatorId`, `id`), FOREIGN KEY(`calculatorId`) REFERENCES `calculators`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "calculatorId",
+            "columnName": "calculatorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "calculatorId",
+            "id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "calculators",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "calculatorId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "budget_sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`calculatorId` TEXT NOT NULL, `id` TEXT NOT NULL, `name` TEXT NOT NULL, PRIMARY KEY(`calculatorId`, `id`), FOREIGN KEY(`calculatorId`) REFERENCES `calculators`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "calculatorId",
+            "columnName": "calculatorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "calculatorId",
+            "id"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "calculators",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "calculatorId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "budget_allocations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`calculatorId` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `periodStartEpochDay` INTEGER NOT NULL, `allocatedMinor` INTEGER NOT NULL, PRIMARY KEY(`calculatorId`, `sourceId`, `periodStartEpochDay`), FOREIGN KEY(`calculatorId`, `sourceId`) REFERENCES `budget_sources`(`calculatorId`, `id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "calculatorId",
+            "columnName": "calculatorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "periodStartEpochDay",
+            "columnName": "periodStartEpochDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "allocatedMinor",
+            "columnName": "allocatedMinor",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "calculatorId",
+            "sourceId",
+            "periodStartEpochDay"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_budget_allocations_calculatorId_periodStartEpochDay",
+            "unique": false,
+            "columnNames": [
+              "calculatorId",
+              "periodStartEpochDay"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_budget_allocations_calculatorId_periodStartEpochDay` ON `${TABLE_NAME}` (`calculatorId`, `periodStartEpochDay`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "budget_sources",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "calculatorId",
+              "sourceId"
+            ],
+            "referencedColumns": [
+              "calculatorId",
+              "id"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "expenses",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`calculatorId` TEXT NOT NULL, `id` TEXT NOT NULL, `amountMinor` INTEGER NOT NULL, `dateEpochDay` INTEGER NOT NULL, `categoryId` TEXT, `sourceId` TEXT NOT NULL, `note` TEXT, PRIMARY KEY(`calculatorId`, `id`), FOREIGN KEY(`calculatorId`) REFERENCES `calculators`(`id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`calculatorId`, `categoryId`) REFERENCES `categories`(`calculatorId`, `id`) ON UPDATE NO ACTION ON DELETE RESTRICT , FOREIGN KEY(`calculatorId`, `sourceId`) REFERENCES `budget_sources`(`calculatorId`, `id`) ON UPDATE NO ACTION ON DELETE RESTRICT )",
+        "fields": [
+          {
+            "fieldPath": "calculatorId",
+            "columnName": "calculatorId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "amountMinor",
+            "columnName": "amountMinor",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateEpochDay",
+            "columnName": "dateEpochDay",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "categoryId",
+            "columnName": "categoryId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "calculatorId",
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_expenses_calculatorId_dateEpochDay",
+            "unique": false,
+            "columnNames": [
+              "calculatorId",
+              "dateEpochDay"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_expenses_calculatorId_dateEpochDay` ON `${TABLE_NAME}` (`calculatorId`, `dateEpochDay`)"
+          },
+          {
+            "name": "index_expenses_calculatorId_categoryId",
+            "unique": false,
+            "columnNames": [
+              "calculatorId",
+              "categoryId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_expenses_calculatorId_categoryId` ON `${TABLE_NAME}` (`calculatorId`, `categoryId`)"
+          },
+          {
+            "name": "index_expenses_calculatorId_sourceId",
+            "unique": false,
+            "columnNames": [
+              "calculatorId",
+              "sourceId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_expenses_calculatorId_sourceId` ON `${TABLE_NAME}` (`calculatorId`, `sourceId`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "calculators",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "calculatorId"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          },
+          {
+            "table": "categories",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "calculatorId",
+              "categoryId"
+            ],
+            "referencedColumns": [
+              "calculatorId",
+              "id"
+            ]
+          },
+          {
+            "table": "budget_sources",
+            "onDelete": "RESTRICT",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "calculatorId",
+              "sourceId"
+            ],
+            "referencedColumns": [
+              "calculatorId",
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'bafcc93374123a999f237711f0f81500')"
+    ]
+  }
+}

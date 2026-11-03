@@ -1,4 +1,4 @@
-package com.example.manymanager.data.local
+package com.example.simple.manymanager.data.local
 
 import androidx.room.Dao
 import androidx.room.Insert
@@ -25,20 +25,14 @@ abstract class ManyManagerDao {
     // ABORT is intentional: these are inserts, never silent replacement of existing facts.
     @Insert abstract suspend fun insertCategory(category: CategoryEntity)
     @Insert abstract suspend fun insertSource(source: BudgetSourceEntity)
-    @Insert abstract suspend fun insertAllocation(allocation: BudgetAllocationEntity)
+    @Insert abstract suspend fun insertBudget(budget: PeriodBudgetEntity)
     @Insert abstract suspend fun insertExpense(expense: ExpenseEntity)
 
     @Query("SELECT * FROM expenses WHERE calculatorId = :calculatorId AND id = :id")
     abstract suspend fun expense(calculatorId: String, id: String): ExpenseEntity?
 
-    @Query("""
-        SELECT * FROM budget_allocations
-        WHERE calculatorId = :calculatorId AND sourceId = :sourceId
-            AND periodStartEpochDay = :periodStartEpochDay
-    """)
-    abstract suspend fun allocation(
-        calculatorId: String, sourceId: String, periodStartEpochDay: Long
-    ): BudgetAllocationEntity?
+    @Query("SELECT * FROM period_budgets WHERE calculatorId = :calculatorId AND periodStartEpochDay = :periodStartEpochDay")
+    abstract suspend fun periodBudget(calculatorId: String, periodStartEpochDay: Long): PeriodBudgetEntity?
 
     @Query("SELECT * FROM categories WHERE calculatorId = :calculatorId ORDER BY rowid")
     abstract suspend fun categories(calculatorId: String): List<CategoryEntity>
@@ -49,13 +43,6 @@ abstract class ManyManagerDao {
     @Query("SELECT * FROM budget_sources WHERE calculatorId = :calculatorId AND id = :id")
     abstract suspend fun source(calculatorId: String, id: String): BudgetSourceEntity?
 
-    @Query("""
-        SELECT * FROM budget_allocations
-        WHERE calculatorId = :calculatorId AND periodStartEpochDay = :periodStartEpochDay
-    """)
-    abstract suspend fun allocations(
-        calculatorId: String, periodStartEpochDay: Long
-    ): List<BudgetAllocationEntity>
 
     @Query("""
         SELECT * FROM expenses WHERE calculatorId = :calculatorId
@@ -79,7 +66,7 @@ abstract class ManyManagerDao {
     abstract suspend fun deleteExpense(calculatorId: String, id: String): Int
 
     @Upsert
-    abstract suspend fun putAllocation(allocation: BudgetAllocationEntity)
+    abstract suspend fun putBudget(budget: PeriodBudgetEntity)
 
     companion object {
         /** Internal identity of the initial local calculator; never derived from a translated label. */

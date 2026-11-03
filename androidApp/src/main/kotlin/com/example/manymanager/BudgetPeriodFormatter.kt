@@ -1,7 +1,7 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.content.Context
-import com.example.manymanager.domain.BudgetPeriod
+import com.example.simple.manymanager.domain.BudgetPeriod
 import java.time.format.DateTimeFormatter
 
 /** Formats a BudgetPeriod into a localized date range string. */

@@ -30,7 +30,7 @@
             android:layout_height="15dp" android:src="@drawable/ic_left"
             app:tint="@color/muted" android:importantForAccessibility="no" />
     </LinearLayout>
-    <com.example.manymanager.ChipFlowLayout android:id="@+id/languageDetails"
+    <com.example.simple.manymanager.ChipFlowLayout android:id="@+id/languageDetails"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:paddingStart="40dp" android:paddingBottom="20dp" android:visibility="gone">
         <TextView android:id="@+id/languageHe" style="@style/Text" android:layout_width="wrap_content"
@@ -45,7 +45,7 @@
             android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center"
             android:text="@string/language_ru" android:textSize="13sp" android:padding="11dp"
             android:background="@drawable/chip" android:clickable="true" android:focusable="true" />
-    </com.example.manymanager.ChipFlowLayout>
+    </com.example.simple.manymanager.ChipFlowLayout>
     <LinearLayout android:id="@+id/themeToggle" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:minHeight="78dp" android:orientation="horizontal"
         android:gravity="center_vertical" android:paddingTop="14dp" android:paddingBottom="14dp"
@@ -66,7 +66,7 @@
             android:layout_height="15dp" android:src="@drawable/ic_left"
             app:tint="@color/muted" android:importantForAccessibility="no" />
     </LinearLayout>
-    <com.example.manymanager.ChipFlowLayout android:id="@+id/themeDetails"
+    <com.example.simple.manymanager.ChipFlowLayout android:id="@+id/themeDetails"
         android:layout_width="match_parent" android:layout_height="wrap_content"
         android:paddingStart="40dp" android:paddingBottom="20dp" android:visibility="gone">
         <TextView android:id="@+id/lightTheme" style="@style/Text" android:layout_width="wrap_content"
@@ -77,5 +77,5 @@
             android:layout_height="wrap_content" android:minHeight="48dp" android:gravity="center"
             android:text="@string/theme_dark" android:textSize="13sp" android:padding="11dp"
             android:background="@drawable/chip" android:clickable="true" android:focusable="true" />
-    </com.example.manymanager.ChipFlowLayout>
+    </com.example.simple.manymanager.ChipFlowLayout>
 </LinearLayout>

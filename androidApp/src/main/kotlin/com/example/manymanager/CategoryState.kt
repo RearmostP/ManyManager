@@ -1,9 +1,9 @@
-package com.example.manymanager
+package com.example.simple.manymanager
 
 import android.os.Bundle
-import com.example.manymanager.domain.Category
-import com.example.manymanager.domain.DataError
-import com.example.manymanager.domain.DataResult
+import com.example.simple.manymanager.domain.Category
+import com.example.simple.manymanager.domain.DataError
+import com.example.simple.manymanager.domain.DataResult
 
 sealed interface CategoryListState {
     data object Loading : CategoryListState

@@ -1,7 +1,7 @@
 <!doctype html><meta charset="utf-8"><base href="../"><title>Expense details checks</title>
 <h1>Expense details, full updates, groups and confirmed deletion</h1><pre id="results">Running…</pre>
 <script type="module">
-import {previewModel,addCategory,addSource,createExpense,updateExpense,deleteExpense,snapshotFor,observePreview} from "../js/preview-model.js";
+import {previewModel,addCategory,addSource,createExpense,updateExpense,deleteExpense,snapshotFor,observePreview,setBudget} from "../js/preview-model.js";
 import {state,savedExpenseDraft,closeOverlay} from "../js/state.js";
 import {expenseDetails} from "../js/components/expense-details.js";
 import {loadLanguage} from "../js/i18n.js";
@@ -10,13 +10,14 @@ const results=[],check=(value,label)=>{if(!value)throw Error(label);results.push
 try {
  await loadLanguage("en");state.language="en";
  const start=new Date(2026,10,10),before=new Date(2026,10,9),future=new Date(2026,11,10);
- const a=addSource("Same",start,100),b=addSource("Same",start,0),c=addCategory("Same"),d=addCategory("Same");
+ setBudget(start,100);
+ const a=addSource("Same"),b=addSource("Same"),c=addCategory("Same"),d=addCategory("Same");
  const first=createExpense({amountMinor:29,date:"2026-11-09",sourceId:a.id,categoryId:c.id,note:"Old"});
  const id=first.id;
  check(updateExpense(id,{amountMinor:123,date:"2026-11-10",sourceId:b.id,categoryId:d.id,note:"New"}),"all fields update");
  check(first.id===id&&previewModel.expenses.length===1&&first.note==="New"&&first.sourceId===b.id&&first.categoryId===d.id,"identity/count retained");
  check(snapshotFor(before).spent===0&&snapshotFor(start).spent===123,"both periods update across 9/10");
- check(snapshotFor(start).allocated===100&&snapshotFor(start).remaining===-23&&snapshotFor(start).sources[1].remaining===-123,"zero source negative balance allocations unchanged");
+ check(snapshotFor(start).allocated===100&&snapshotFor(start).remaining===-23,"zero source negative balance allocations unchanged");
  check(snapshotFor(start).categoryBreakdown[0].id===d.id&&snapshotFor(start).sourceBreakdown[0].id===b.id,"groups use stable IDs");
  check(updateExpense(id,{...first,categoryId:null,note:""}),"clear category and note");
  check(first.categoryId===null&&!first.note,"optional values clear");
@@ -53,7 +54,7 @@ try {
  const type=(selector,value)=>{const input=doc.querySelector(selector);if(!input)throw Error("Missing "+selector);input.value=value;input.dispatchEvent(new win.Event("input",{bubbles:true}))};
  const nav=index=>{click("#menu-button");click('[data-action="navigate"][data-index="'+index+'"]')};
  nav(3);
- for(let i=0;i<2;i++){click('[data-action="add-source"]');type("#source-name","Same");type("#source-initial",i?"0":"10");click('[data-action="confirm-add-source"]')}
+ for(let i=0;i<2;i++){click('[data-action="add-source"]');type("#source-name","Same");click('[data-action="confirm-add-source"]')}
  const sourceIds=[...doc.querySelectorAll('[data-action="edit-source"]')].map(item=>item.dataset.id);
  const dates=periodFor(new Date()),date=civilDate(dates.start),newDate=civilDate(dates.endExclusive);
  async function add(amount,sourceId,categoryName){

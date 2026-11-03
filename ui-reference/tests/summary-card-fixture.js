@@ -1,10 +1,11 @@
 // Optional visual-review fixture only. Never imported by the default app.
-import {addSource,addCategory,createExpense} from "../js/preview-model.js";
+import {addSource,setBudget,addCategory,createExpense} from "../js/preview-model.js";
 import {state} from "../js/state.js";
 import {periodFor,civilDate} from "../js/budget-period.js";
 const period=periodFor(new Date()),date=civilDate(period.start);
-const source=addSource("תקציב משפחתי · Family budget · Семейный бюджет",period.start,120000);
-const otherSource=addSource("תקציב משפחתי · Family budget · Семейный бюджет",period.start,0);
+const source=addSource("מזומן · Cash · Наличные");
+setBudget(period.start,120000);
+const otherSource=addSource("מזומן · Cash · Наличные");
 const category=addCategory("קניות לבית · Household shopping · Покупки для дома");
 const otherCategory=addCategory(category.name);
 const note="קנייה שבועית לבית · Weekly household shopping · Покупки для дома. ".repeat(12);

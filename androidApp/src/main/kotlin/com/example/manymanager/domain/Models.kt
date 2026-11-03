@@ -1,4 +1,4 @@
-package com.example.manymanager.domain
+package com.example.simple.manymanager.domain
 
 import java.time.LocalDate
 
@@ -10,8 +10,7 @@ data class Expense(
     val categoryId: String?, val sourceId: String, val note: String?,
 )
 data class SourceBudget(
-    val source: BudgetSource, val allocatedMinor: Long, val spentMinor: Long,
-    val remainingMinor: Long, val expenseCount: Int,
+    val source: BudgetSource, val spentMinor: Long, val expenseCount: Int,
 )
 data class CategorySummary(val categoryId: String?, val spentMinor: Long, val expenseCount: Int)
 data class BudgetSnapshot(
@@ -26,15 +25,10 @@ data class BudgetSnapshot(
     val expenseCount: Int,
     val categoryBreakdown: List<CategorySummary>,
 ) {
-    /** Spending rows only; allocation/remaining rows retain their separate management order. */
+    /** Payment methods with spending in this period. */
     val sourceBreakdown: List<SourceBudget> = sources.filter { it.expenseCount > 0 }
         .sortedWith(compareByDescending<SourceBudget> { it.spentMinor }.thenBy { it.source.id })
 }
-data class BudgetAdjustmentPreview(
-    val sourceId: String, val period: BudgetPeriod, val currentAllocatedMinor: Long,
-    val deltaMinor: Long, val resultingAllocatedMinor: Long,
-)
-
 data class NewExpense(
     val amountMinor: Long, val date: LocalDate, val sourceId: String,
     val categoryId: String? = null, val note: String? = null,

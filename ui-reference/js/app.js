@@ -2,7 +2,7 @@ import {adjacentPeriod,civilDate,periodFor} from "./budget-period.js";
 import {state,changePage,goBack,closeOverlay,cancelExpenseEdit,savedExpenseDraft} from "./state.js";
 import {loadLanguage,t,shortDate} from "./i18n.js";
 import {icon} from "./icons.js";
-import {previewModel,addSource,updateSource,parseAmount,createExpense,updateExpense,deleteExpense,observePreview} from "./preview-model.js";
+import {previewModel,addSource,updateSource,setBudget,totalFor,parseAmount,createExpense,updateExpense,deleteExpense,observePreview} from "./preview-model.js";
 import {home} from "./screens/home.js";
 import {summary} from "./screens/summary.js";
 import {budget} from "./screens/budget.js";
@@ -13,7 +13,7 @@ import {expense,canSaveExpense} from "./components/expense-sheet.js";
 import {expenseDelete} from "./components/expense-delete.js";
 import {expenseDetails,expenseDetailsBody} from "./components/expense-details.js";
 import {categoryDialog,beginCategoryCreation,confirmCategoryCreation} from "./components/category-dialog.js";
-import {sourceDialog,sourcePreview,canConfirmSourceEdit} from "./components/source-dialog.js";
+import {sourceDialog,canConfirmSourceEdit,budgetDialog} from "./components/source-dialog.js";
 
 const app=document.getElementById("app");
 const page=document.getElementById("page");
@@ -45,7 +45,7 @@ function render(){
     }else if(focusId)panel.querySelector("#"+CSS.escape(focusId))?.focus({preventScroll:true});
   }else overlay.innerHTML=({
     menu:drawer,expense,"add-category":categoryDialog,
-    "add-source":sourceDialog,"edit-source":sourceDialog
+    "add-source":sourceDialog,"edit-source":sourceDialog,"edit-budget":budgetDialog
   })[state.overlay]?.()??"";
   app.inert=Boolean(state.overlay);
   scroll.style.overflow=state.overlay?"hidden":"auto";
@@ -90,7 +90,6 @@ document.addEventListener("input",event=>{
     state.sourceDraft[event.target.dataset.sourceDraft]=event.target.value;
     clearError("source-error");
     if(state.overlay==="edit-source"){
-      document.getElementById("source-preview").textContent=sourcePreview();
       document.querySelector('[data-action="confirm-edit-source"]').disabled=!canConfirmSourceEdit();
     }
   }
@@ -113,36 +112,41 @@ document.addEventListener("click",async event=>{
       renderKeepScroll();break;
     case "add-source":
       state.dialogMonth=new Date(state.budgetMonth);
-      state.sourceDraft={name:"",initial:"0",adjustment:"",operation:"add",sourceId:null};
+      state.sourceDraft={name:"",sourceId:null};
       state.overlay="add-source";renderKeepScroll();break;
     case "edit-source":{
       const source=previewModel.sources.find(item=>item.id===button.dataset.id);
       if(!source)break;
       state.dialogMonth=new Date(state.budgetMonth);
-      state.sourceDraft={name:source.name,initial:"0",adjustment:"",operation:"add",sourceId:source.id};
+      state.sourceDraft={name:source.name,sourceId:source.id};
       state.overlay="edit-source";renderKeepScroll();break;
     }
     case "confirm-add-source":{
-      const initial=parseAmount(state.sourceDraft.initial);
       if(!state.sourceDraft.name.trim()){showError("source-error","source_name_required");break}
-      if(initial===null||!addSource(state.sourceDraft.name,state.dialogMonth,initial)){
+      if(!addSource(state.sourceDraft.name)){
         showError("source-error","budget_invalid_amount");break;
       }
       closeOverlay();renderKeepScroll();break;
     }
     case "confirm-edit-source":{
-      const raw=state.sourceDraft.adjustment;
-      const magnitude=raw.trim()===""?0:parseAmount(raw);
+
       if(!state.sourceDraft.name.trim()){showError("source-error","source_name_required");break}
-      if(magnitude===null){showError("source-error","budget_invalid_amount");break}
-      const delta=state.sourceDraft.operation==="add"?magnitude:-magnitude;
-      if(!updateSource(state.sourceDraft.sourceId,state.sourceDraft.name,state.dialogMonth,delta)){
+      if(!updateSource(state.sourceDraft.sourceId,state.sourceDraft.name)){
         showError("source-error","budget_invalid_amount");break;
       }
       closeOverlay();renderKeepScroll();break;
     }
-    case "operation":
-      state.sourceDraft.operation=button.dataset.value;renderKeepScroll();break;
+    case "edit-budget":
+      state.dialogMonth=new Date(state.budgetMonth);
+      state.budgetDraft=String(totalFor(state.dialogMonth)/100);
+      state.overlay="edit-budget";renderKeepScroll();break;
+    case "confirm-budget":{
+      const amount=parseAmount(document.getElementById("period-budget").value);
+      if(amount===null||!setBudget(state.dialogMonth,amount)){
+        showError("source-error","budget_invalid_amount");break;
+      }
+      closeOverlay();renderKeepScroll();break;
+    }
     case "expense-category":
       state.expenseDraft.categoryId=button.dataset.id??null;renderKeepScroll();break;
     case "expense-source":

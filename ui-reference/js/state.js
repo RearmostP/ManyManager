@@ -6,15 +6,12 @@ export const state={
   history:[],expanded:new Set(),budgetExpanded:false,
   currentDate:new Date(),budgetMonth:periodFor(new Date()).start,
   expenseDraft:{amount:"",date:"",note:"",categoryId:null,sourceId:null},
-  expenseEditId:null,expenseOriginal:null,expenseGroup:null,expenseEditing:false,expenseDetailsError:null,
+  expenseEditId:null,expenseOriginal:null,expandedSummaryGroups:new Set(),expenseEditing:false,expenseDetailsError:null,
   categoryDraft:"",categoryReturnOverlay:null,
   sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
   dialogMonth:null
 };
 export function changePage(index,scrollElement){
-  if(state.page===5){
-    state.page=1;state.tab=state.expenseGroup?.tab??0;state.expenseGroup=null;
-  }
   if(index===state.page)return;
   if(index===3)state.budgetMonth=periodFor(state.currentDate).start;
   if(index===0)state.history=[];
@@ -40,10 +37,6 @@ export function closeOverlay(){
 }
 export function goBack(scrollElement){
   if(state.overlay){closeOverlay();return true}
-  if(state.page===5){
-    const group=state.expenseGroup;state.page=1;state.tab=group?.tab??0;state.expenseGroup=null;
-    requestAnimationFrame(()=>scrollElement.scrollTop=group?.scroll??0);return true;
-  }
   if(state.page===0&&state.budgetExpanded){state.budgetExpanded=false;return true}
   if(state.page===0)return false;
   const previous=state.history.pop()||{page:0,tab:0,scroll:0};

@@ -112,8 +112,6 @@
   "expense_missing_record": "This expense no longer exists. Close and review saved data.",
   "expense_edit_loading": "Loading expense…",
   "expense_edit_retry": "Could not load the expense. Tap to retry.",
-  "group_expenses_empty": "No expenses in this group for the selected period.",
-  "open_group_expenses": "Open group expenses",
   "expense_deleted": "Expense deleted",
   "expense_details": "Expense details",
   "edit": "Edit"

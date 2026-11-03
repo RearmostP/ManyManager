@@ -62,8 +62,6 @@
                         android:id="@+id/settingsPage"
                         layout="@layout/page_settings"
                         android:visibility="gone" />
-                    <include android:id="@+id/expenseGroupPage" layout="@layout/page_expense_group"
-                        android:visibility="gone" />
                     <include
                         android:id="@+id/categoriesPage"
                         layout="@layout/page_categories"

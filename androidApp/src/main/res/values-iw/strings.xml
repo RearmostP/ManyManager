@@ -124,9 +124,9 @@
     <string name="expense_missing_record">ההוצאה אינה קיימת עוד. אפשר לסגור ולבדוק את הנתונים השמורים.</string>
     <string name="expense_edit_loading">טוען את ההוצאה…</string>
     <string name="expense_edit_retry">טעינת ההוצאה נכשלה. לחצו לניסיון חוזר.</string>
-    <string name="group_expenses_empty">אין הוצאות בקבוצה זו בתקופה שנבחרה.</string>
-    <string name="open_group_expenses">פתיחת הוצאות הקבוצה</string>
     <string name="expense_deleted">ההוצאה נמחקה</string>
     <string name="expense_details">פרטי הוצאה</string>
     <string name="edit">עריכה</string>
+    <string name="group_expanded">הקבוצה מורחבת</string>
+    <string name="group_collapsed">הקבוצה מכווצת</string>
 </resources>

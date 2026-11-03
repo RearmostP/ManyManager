@@ -33,6 +33,12 @@ class AllExpensesUi(private val root: View, private val onCorrect: (Expense) -> 
         status.setOnClickListener { if (state is PersistentDataState.Failed) onRetry() }
         status.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         if (snapshot == null) return
+        renderRows(rows, snapshot, expenses)
+    }
+
+    /** Shared non-scrolling rows for All Expenses and inline Summary groups. */
+    fun renderRows(rows: LinearLayout, snapshot: com.example.manymanager.domain.BudgetSnapshot, expenses: List<Expense>) {
+        rows.removeAllViews()
         val categories = snapshot.categories.associateBy { it.id }
         val sources = snapshot.sources.associateBy { it.source.id }
         val locale = context.resources.configuration.locales[0]

@@ -112,8 +112,6 @@
   "expense_missing_record": "ההוצאה אינה קיימת עוד. אפשר לסגור ולבדוק את הנתונים השמורים.",
   "expense_edit_loading": "טוען את ההוצאה…",
   "expense_edit_retry": "טעינת ההוצאה נכשלה. לחצו לניסיון חוזר.",
-  "group_expenses_empty": "אין הוצאות בקבוצה זו בתקופה שנבחרה.",
-  "open_group_expenses": "פתיחת הוצאות הקבוצה",
   "expense_deleted": "ההוצאה נמחקה",
   "expense_details": "פרטי הוצאה",
   "edit": "עריכה"

@@ -12,7 +12,6 @@ import {drawer} from "./components/drawer.js";
 import {expense,canSaveExpense} from "./components/expense-sheet.js";
 import {expenseDelete} from "./components/expense-delete.js";
 import {expenseDetails,expenseDetailsBody} from "./components/expense-details.js";
-import {expenseGroup} from "./screens/expense-group.js";
 import {categoryDialog,beginCategoryCreation,confirmCategoryCreation} from "./components/category-dialog.js";
 import {sourceDialog,sourcePreview,canConfirmSourceEdit} from "./components/source-dialog.js";
 
@@ -31,7 +30,7 @@ function render(){
   document.title=translate("app_name");
   menuButton.setAttribute("aria-label",translate("menu_button_label"));
   menuButton.innerHTML=icon("menu");
-  page.innerHTML=[home,summary,settings,budget,categories,expenseGroup][state.page]();
+  page.innerHTML=[home,summary,settings,budget,categories][state.page]();
   if(["expense-details","delete-expense"].includes(state.overlay)){
     if(!overlay.querySelector("#expense-details"))overlay.innerHTML=expenseDetails();
     const panel=overlay.querySelector("#expense-details");
@@ -98,7 +97,7 @@ document.addEventListener("input",event=>{
 });
 document.addEventListener("click",async event=>{
   const button=event.target.closest("[data-action]");
-  if(!button)return;
+  if(!button||(app.inert&&app.contains(button)))return;
   if(button.classList.contains("scrim")&&event.target.closest("[data-stop-close]"))return;
   switch(button.dataset.action){
     case "close-overlay":
@@ -201,11 +200,10 @@ document.addEventListener("click",async event=>{
       break;
     }
     case "expense-group":{
-      const category=button.dataset.kind==="category",id=button.dataset.id||null;
-      const name=category?(previewModel.categories.find(item=>item.id===id)?.name??translate("uncategorized")):
-        previewModel.sources.find(item=>item.id===id)?.name??"";
-      state.expenseGroup={category,id,name,periodStart:civilDate(periodFor(state.currentDate).start),tab:state.tab,scroll:scroll.scrollTop};
-      state.page=5;render();scroll.scrollTop=0;break;
+      const key=button.dataset.kind+":"+(button.dataset.id||"");
+      if(state.expandedSummaryGroups.has(key))state.expandedSummaryGroups.delete(key);
+      else state.expandedSummaryGroups.add(key);
+      renderKeepScroll();break;
     }
     case "budget-toggle":
       state.budgetExpanded=!state.budgetExpanded;renderKeepScroll();break;

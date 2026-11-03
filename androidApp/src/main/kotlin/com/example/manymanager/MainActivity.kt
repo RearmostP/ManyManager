@@ -24,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.doOnAttach
+import androidx.core.view.doOnPreDraw
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -49,7 +50,8 @@ class MainActivity : AppCompatActivity() {
             (application as ManyManagerApplication).repository
         ))[PersistentDataViewModel::class.java]
     }
-    private var groupExpensesUi: AllExpensesUi? = null
+    private val expandedSummaryGroups = mutableSetOf<String>()
+    private var summaryDialogScroll: Int? = null
     private var allExpensesUi: AllExpensesUi? = null
     private var summaryBreakdownUi: SummaryBreakdownUi? = null
     private var categoryDialog: CategoryCreationDialog? = null
@@ -94,7 +96,6 @@ class MainActivity : AppCompatActivity() {
                 launch { persistentViewModel.sourceCreationState.collect(::renderSourceCreation) }
                 launch { persistentViewModel.sourceEditingState.collect(::renderSourceEditing) }
                 launch { persistentViewModel.expenseCreationState.collect(::renderExpenseCreation) }
-                launch { persistentViewModel.groupBudget.collect(::renderExpenseGroup) }
             }
         }
     }
@@ -263,13 +264,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
         allExpensesUi = AllExpensesUi(findViewById(R.id.allPanel), ::showExpenseEditor, persistentViewModel::refresh)
-        summaryBreakdownUi = SummaryBreakdownUi(findViewById(R.id.summaryPage), persistentViewModel::refresh, ::openExpenseGroup)
-        groupExpensesUi = AllExpensesUi(findViewById(R.id.expenseGroupPage), ::showExpenseEditor,
-            persistentViewModel::retryExpenseGroup, R.id.expenseGroupRows, R.id.expenseGroupEmpty, R.string.group_expenses_empty)
-        findViewById<View>(R.id.expenseGroupBack).setOnClickListener { navigateBack() }
-        savedInstanceState?.getBundle("expenseGroup")?.let {
-            persistentViewModel.openExpenseGroup(ExpenseGroupSelection.fromBundle(it))
+        savedInstanceState?.getStringArrayList("expandedSummaryGroups")?.let {
+            expandedSummaryGroups.clear(); expandedSummaryGroups.addAll(it)
         }
+        summaryDialogScroll = savedInstanceState?.takeIf { it.containsKey("summaryDialogScroll") }?.getInt("summaryDialogScroll")
+        summaryBreakdownUi = SummaryBreakdownUi(findViewById(R.id.summaryPage), persistentViewModel::refresh,
+            ::showExpenseEditor, expandedSummaryGroups)
         selectPage(page)
         selectTab(tab)
         savedInstanceState?.getBundle("expenseCreation")?.let {
@@ -299,7 +299,6 @@ class MainActivity : AppCompatActivity() {
         renderSources(persistentViewModel.sources.value)
         renderCategoryState(persistentViewModel.categories.value)
         renderExpenseCreation(persistentViewModel.expenseCreationState.value)
-        renderExpenseGroup(persistentViewModel.groupBudget.value)
         renderCategoryCreation(persistentViewModel.categoryCreation.value)
         renderSourceCreation(persistentViewModel.sourceCreationState.value)
         renderSourceEditing(persistentViewModel.sourceEditingState.value)
@@ -327,29 +326,7 @@ class MainActivity : AppCompatActivity() {
         renderActiveBudget(persistentViewModel.activeBudget.value)
     }
 
-    private fun openExpenseGroup(category: Boolean, id: String?, name: String, period: BudgetPeriod) {
-        persistentViewModel.openExpenseGroup(ExpenseGroupSelection(category, id, name, period, tab,
-            findViewById<ScrollView>(R.id.pageScroll).scrollY))
-        selectPage(5)
-        renderExpenseGroup(PersistentDataState.Loading)
-    }
-
-    private fun renderExpenseGroup(state: PersistentDataState) {
-        if (!contentReady) return
-        val group = persistentViewModel.expenseGroup.value ?: return
-        findViewById<TextView>(R.id.expenseGroupTitle).text = group.name
-        findViewById<TextView>(R.id.expenseGroupPeriod).text = BudgetPeriodFormatter.description(this, group.period)
-        groupExpensesUi?.render(state, group::includes)
-    }
-
     private fun navigateBack() {
-        if (page == 5) {
-            val group = persistentViewModel.expenseGroup.value
-            persistentViewModel.closeExpenseGroup()
-            selectPage(1, scrollY = group?.originScroll ?: 0)
-            selectTab(group?.originTab ?: tab)
-            return
-        }
         if (page == 0 && budgetState.breakdownExpanded) {
             homeBudgetUi?.setExpanded(false)
             return
@@ -360,7 +337,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun navigateToPage(index: Int) {
-        if (page == 5) navigateBack()
         if (index == page) return
         if (index == 3) persistentViewModel.selectPeriod(null)
         if (index == 0) {
@@ -384,7 +360,7 @@ class MainActivity : AppCompatActivity() {
                 pageBackCallback.isEnabled = index != 0 || budgetState.breakdownExpanded
                 categoryManagementUi?.render(persistentViewModel.categories.value)
                 listOf(R.id.homePage, R.id.summaryPage, R.id.settingsPage,
-                    R.id.budgetPage, R.id.categoriesPage, R.id.expenseGroupPage).forEachIndexed { i, id ->
+                    R.id.budgetPage, R.id.categoriesPage).forEachIndexed { i, id ->
                     findViewById<View>(id).visibility = if (i == index) View.VISIBLE else View.GONE
                 }
             },
@@ -462,8 +438,11 @@ class MainActivity : AppCompatActivity() {
     private fun renderActiveBudget(state: PersistentDataState) {
         if (!contentReady) return
         homeBudgetUi?.renderState(state, budgetState.breakdownExpanded, persistentViewModel::refresh)
+        val scroll = findViewById<ScrollView>(R.id.pageScroll)
+        val top = if (page == 1) summaryDialogScroll ?: scroll.scrollY else scroll.scrollY
         allExpensesUi?.render(state)
         summaryBreakdownUi?.render(state)
+        if (page == 1) scroll.doOnPreDraw { scroll.scrollTo(0, top) }
         val snapshot = (state as? PersistentDataState.Ready)?.snapshot
         val total = snapshot?.let { BudgetAmounts.number(it.totalSpentMinor, resources.configuration.locales[0]) } ?: "—"
         findViewById<TextView>(R.id.homeTotal).text = total
@@ -691,6 +670,10 @@ class MainActivity : AppCompatActivity() {
         expenseDetailsDialog?.dispose()
         if (activeDialog === expenseDetailsDialog?.dialog) activeDialog = null
         expenseDetailsDialog = null
+        summaryDialogScroll?.let { top ->
+            findViewById<ScrollView>(R.id.pageScroll).let { scroll -> scroll.doOnPreDraw { scroll.scrollTo(0, top) } }
+        }
+        summaryDialogScroll = null
         if (state == null || state.saved) {
             expenseDialog?.setOnDismissListener(null)
             expenseDialog?.dismissImmediately()
@@ -724,6 +707,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showExpenseEditor(expense: com.example.manymanager.domain.Expense) {
         dismissActiveDialogImmediately()
+        summaryDialogScroll = findViewById<ScrollView>(R.id.pageScroll).scrollY
         persistentViewModel.openExpenseDetails(expense.id)
         renderExpenseCreation(persistentViewModel.expenseCreationState.value)
     }
@@ -735,9 +719,8 @@ class MainActivity : AppCompatActivity() {
         persistentViewModel.expenseCreationState.value?.let {
             outState.putBundle("expenseCreation", it.toBundle())
         }
-        persistentViewModel.expenseGroup.value?.let {
-            outState.putBundle("expenseGroup", it.toBundle())
-        }
+        outState.putStringArrayList("expandedSummaryGroups", ArrayList(expandedSummaryGroups))
+        summaryDialogScroll?.let { outState.putInt("summaryDialogScroll", it) }
         persistentViewModel.categoryCreation.value?.let {
             outState.putBundle("categoryCreation", it.toBundle())
         }

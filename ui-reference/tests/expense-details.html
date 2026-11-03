@@ -67,7 +67,11 @@ try {
  check(doc.querySelectorAll('[data-action="expense-group"]').length===3,"duplicate category names and null remain distinct");
  const firstCard=[...doc.querySelectorAll('[data-action="expense-group"][data-kind="category"][data-id]:not([data-id=""])')].at(-1);
  const categoryId=firstCard.dataset.id;firstCard.click();
- check(doc.querySelectorAll('[data-expense-group-rows] [data-action="view-expense"]').length===1,"one-expense group still opens list");
+ check(doc.querySelectorAll('[data-inline-group] [data-action="view-expense"]').length===1,"one-expense group expands inline");
+ check(doc.querySelector('.tab.selected').dataset.index==="0"&&doc.querySelector('[data-action="expense-group"][data-id="'+categoryId+'"]').getAttribute("aria-expanded")==="true","Summary remains underlying screen");
+ click('[data-action="expense-group"][data-id="'+categoryId+'"]');
+ check(!doc.querySelector('[data-inline-group]:not([hidden])'),"card toggles collapse");
+ click('[data-action="expense-group"][data-id="'+categoryId+'"]');
  const rowId=doc.querySelector('[data-action="view-expense"]').dataset.id;click('[data-action="view-expense"]');
  const panel=doc.querySelector("#expense-details");
  check(panel&&!panel.querySelector("input,textarea,select"),"filtered row opens read-only details");
@@ -91,19 +95,18 @@ try {
  type("#details-amount","1.23");type("#details-note","Saved");type("#details-sourceId",sourceIds[1]);type("#details-categoryId","");type("#details-date",newDate);
  click('[data-action="save-expense-details"]');
  check(panel===doc.querySelector("#expense-details")&&!panel.querySelector("input")&&panel.textContent.includes("Saved")&&panel.textContent.includes("1.23"),"Save returns updated read-only details same node");
- check(doc.querySelectorAll('[data-expense-group-rows] [data-action="view-expense"]').length===0,"moved final row leaves captured group");
+ check(doc.querySelectorAll('[data-inline-group] [data-action="view-expense"]').length===0,"moved final row removes empty inline group");
  check(panel.querySelector('[data-value="sourceId"]').textContent==="Same","saved details by ID survive group membership change");
  click('#expense-details [data-action="close-overlay"]');
- check(!doc.querySelector("#expense-details")&&doc.querySelector("[data-expense-group-rows]"),"read-only Back returns originating group");
- click('[data-action="back"]');
+ check(!doc.querySelector("#expense-details")&&doc.querySelector(".summary"),"read-only Back reveals Summary");
  check(doc.querySelector('.tab.selected').dataset.index==="0"&&!doc.querySelector('[data-breakdown-id="'+categoryId+'"]'),"Back restores originating tab with removed card");
  click('[data-action="tab"][data-index="1"]');
  click('[data-action="expense-group"][data-id="'+sourceIds[0]+'"]');
  check(doc.querySelectorAll('[data-action="view-expense"]').length===1,"source group filters by stable ID after move");
  click('[data-action="view-expense"]');check(!doc.querySelector("#expense-details input"),"source entry opens read-only");
  click('[data-action="begin-expense-edit"]');click('[data-action="delete-expense"]');click('[data-action="confirm-delete-expense"]');
- check(!doc.querySelector("#expense-details")&&doc.querySelectorAll('[data-action="view-expense"]').length===0,"confirmed deletion closes to useful empty filtered list");
- click('[data-action="back"]');check(doc.querySelector('.tab.selected').dataset.index==="1","source Back restores source tab");
+ check(!doc.querySelector("#expense-details")&&doc.querySelectorAll('[data-action="view-expense"]').length===0,"confirmed deletion closes and removes final inline group");
+ check(doc.querySelector('.tab.selected').dataset.index==="1","deletion preserves source tab");
  click('[data-action="tab"][data-index="2"]');click('[data-action="view-expense"]');
  check(!doc.querySelector("#expense-details input"),"All Expenses entry opens read-only");
  click('#expense-details [data-action="close-overlay"]');
@@ -123,6 +126,21 @@ try {
      click('[data-action="cancel-expense-edit"]');click('#expense-details [data-action="close-overlay"]');
    }
  }
+ for(let index=0;index<35;index++)await add("0.01",sourceIds[0],null);
+ nav(1);click('[data-action="tab"][data-index="0"]');
+ const nullCard='[data-action="expense-group"][data-kind="category"][data-id=""]';
+ if(doc.querySelector(nullCard).getAttribute("aria-expanded")!=="true")click(nullCard);
+ check(doc.querySelectorAll('[data-inline-group="category:"] [data-action="view-expense"]').length===35,"long Uncategorized list expands within Summary");
+ const list=doc.querySelector('[data-inline-group="category:"]'),scroller=doc.querySelector("#page-scroll");
+ check(win.getComputedStyle(list).overflowY==="visible"&&list.scrollHeight<=list.clientHeight,"inline list has no separate scrolling viewport");
+ scroller.scrollTop=400;const top=scroller.scrollTop;
+ click('[data-inline-group="category:"] [data-action="view-expense"]');
+ check(doc.querySelector("#app").inert&&scroller.scrollTop===top,"details dim and block Summary without scrolling");
+ click('[data-action="tab"][data-index="1"]');
+ check(doc.querySelector('.tab.selected').dataset.index==="0","dimmed tab cannot be activated");
+ click('#expense-details [data-action="close-overlay"]');
+ check(scroller.scrollTop===top&&doc.querySelector(nullCard).getAttribute("aria-expanded")==="true","close restores scroll and expanded group");
+ click(nullCard);check(doc.querySelector(nullCard).getAttribute("aria-expanded")==="false","long group collapses");
  frame.remove();
  document.getElementById("results").textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
 }catch(error){document.getElementById("results").textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}

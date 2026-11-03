@@ -853,15 +853,23 @@ class BudgetLifecycleTest {
                         for (line in 0 until text.lineCount) assertTrue(text.layout.getLineWidth(line) <= text.width - text.compoundPaddingLeft - text.compoundPaddingRight + 1)
                     }
                     assertEquals(if (language == "he") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR, row.layoutDirection)
+                    row.performClick()
+                    val list = content.findViewById<android.widget.LinearLayout>(container).getChildAt(1) as android.widget.LinearLayout
+                    assertEquals(1, list.childCount)
+                    assertEquals(row.context.getString(R.string.group_expanded), androidx.core.view.ViewCompat.getStateDescription(row))
                 }
                 dialog.dismiss()
             }
         }
     }
 
+    private fun inlineRows(activity: MainActivity, category: Boolean, id: String?): android.widget.LinearLayout? =
+        activity.findViewById<View>(if (category) R.id.categorySummaryRows else R.id.sourceSummaryRows)
+            .findViewWithTag((if (category) "category:" else "source:") + id.orEmpty())
+
     /** Protected system broadcasts cannot be sent by an app. Invoke the registered receiver's
      * callback with a simulated event; never change the user's device clock/zone. */
-    @Test fun groupDetailsMoveOutOfFilterButStayOpenAndBackRestoresSummary(): Unit = runBlocking {
+    @Test fun inlineGroupDetailsStayAboveSummaryAfterMoveAndRecreation(): Unit = runBlocking {
         val period = success(app.repository.currentPeriod())
         val source = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
         val otherSource = success(app.repository.createSourceWithInitialAllocation("Same", period, 0))
@@ -883,20 +891,22 @@ class BudgetLifecycleTest {
             val rows = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
             (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == category.id }.performClick()
         }
-        awaitUi(screen) { it.findViewById<View>(R.id.expenseGroupPage).isShown &&
-            it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 1 }
-        assertEquals(category.id, controller.expenseGroup.value!!.id)
-        assertEquals(originScroll, controller.expenseGroup.value!!.originScroll)
-        screen.onActivity { it.findViewById<View>(R.id.expenseGroupBack).performClick() }
-        awaitUi(screen) { it.findViewById<View>(R.id.summaryPage).isShown &&
-            it.findViewById<android.widget.ScrollView>(R.id.pageScroll).scrollY == originScroll }
+        awaitUi(screen) { inlineRows(it, true, category.id)?.childCount == 1 }
         screen.onActivity {
-            val rows = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
-            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == category.id }.performClick()
+            assertTrue(it.findViewById<View>(R.id.summaryPage).isShown)
+            val card = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
+                .findViewWithTag<View>(category.id)
+            assertEquals(it.getString(R.string.group_expanded), androidx.core.view.ViewCompat.getStateDescription(card))
+            card.performClick()
+            assertNull(inlineRows(it, true, category.id))
+            card.performClick()
         }
-        awaitUi(screen) { it.findViewById<View>(R.id.expenseGroupPage).isShown &&
-            it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 1 }
-        screen.onActivity { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).getChildAt(0).performClick() }
+        awaitUi(screen) { inlineRows(it, true, category.id)?.childCount == 1 }
+        screen.onActivity {
+            val scroll = it.findViewById<android.widget.ScrollView>(R.id.pageScroll)
+            scroll.scrollTo(0, 70); originScroll = scroll.scrollY
+            inlineRows(it, true, category.id)!!.getChildAt(0).performClick()
+        }
         awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.original?.id == first.id }
         val window = rootWith(R.id.expenseDetailsTitle)
         screen.onActivity {
@@ -938,13 +948,18 @@ class BudgetLifecycleTest {
         screen.recreate()
         awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.editing == true }
         assertEquals(draft, controller.expenseCreationState.value!!.draft)
-        screen.onActivity { rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.saveExpenseDetails).performClick() }
+        screen.onActivity {
+            assertTrue(it.findViewById<View>(R.id.categoryTab).isSelected)
+            assertEquals(1, inlineRows(it, true, category.id)!!.childCount)
+            assertEquals(originScroll, it.findViewById<android.widget.ScrollView>(R.id.pageScroll).scrollY)
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.saveExpenseDetails).performClick()
+        }
         awaitUi(screen) { controller.expenseCreationState.value?.editing == false &&
             controller.expenseCreationState.value?.original?.date == period.endExclusive }
         assertNotNull(rootWith(R.id.expenseDetailsTitle))
         assertEquals(first.copy(amountMinor = 123, date = period.endExclusive, sourceId = otherSource.id,
             categoryId = null, note = "Edited"), success(app.repository.expense(first.id)))
-        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 0 }
+        awaitUi(screen) { inlineRows(it, true, category.id) == null }
         screen.onActivity {
             assertEquals(View.GONE, rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.expenseDetailsAmount).visibility)
             assertTrue(rootWith(R.id.expenseDetailsTitle)!!.findViewById<TextView>(R.id.expenseDetailsNoteValue).text.contains("Edited"))
@@ -952,13 +967,10 @@ class BudgetLifecycleTest {
         app.clock.now = period.endExclusive.atTime(12, 0).atZone(app.clock.zone).toInstant()
         screen.onActivity { controller.refresh() }
         awaitUi(screen) { (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.period?.start == period.endExclusive }
-        assertEquals(period, controller.expenseGroup.value!!.period)
+        awaitUi(screen) { inlineRows(it, true, null)?.childCount == 1 ||
+            it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows).childCount == 1 }
         screen.onActivity { detailsBack(it) }
         awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) == null }
-        screen.onActivity {
-            assertEquals(it.getString(R.string.group_expenses_empty), it.findViewById<TextView>(R.id.expenseGroupEmpty).text)
-            it.findViewById<View>(R.id.expenseGroupBack).performClick()
-        }
         awaitUi(screen) { it.findViewById<View>(R.id.summaryPage).isShown }
         screen.onActivity {
             assertTrue(it.findViewById<View>(R.id.categoryTab).isSelected)
@@ -988,9 +1000,9 @@ class BudgetLifecycleTest {
             val rows = it.findViewById<android.widget.LinearLayout>(R.id.sourceSummaryRows)
             (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == source.id }.performClick()
         }
-        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 2 }
+        awaitUi(screen) { inlineRows(it, false, source.id)?.childCount == 2 }
         screen.onActivity {
-            val rows = it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows)
+            val rows = inlineRows(it, false, source.id)!!
             (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == first.id }.performClick()
         }
         awaitUi(screen) { controller.expenseCreationState.value?.original?.id == first.id }
@@ -1024,19 +1036,17 @@ class BudgetLifecycleTest {
             }
         } finally { release.complete(Unit); held.join() }
         awaitUi(screen) { controller.expenseCreationState.value == null &&
-            it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 1 }
+            inlineRows(it, false, source.id)?.childCount == 1 }
         assertNull(rootWith(R.id.expenseDetailsTitle))
         assertEquals(setOf(second.id, other.id), success(app.repository.snapshot()).expenses.map { it.id }.toSet())
         screen.onActivity {
-            it.findViewById<View>(R.id.expenseGroupBack).performClick()
             assertTrue(it.findViewById<View>(R.id.sourceTab).isSelected)
             it.findViewById<View>(R.id.categoryTab).performClick()
             val rows = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
             (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == null }.performClick()
         }
-        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 1 }
-        assertNull(controller.expenseGroup.value!!.id)
-        screen.onActivity { it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).getChildAt(0).performClick() }
+        awaitUi(screen) { inlineRows(it, true, null)?.childCount == 1 }
+        screen.onActivity { inlineRows(it, true, null)!!.getChildAt(0).performClick() }
         awaitUi(screen) { controller.expenseCreationState.value?.original?.id == other.id }
         assertFalse(controller.expenseCreationState.value!!.editing)
         success(app.repository.deleteExpense(other.id))
@@ -1046,9 +1056,84 @@ class BudgetLifecycleTest {
             detailsBack(it)
         }
         awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) == null &&
-            it.findViewById<android.widget.LinearLayout>(R.id.expenseGroupRows).childCount == 0 }
+            inlineRows(it, true, null) == null }
         assertEquals(listOf(second), success(app.repository.snapshot()).expenses)
         assertEquals(100L, success(app.repository.snapshot()).totalAllocatedMinor)
+    }
+
+    @Test fun longInlineListKeepsSummaryScrollAndExpansionUnderDetails(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 0))
+        val category = success(app.repository.createCategory("Same"))
+        val otherCategory = success(app.repository.createCategory("Same"))
+        repeat(45) { success(app.repository.createExpense(NewExpense(10, period.start, source.id, category.id, "Row $it"))) }
+        val single = success(app.repository.createExpense(NewExpense(20, period.start, source.id, otherCategory.id)))
+        val screen = launch()
+        val controller = model(screen)
+        screen.onActivity { it.findViewById<View>(R.id.menuButton).performClick() }
+        awaitUi(screen) { rootWith(R.id.nav1) != null }
+        screen.onActivity { rootWith(R.id.nav1)!!.findViewById<View>(R.id.nav1).performClick() }
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows).childCount == 2 }
+        screen.onActivity { it.findViewById<View>(R.id.categorySummaryRows).findViewWithTag<View>(category.id).performClick() }
+        awaitUi(screen) { inlineRows(it, true, category.id)?.childCount == 45 }
+        var top = 0
+        screen.onActivity {
+            val list = inlineRows(it, true, category.id)!!
+            var ancestor: View? = list
+            var scrollCount = 0
+            while (ancestor != null) {
+                if (ancestor is android.widget.ScrollView) scrollCount++
+                ancestor = ancestor.parent as? View
+            }
+            assertEquals(1, scrollCount)
+            val scroll = it.findViewById<android.widget.ScrollView>(R.id.pageScroll)
+            scroll.scrollTo(0, 600); top = scroll.scrollY
+            assertTrue(top > 0)
+            list.getChildAt(12).performClick()
+        }
+        awaitUi(screen) { controller.expenseCreationState.value?.original != null }
+        screen.onActivity {
+            assertTrue(it.findViewById<View>(R.id.summaryPage).isShown)
+            assertEquals(top, it.findViewById<android.widget.ScrollView>(R.id.pageScroll).scrollY)
+            assertTrue((rootWith(R.id.expenseDetailsTitle)!!.layoutParams as android.view.WindowManager.LayoutParams).flags and
+                android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND != 0)
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.editExpenseDetails).performClick()
+            controller.updateExpenseDraft(controller.expenseCreationState.value!!.draft.copy(note = "Discard"))
+            detailsBack(it)
+        }
+        awaitUi(screen) { controller.expenseCreationState.value?.editing == false }
+        screen.recreate()
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && inlineRows(it, true, category.id)?.childCount == 45 }
+        screen.onActivity {
+            assertTrue(it.findViewById<View>(R.id.categoryTab).isSelected)
+            assertEquals(top, it.findViewById<android.widget.ScrollView>(R.id.pageScroll).scrollY)
+            detailsBack(it)
+        }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) == null }
+        screen.onActivity {
+            assertEquals(top, it.findViewById<android.widget.ScrollView>(R.id.pageScroll).scrollY)
+            it.findViewById<View>(R.id.categorySummaryRows).findViewWithTag<View>(otherCategory.id).performClick()
+        }
+        awaitUi(screen) { inlineRows(it, true, otherCategory.id)?.childCount == 1 }
+        screen.onActivity { inlineRows(it, true, otherCategory.id)!!.getChildAt(0).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.original?.id == single.id }
+        screen.onActivity { controller.editExpense(); controller.requestExpenseDeletion(); controller.confirmExpenseDeletion() }
+        awaitUi(screen) { controller.expenseCreationState.value == null && inlineRows(it, true, otherCategory.id) == null }
+        screen.onActivity {
+            assertTrue(it.findViewById<View>(R.id.categoryTab).isSelected)
+            assertEquals(45, inlineRows(it, true, category.id)!!.childCount)
+            it.findViewById<View>(R.id.sourceTab).performClick()
+            it.findViewById<View>(R.id.sourceSummaryRows).findViewWithTag<View>(source.id).performClick()
+        }
+        awaitUi(screen) { inlineRows(it, false, source.id)?.childCount == 45 }
+        val moved = success(app.repository.snapshot()).expenses.first()
+        success(app.repository.updateExpense(moved.id, NewExpense(moved.amountMinor, moved.date, moved.sourceId, otherCategory.id, moved.note)))
+        awaitUi(screen) { inlineRows(it, true, category.id)?.childCount == 44 && inlineRows(it, true, otherCategory.id)?.childCount == 1 }
+        screen.onActivity {
+            it.findViewById<View>(R.id.categoryTab).performClick()
+            assertEquals(44, inlineRows(it, true, category.id)!!.childCount)
+            assertEquals(1, inlineRows(it, true, otherCategory.id)!!.childCount)
+        }
     }
 
     @Test fun detailsActionsFollowLocaleAndFitNarrowLightAndDarkWindows(): Unit = runBlocking {

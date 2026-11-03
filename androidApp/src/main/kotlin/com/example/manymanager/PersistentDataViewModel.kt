@@ -360,24 +360,7 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
 
     private val expenseCreation = MutableStateFlow<ExpenseCreationState?>(null)
     val expenseCreationState: StateFlow<ExpenseCreationState?> = expenseCreation
-    private val groupSelection = MutableStateFlow<ExpenseGroupSelection?>(null)
-    val expenseGroup: StateFlow<ExpenseGroupSelection?> = groupSelection
-    private val groupRefresh = MutableStateFlow(0L)
-    val groupBudget: StateFlow<PersistentDataState> = groupRefresh.flatMapLatest {
-        groupSelection.flatMapLatest { group ->
-            if (group == null) kotlinx.coroutines.flow.flowOf(PersistentDataState.Loading)
-            else repository.observeSnapshot(group.period).map { result ->
-                when (result) {
-                    is DataResult.Success -> PersistentDataState.Ready(result.value)
-                    is DataResult.Failure -> PersistentDataState.Failed(result.error)
-                }
-            }.onStart { emit(PersistentDataState.Loading) }
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PersistentDataState.Loading)
 
-    fun openExpenseGroup(group: ExpenseGroupSelection) { groupSelection.value = group }
-    fun closeExpenseGroup() { groupSelection.value = null }
-    fun retryExpenseGroup() { groupRefresh.update { it + 1 } }
     private var expenseLoad: Job? = null
 
     fun openExpenseDetails(id: String) {
@@ -554,7 +537,6 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         selection.update { it.copy(refresh = it.refresh + 1) }
         activeRefresh.update { it + 1 }
         retrySources()
-        retryExpenseGroup()
     }
 }
 

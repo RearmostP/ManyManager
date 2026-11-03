@@ -69,24 +69,6 @@ data class ExpenseCreationState(
     }
 }
 
-data class ExpenseGroupSelection(
-    val category: Boolean, val id: String?, val name: String, val period: BudgetPeriod,
-    val originTab: Int, val originScroll: Int,
-) {
-    fun includes(expense: Expense) = if (category) expense.categoryId == id else expense.sourceId == id
-    fun toBundle() = Bundle().apply {
-        putBoolean("category", category); putString("id", id); putString("name", name)
-        putLong("start", period.startEpochDay); putLong("end", period.endExclusiveEpochDay)
-        putInt("tab", originTab); putInt("scroll", originScroll)
-    }
-    companion object {
-        fun fromBundle(bundle: Bundle) = ExpenseGroupSelection(bundle.getBoolean("category"),
-            bundle.getString("id"), bundle.getString("name").orEmpty(),
-            BudgetPeriod(LocalDate.ofEpochDay(bundle.getLong("start")), LocalDate.ofEpochDay(bundle.getLong("end"))),
-            bundle.getInt("tab"), bundle.getInt("scroll"))
-    }
-}
-
 fun expenseErrorMessage(error: DataError): Int = when (error) {
     DataError.InvalidAmount, DataError.NonPositiveAmount -> R.string.expense_positive_amount
     DataError.AmountOverflow -> R.string.expense_amount_overflow

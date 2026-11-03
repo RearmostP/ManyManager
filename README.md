@@ -8,7 +8,9 @@ Android uses Room schema 1 in app-private `databases/many-manager.db`. Business 
 
 The stage-10 instrumentation rerun passed all 61 tests on SM-S928B / Android 17 (37 repository/controller, 12 database, 12 Activity/dialog), including the strengthened schema-1 preservation test. Both APKs remained installed. Earlier connection/install failures remain documented. Release preparation added and passed the continuous file-reopen-to-fresh-UI acceptance scenario; the full device suite at that stage passed 62 tests. Other verification limits remain explicit. See the [acceptance report](docs/persistent-data-acceptance.md) and [ten-stage plan/results](docs/persistent-data-plan.md).
 
-See [the private signed release guide](docs/release.md) for building and installing version 0.1.0, local signing and key backup.
+The repository has two permanent development branches: `main` and `original`.
+
+See the [release guide](docs/release.md) for release naming, independent publication, signed builds and key backup.
 
 ## Build and checks
 

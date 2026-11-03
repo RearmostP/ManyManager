@@ -1,7 +1,7 @@
 import {state} from "./state.js";
 import {t} from "./i18n.js";
 import {icon} from "./icons.js";
-import {periodFor,lastDate} from "./budget-period.js";
+import {periodFor,lastDate} from "./dates.js";
 
 export const tr=(key,...args)=>t(state.language,key,...args);
 export const money=(cents=0)=>tr("ils_amount",new Intl.NumberFormat(

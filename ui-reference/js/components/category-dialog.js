@@ -1,5 +1,5 @@
 import {state} from "../state.js";
-import {addCategory} from "../preview-model.js";
+import {demo} from "../demo.js";
 import {tr,escapeValue} from "../render-helpers.js";
 
 export function beginCategoryCreation(){
@@ -9,8 +9,9 @@ export function beginCategoryCreation(){
 }
 export function confirmCategoryCreation(){
   const name=state.categoryDraft.trim();
-  const created=addCategory(name);
-  if(!created)return false;
+  if(!name)return false;
+  const created={id:`c${state.nextId++}`,name};
+  demo.categories.push(created);
   if(["expense","expense-details"].includes(state.categoryReturnOverlay))state.expenseDraft.categoryId=created.id;
   state.overlay=state.categoryReturnOverlay;
   state.categoryReturnOverlay=null;

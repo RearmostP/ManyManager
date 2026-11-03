@@ -1,8 +1,8 @@
-import {adjacentPeriod,civilDate,periodFor} from "./budget-period.js";
+import {adjacentPeriod,civilDate,periodKey} from "./dates.js";
 import {state,changePage,goBack,closeOverlay,cancelExpenseEdit,savedExpenseDraft} from "./state.js";
-import {loadLanguage,t,shortDate} from "./i18n.js";
+import {loadLanguage,t} from "./i18n.js";
 import {icon} from "./icons.js";
-import {previewModel,addSource,updateSource,parseAmount,createExpense,updateExpense,deleteExpense,observePreview} from "./preview-model.js";
+import {demo,parseAmount} from "./demo.js";
 import {home} from "./screens/home.js";
 import {summary} from "./screens/summary.js";
 import {budget} from "./screens/budget.js";
@@ -13,261 +13,166 @@ import {expense,canSaveExpense} from "./components/expense-sheet.js";
 import {expenseDelete} from "./components/expense-delete.js";
 import {expenseDetails,expenseDetailsBody} from "./components/expense-details.js";
 import {categoryDialog,beginCategoryCreation,confirmCategoryCreation} from "./components/category-dialog.js";
-import {sourceDialog,sourcePreview,canConfirmSourceEdit} from "./components/source-dialog.js";
+import {sourceDialog,sourcePreview} from "./components/source-dialog.js";
 
 const app=document.getElementById("app");
 const page=document.getElementById("page");
 const scroll=document.getElementById("page-scroll");
 const overlay=document.getElementById("overlay-root");
 const menuButton=document.getElementById("menu-button");
-const translate=key=>t(state.language,key);
 
 function render(){
-  state.currentDate=new Date();
+  const top=scroll.scrollTop;
   document.documentElement.lang=state.language;
   document.documentElement.dir=state.language==="he"?"rtl":"ltr";
   document.documentElement.dataset.theme=state.theme;
-  document.title=translate("app_name");
-  menuButton.setAttribute("aria-label",translate("menu_button_label"));
+  document.title=t(state.language,"app_name");
+  menuButton.setAttribute("aria-label",t(state.language,"menu_button_label"));
   menuButton.innerHTML=icon("menu");
   page.innerHTML=[home,summary,settings,budget,categories][state.page]();
   if(["expense-details","delete-expense"].includes(state.overlay)){
+    // Keep the details panel in place when switching between read/edit/confirmation.
     if(!overlay.querySelector("#expense-details"))overlay.innerHTML=expenseDetails();
     const panel=overlay.querySelector("#expense-details");
-    const focused=document.activeElement,focusId=panel.contains(focused)?focused.id:null;
     panel.innerHTML=expenseDetailsBody();
     panel.inert=state.overlay==="delete-expense";
-    if(panel.inert)panel.setAttribute("aria-hidden","true");else panel.removeAttribute("aria-hidden");
     overlay.querySelector("[data-expense-delete-confirmation]")?.remove();
     if(panel.inert){
-      const confirmation=document.createElement("div");confirmation.dataset.expenseDeleteConfirmation="";
-      confirmation.innerHTML=expenseDelete();overlay.append(confirmation);
-    }else if(focusId)panel.querySelector("#"+CSS.escape(focusId))?.focus({preventScroll:true});
+      const confirmation=document.createElement("div");
+      confirmation.dataset.expenseDeleteConfirmation="";
+      confirmation.innerHTML=expenseDelete();
+      overlay.append(confirmation);
+    }
   }else overlay.innerHTML=({
     menu:drawer,expense,"add-category":categoryDialog,
     "add-source":sourceDialog,"edit-source":sourceDialog
   })[state.overlay]?.()??"";
   app.inert=Boolean(state.overlay);
   scroll.style.overflow=state.overlay?"hidden":"auto";
-}
-function renderKeepScroll(){
-  const top=scroll.scrollTop;
-  render();
   scroll.scrollTop=top;
 }
-function showError(id,key){
-  const element=document.getElementById(id);
-  element.textContent=translate(key);
-  element.hidden=false;
-}
-function clearError(id){
-  const element=document.getElementById(id);
-  if(element)element.hidden=true;
-}
-await loadLanguage(state.language);
-render();
-observePreview(()=>renderKeepScroll());
 
+// These handlers only change disposable examples. There are no async writes or observers.
 document.addEventListener("input",event=>{
-  if(event.target.dataset.details && state.expenseEditing){
-    const key=event.target.dataset.details;
-    state.expenseDraft[key]=["categoryId","sourceId"].includes(key)?(event.target.value||null):event.target.value;
-    state.expenseDetailsError=null;
-    const save=document.querySelector('[data-action="save-expense-details"]');
+  const field=event.target;
+  const expenseKey=field.dataset.details||field.dataset.expense;
+  if(expenseKey){
+    state.expenseDraft[expenseKey]=["categoryId","sourceId"].includes(expenseKey)?(field.value||null):field.value;
+    const save=overlay.querySelector('[data-action="save-expense"],[data-action="save-expense-details"]');
     if(save)save.disabled=!canSaveExpense();
-    clearError("expense-details-error");
   }
-  if(event.target.dataset.expense){
-    state.expenseDraft[event.target.dataset.expense]=event.target.value;
-    document.querySelector('[data-action="save-expense"]').disabled=!canSaveExpense();
-    clearError("expense-error");
-  }
-  if(event.target.hasAttribute("data-category-draft")){
-    state.categoryDraft=event.target.value;
-    clearError("category-error");
-  }
-  if(event.target.dataset.sourceDraft){
-    state.sourceDraft[event.target.dataset.sourceDraft]=event.target.value;
-    clearError("source-error");
-    if(state.overlay==="edit-source"){
-      document.getElementById("source-preview").textContent=sourcePreview();
-      document.querySelector('[data-action="confirm-edit-source"]').disabled=!canConfirmSourceEdit();
-    }
+  if(field.hasAttribute("data-category-draft"))state.categoryDraft=field.value;
+  if(field.dataset.sourceDraft){
+    state.sourceDraft[field.dataset.sourceDraft]=field.value;
+    const preview=document.getElementById("source-preview");
+    if(preview)preview.textContent=sourcePreview();
   }
 });
+
 document.addEventListener("click",async event=>{
   const button=event.target.closest("[data-action]");
   if(!button||(app.inert&&app.contains(button)))return;
   if(button.classList.contains("scrim")&&event.target.closest("[data-stop-close]"))return;
+  const saved=()=>demo.expenses.find(item=>item.id===state.expenseEditId);
   switch(button.dataset.action){
-    case "close-overlay":
-      closeOverlay();renderKeepScroll();break;
-    case "navigate":
-      changePage(Number(button.dataset.index),scroll);state.overlay=null;render();break;
-    case "back":
-      if(goBack(scroll))renderKeepScroll();break;
-    case "add-category":
-      beginCategoryCreation();renderKeepScroll();break;
-    case "confirm-category":
-      if(!confirmCategoryCreation()){showError("category-error","category_name_required");break}
-      renderKeepScroll();break;
+    case "close-overlay": closeOverlay(); break;
+    case "navigate": changePage(Number(button.dataset.index),scroll);state.overlay=null;break;
+    case "back": goBack(scroll);break;
+    case "add-category": beginCategoryCreation();break;
+    case "confirm-category": confirmCategoryCreation();break;
     case "add-source":
-      state.dialogMonth=new Date(state.budgetMonth);
-      state.sourceDraft={name:"",initial:"0",adjustment:"",operation:"add",sourceId:null};
-      state.overlay="add-source";renderKeepScroll();break;
     case "edit-source":{
-      const source=previewModel.sources.find(item=>item.id===button.dataset.id);
-      if(!source)break;
+      const source=demo.sources.find(item=>item.id===button.dataset.id);
       state.dialogMonth=new Date(state.budgetMonth);
-      state.sourceDraft={name:source.name,initial:"0",adjustment:"",operation:"add",sourceId:source.id};
-      state.overlay="edit-source";renderKeepScroll();break;
+      state.sourceDraft={name:source?.name??"",initial:"0",adjustment:"",operation:"add",sourceId:source?.id};
+      state.overlay=button.dataset.action;break;
     }
     case "confirm-add-source":{
-      const initial=parseAmount(state.sourceDraft.initial);
-      if(!state.sourceDraft.name.trim()){showError("source-error","source_name_required");break}
-      if(initial===null||!addSource(state.sourceDraft.name,state.dialogMonth,initial)){
-        showError("source-error","budget_invalid_amount");break;
-      }
-      closeOverlay();renderKeepScroll();break;
+      const id="s"+state.nextId++;
+      demo.sources.push({id,name:state.sourceDraft.name||"Example source"});
+      demo.allocations[id]={[periodKey(state.dialogMonth)]:parseAmount(state.sourceDraft.initial)};
+      state.overlay=null;break;
     }
     case "confirm-edit-source":{
-      const raw=state.sourceDraft.adjustment;
-      const magnitude=raw.trim()===""?0:parseAmount(raw);
-      if(!state.sourceDraft.name.trim()){showError("source-error","source_name_required");break}
-      if(magnitude===null){showError("source-error","budget_invalid_amount");break}
-      const delta=state.sourceDraft.operation==="add"?magnitude:-magnitude;
-      if(!updateSource(state.sourceDraft.sourceId,state.sourceDraft.name,state.dialogMonth,delta)){
-        showError("source-error","budget_invalid_amount");break;
-      }
-      closeOverlay();renderKeepScroll();break;
+      const draft=state.sourceDraft;
+      const source=demo.sources.find(item=>item.id===draft.sourceId);
+      source.name=draft.name||source.name;
+      const key=periodKey(state.dialogMonth),amount=parseAmount(draft.adjustment);
+      demo.allocations[source.id][key]=(demo.allocations[source.id][key]??0)+(draft.operation==="add"?amount:-amount);
+      state.overlay=null;break;
     }
-    case "operation":
-      state.sourceDraft.operation=button.dataset.value;renderKeepScroll();break;
-    case "expense-category":
-      state.expenseDraft.categoryId=button.dataset.id??null;renderKeepScroll();break;
-    case "expense-source":
-      state.expenseDraft.sourceId=button.dataset.id;renderKeepScroll();break;
+    case "operation": state.sourceDraft.operation=button.dataset.value;break;
+    case "expense-category": state.expenseDraft.categoryId=button.dataset.id??null;break;
+    case "expense-source": state.expenseDraft.sourceId=button.dataset.id;break;
     case "expense":
-      state.expenseEditId=null;state.expenseOriginal=null;state.expenseEditing=false;state.expenseDetailsError=null;
-      state.overlay="expense";
+      state.expenseEditId=null;state.expenseEditing=false;
       state.expenseDraft={amount:"",date:civilDate(state.currentDate),note:"",categoryId:null,sourceId:null};
-      renderKeepScroll();break;
-    case "save-expense":{
-      if(!canSaveExpense())break;
-      const input={...state.expenseDraft,amountMinor:parseAmount(state.expenseDraft.amount)};
-      const saved=createExpense(input);
-      if(!saved){
-        showError("expense-error",state.expenseEditId&&!previewModel.expenses.some(item=>item.id===state.expenseEditId)?"expense_missing_record":"expense_save_error");break;
-      }
-      closeOverlay();renderKeepScroll();break;
-    }
-    case "view-expense":{
-      const item=previewModel.expenses.find(value=>value.id===button.dataset.id);
-      state.expenseEditId=button.dataset.id;state.expenseOriginal=item?{...item}:null;
-      state.expenseEditing=false;state.expenseDetailsError=null;
-      state.expenseDraft=savedExpenseDraft(item);
-      state.overlay="expense-details";renderKeepScroll();break;
-    }
-    case "begin-expense-edit":{
-      const saved=previewModel.expenses.find(item=>item.id===state.expenseEditId);
-      if(!saved){renderKeepScroll();break}
-      state.expenseDraft=savedExpenseDraft(saved);state.expenseEditing=true;state.expenseDetailsError=null;
-      renderKeepScroll();break;
-    }
-    case "cancel-expense-edit":
-      cancelExpenseEdit();renderKeepScroll();break;
-    case "save-expense-details":{
-      if(state.overlay!=="expense-details"||!state.expenseEditing||!canSaveExpense())break;
-      if(!updateExpense(state.expenseEditId,{...state.expenseDraft,amountMinor:parseAmount(state.expenseDraft.amount)})){
-        state.expenseDetailsError=previewModel.expenses.some(item=>item.id===state.expenseEditId)?"expense_save_error":"expense_missing_record";
-        renderKeepScroll();break;
-      }
-      cancelExpenseEdit();renderKeepScroll();break;
-    }
-    case "delete-expense":{
-      const saved=previewModel.expenses.find(item=>item.id===state.expenseEditId);
-      if(state.overlay!=="expense-details"||!state.expenseEditing)break;
-      if(!saved){state.expenseDetailsError="expense_missing_record";renderKeepScroll();break}
-      state.expenseOriginal={...saved};
-      state.overlay="delete-expense";renderKeepScroll();break;
-    }
-    case "confirm-delete-expense":{
-      if(state.overlay!=="delete-expense"||!state.expenseEditing)break;
-      const deleted=deleteExpense(state.expenseEditId);
-      state.overlay=deleted?null:"expense-details";
-      if(!deleted)state.expenseDetailsError=previewModel.expenses.some(item=>item.id===state.expenseEditId)?"expense_save_error":"expense_missing_record";
-      renderKeepScroll();
-      break;
-    }
+      state.overlay="expense";break;
+    case "save-expense":
+      if(!canSaveExpense())return;
+      demo.expenses.push({...state.expenseDraft,id:"e"+state.nextId++,amountMinor:parseAmount(state.expenseDraft.amount)});
+      state.overlay=null;break;
+    case "view-expense":
+      state.expenseEditId=button.dataset.id;
+      state.expenseEditing=false;state.expenseDraft=savedExpenseDraft(saved());
+      state.overlay="expense-details";break;
+    case "begin-expense-edit":
+      state.expenseDraft=savedExpenseDraft(saved());state.expenseEditing=true;break;
+    case "cancel-expense-edit": cancelExpenseEdit();break;
+    case "save-expense-details":
+      if(!canSaveExpense())return;
+      Object.assign(saved(),state.expenseDraft,{amountMinor:parseAmount(state.expenseDraft.amount)});
+      cancelExpenseEdit();break;
+    case "delete-expense": state.overlay="delete-expense";break;
+    case "confirm-delete-expense":
+      demo.expenses=demo.expenses.filter(item=>item.id!==state.expenseEditId);
+      state.overlay=null;break;
     case "expense-group":{
       const key=button.dataset.kind+":"+(button.dataset.id||"");
-      if(state.expandedSummaryGroups.has(key))state.expandedSummaryGroups.delete(key);
-      else state.expandedSummaryGroups.add(key);
-      renderKeepScroll();
-      document.querySelector('[data-action="expense-group"][data-kind="'+button.dataset.kind+'"][data-id="'+(button.dataset.id||"")+'"]')?.focus({preventScroll:true});
-      break;
+      state.expandedSummaryGroups.has(key)?state.expandedSummaryGroups.delete(key):state.expandedSummaryGroups.add(key);
+      render();
+      overlay.querySelector("button")?.focus({preventScroll:true});
+      page.querySelector(`[data-action="expense-group"][data-kind="${button.dataset.kind}"][data-id="${button.dataset.id}"]`)?.focus({preventScroll:true});
+      return;
     }
-    case "budget-toggle":
-      state.budgetExpanded=!state.budgetExpanded;renderKeepScroll();break;
-    case "tab":
-      state.tab=Number(button.dataset.index);renderKeepScroll();break;
+    case "budget-toggle": state.budgetExpanded=!state.budgetExpanded;break;
+    case "tab": state.tab=Number(button.dataset.index);break;
     case "budget-prev":
-    case "budget-next":
-      state.budgetMonth=adjacentPeriod(state.budgetMonth,button.dataset.action==="budget-prev"?-1:1);
-      renderKeepScroll();break;
+    case "budget-next": state.budgetMonth=adjacentPeriod(state.budgetMonth,button.dataset.action==="budget-prev"?-1:1);break;
     case "toggle-setting":{
       const key=button.dataset.key;
-      state.expanded.has(key)?state.expanded.delete(key):state.expanded.add(key);
-      renderKeepScroll();break;
+      state.expanded.has(key)?state.expanded.delete(key):state.expanded.add(key);break;
     }
     case "language":
-      if(state.language!==button.dataset.value){
-        await loadLanguage(button.dataset.value);
-        state.language=button.dataset.value;state.page=2;state.expanded.add("language");
-        renderKeepScroll();
-      }
-      break;
-    case "theme":
-      state.theme=button.dataset.value;renderKeepScroll();break;
+      await loadLanguage(button.dataset.value);state.language=button.dataset.value;break;
+    case "theme": state.theme=button.dataset.value;break;
+    default:return;
   }
+  render();
 });
-function refreshToday(){
-  if(new Date().toDateString()!==state.currentDate.toDateString())renderKeepScroll();
-}
-window.addEventListener("focus",refreshToday);
-document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshToday()});
-setInterval(()=>{if(!document.hidden)refreshToday()},60000);
-menuButton.addEventListener("click",()=>{state.overlay="menu";renderKeepScroll()});
+menuButton.addEventListener("click",()=>{state.overlay="menu";render()});
 document.addEventListener("keydown",event=>{
-  if(event.key==="Escape"||(event.key==="Backspace"&&event.target.tagName!=="INPUT"&&event.target.tagName!=="TEXTAREA"&&event.target.tagName!=="SELECT")){
-    if(goBack(scroll)){event.preventDefault();renderKeepScroll()}
-  }
+  if(event.key==="Escape"&&goBack(scroll)){event.preventDefault();render()}
 });
 
-let drag=null;
+// A small visual gesture demo for the existing Add Expense sheet.
+let drag;
 overlay.addEventListener("pointerdown",event=>{
   const handle=event.target.closest(".drag-area");
-  if(!handle||state.overlay!=="expense"||drag)return;
-  const sheet=handle.closest(".sheet");
-  drag={pointerId:event.pointerId,startY:event.clientY,distance:0,handle,sheet};
+  if(!handle)return;
+  drag={handle,sheet:handle.closest(".sheet"),start:event.clientY};
   handle.setPointerCapture(event.pointerId);
 });
 overlay.addEventListener("pointermove",event=>{
-  if(!drag||event.pointerId!==drag.pointerId)return;
-  drag.distance=Math.max(0,event.clientY-drag.startY);
-  drag.sheet.style.transform=`translateY(${drag.distance}px)`;
+  if(drag)drag.sheet.style.transform=`translateY(${Math.max(0,event.clientY-drag.start)}px)`;
 });
-function finishDrag(event,cancelled){
-  if(!drag||event.pointerId!==drag.pointerId)return;
-  const {handle,sheet,distance,pointerId}=drag;
+function endDrag(event){
+  if(!drag)return;
+  if(event.type!=="pointercancel"&&event.clientY-drag.start>=64){state.overlay=null;render()}
+  else drag.sheet.style.transform="";
   drag=null;
-  if(handle.hasPointerCapture(pointerId))handle.releasePointerCapture(pointerId);
-  if(!cancelled&&distance>=64){
-    state.overlay=null;renderKeepScroll();
-  }else{
-    sheet.style.transition="transform 180ms ease";
-    sheet.style.transform="translateY(0)";
-  }
 }
-overlay.addEventListener("pointerup",event=>finishDrag(event,false));
-overlay.addEventListener("pointercancel",event=>finishDrag(event,true));
+overlay.addEventListener("pointerup",endDrag);
+overlay.addEventListener("pointercancel",endDrag);
+await loadLanguage(state.language);
+render();

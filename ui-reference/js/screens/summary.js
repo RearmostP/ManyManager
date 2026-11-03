@@ -1,6 +1,6 @@
 import {state} from "../state.js";
-import {previewModel,snapshotFor} from "../preview-model.js";
-import {parseCivilDate} from "../budget-period.js";
+import {demo,summaryData} from "../demo.js";
+import {parseCivilDate} from "../dates.js";
 import {shortDate,number} from "../i18n.js";
 import {tr,monthControls,money,escapeValue} from "../render-helpers.js";
 
@@ -11,8 +11,8 @@ const panels=[
 ];
 export function expenseRows(expenses,groupKind=null){
  return expenses.map(item=>{
-   const category=previewModel.categories.find(value=>value.id===item.categoryId)?.name??tr("uncategorized");
-   const source=previewModel.sources.find(value=>value.id===item.sourceId)?.name??"";
+   const category=demo.categories.find(value=>value.id===item.categoryId)?.name??tr("uncategorized");
+   const source=demo.sources.find(value=>value.id===item.sourceId)?.name??"";
    const date=shortDate(state.language,parseCivilDate(item.date));
    const secondary=[date,...(groupKind==="category"?[source]:groupKind==="source"?[category]:[category,source])].filter(Boolean);
    const label=[money(item.amountMinor),...secondary,item.note].filter(Boolean).join(" · ");
@@ -24,7 +24,7 @@ export function expenseRows(expenses,groupKind=null){
 }
 export function summary(){
  const keys=panels[state.tab];
- const snapshot=snapshotFor(state.currentDate);
+ const snapshot=summaryData(state.currentDate);
  const rows=state.tab===2?expenseRows(snapshot.expenses):"";
  const groups=state.tab===0?snapshot.categoryBreakdown:snapshot.sourceBreakdown;
  const breakdown=groups.map(item=>{

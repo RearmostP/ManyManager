@@ -1,12 +1,13 @@
-import {periodFor} from "./budget-period.js";
-import {previewModel} from "./preview-model.js";
+import {periodFor,parseCivilDate} from "./dates.js";
+import {demo} from "./demo.js";
 
 export const state={
   page:0,tab:0,language:"he",theme:"light",overlay:null,
   history:[],expanded:new Set(),budgetExpanded:false,
-  currentDate:new Date(),budgetMonth:periodFor(new Date()).start,
+  currentDate:parseCivilDate(demo.today),budgetMonth:periodFor(parseCivilDate(demo.today)).start,
+  nextId:8,
   expenseDraft:{amount:"",date:"",note:"",categoryId:null,sourceId:null},
-  expenseEditId:null,expenseOriginal:null,expandedSummaryGroups:new Set(),expenseEditing:false,expenseDetailsError:null,
+  expenseEditId:null,expandedSummaryGroups:new Set(),expenseEditing:false,
   categoryDraft:"",categoryReturnOverlay:null,
   sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
   dialogMonth:null
@@ -24,8 +25,8 @@ export function savedExpenseDraft(item){
     {amount:"",date:"",categoryId:null,sourceId:null,note:""};
 }
 export function cancelExpenseEdit(){
-  state.expenseEditing=false;state.expenseDetailsError=null;
-  state.expenseDraft=savedExpenseDraft(previewModel.expenses.find(item=>item.id===state.expenseEditId));
+  state.expenseEditing=false;
+  state.expenseDraft=savedExpenseDraft(demo.expenses.find(item=>item.id===state.expenseEditId));
 }
 export function closeOverlay(){
   if(state.overlay==="add-category"){

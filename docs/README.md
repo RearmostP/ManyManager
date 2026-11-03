@@ -39,7 +39,7 @@ Each group expands expense rows inside one unified rounded card in the same tab,
 
 Hebrew (default), Russian and English support RTL/LTR and light/dark themes. Appearance stays in SharedPreferences; locales use AppCompat/platform storage, outside Room.
 
-[ui-reference](../ui-reference/README.md) is a lightweight design reference. Keep its appearance and essential interactions aligned with Android so future design experiments start from an accurate visual baseline. It is not a second production application: preview data is isolated JS memory and resets on reload. Simplifying duplicated logic, implementation and testing burden is a separate task. Preserve visual synchronization and existing tests meanwhile.
+[ui-reference](../ui-reference/README.md) is a lightweight visual playground for trying designs before Android implementation. Run `python preview.py`; a fixed fictional fixture (3 categories, 7 expenses, 2 sources) resets on reload. Keep Android and HTML visually aligned, including essential interaction states, while keeping HTML lightweight. Do not reproduce production business logic, persistence or lifecycle guarantees. Verify the affected screen/interaction when changing the preview; comprehensive browser business-logic regression suites are not required for every Android change.
 
 ## Limits and maintenance
 

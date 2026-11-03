@@ -1,11 +1,11 @@
 import {state} from "../state.js";
-import {snapshotFor} from "../preview-model.js";
+import {summaryData} from "../demo.js";
 import {number} from "../i18n.js";
 import {icon} from "../icons.js";
 import {tr,money,periodLabel,periodDescription,escapeValue} from "../render-helpers.js";
 
 export function home(){
-  const snapshot=snapshotFor(state.currentDate);
+  const snapshot=summaryData(state.currentDate);
   const total=snapshot.allocated,remaining=snapshot.remaining;
   const rows=snapshot.sources.map(item=>`<div class="budget-line budget-source"><span>${escapeValue(tr("source_remaining",item.source.name))}</span><span dir="ltr">${money(item.remaining)}</span></div>`).join("");
   return `<section class="home fade-in"><h1 class="home-title">${tr("home_title")}</h1>

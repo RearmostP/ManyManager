@@ -1,6 +1,8 @@
 # ManyManager release guide
 
-Run commands from the repository root, using a clean, reviewed commit and a compatible JDK. The current checked-in ManyManager configuration is `com.example.manymanager`, versionName `0.2.0`, versionCode `2`. Recheck [androidApp/build.gradle.kts](../../androidApp/build.gradle.kts) before each release; this is not a claim that an APK was published.
+This guide targets `main`: use `manymanager-v<VERSION>` and `ManyManager-<VERSION>.apk` for this branch.
+
+Run commands from the repository root, using a clean, reviewed commit and a compatible JDK. The current checked-in ManyManager configuration is `com.example.manymanager`, versionName `0.2.0`, versionCode `2`. Recheck [androidApp/build.gradle.kts](../androidApp/build.gradle.kts) before each release; this is not a claim that an APK was published.
 
 ## Independent releases
 
@@ -21,7 +23,7 @@ Use the existing release key:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/release.ps1
 ```
 
-[release.ps1](../../scripts/release.ps1) defaults to Android Studio JBR at `C:\Program Files\Android\Android Studio\jbr`; use `-JavaHome` for another supported JDK. It runs `:androidApp:assembleRelease --no-configuration-cache --console=plain`. Avoid debug logging/build scans containing credentials. Missing signing configuration fails explicitly rather than producing an unsigned/debug-signed substitute.
+[release.ps1](../scripts/release.ps1) defaults to Android Studio JBR at `C:\Program Files\Android\Android Studio\jbr`; use `-JavaHome` for another supported JDK. It runs `:androidApp:assembleRelease --no-configuration-cache --console=plain`. Avoid debug logging/build scans containing credentials. Missing signing configuration fails explicitly rather than producing an unsigned/debug-signed substitute.
 
 With JAVA_HOME set to a supported JDK, verify the output (adjust the installed build-tools path if necessary):
 
@@ -56,5 +58,3 @@ For deliberate local password-manager backup, the script's `-CopyPassword` optio
 - [Current application and maintenance guidance](README.md), including schema preservation, backup eligibility and isolated instrumentation precautions.
 - [Historical release preparation](archive/release-preparation.md): original 0.1.0 artifact/certificate records and 0.2.0 preparation; historical “not published” statements apply to their original dates.
 - [Persistence acceptance](archive/persistent-data-acceptance.md) and [expense/details delivery](archive/expense-details.md): historical verification and remaining gaps.
-
-Some unchanged build diagnostics still mention the former `docs/release.md` path; this guide is its replacement.

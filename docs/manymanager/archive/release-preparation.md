@@ -1,3 +1,5 @@
+> Historical record: this document preserves decisions and verification at the time of delivery, including superseded scope. For current confirmed behavior and requirements, read the [ManyManager README](../README.md).
+
 # הפצות ManyManager
 
 ## ענפים קבועים ופרסום עצמאי

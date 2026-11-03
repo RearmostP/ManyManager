@@ -1,3 +1,5 @@
+> Historical record: this document preserves decisions and verification at the time of delivery, including superseded scope. For current confirmed behavior and requirements, read the [ManyManager README](../README.md).
+
 # פרטי הוצאה, עריכה מלאה ומחיקה מאושרת
 
 הרחבה מאושרת לאחר המסירה המקורית של 0.1.0 ועשרת שלבי ההתמדה. אינה כלולה ב־APK הפרטי שכבר נחתם. לא שונו גרסה, סכמה, חתימה או גיבוי ולא נבנה release חדש.

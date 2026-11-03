@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:fillViewport="false" android:scrollbars="none">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp">
+        <TextView android:id="@+id/periodBudgetTitle" style="@style/Text"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textSize="23sp" android:textStyle="bold" android:accessibilityHeading="true" />
+        <TextView style="@style/Text"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" android:text="@string/monthly_budget"
+            android:textSize="14sp" android:labelFor="@id/periodBudgetAmount" />
+        <EditText android:id="@id/periodBudgetAmount" style="@style/Text"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:background="@drawable/chip" android:minHeight="48dp"
+            android:padding="14dp" android:inputType="numberDecimal"
+            android:importantForAutofill="no" android:singleLine="true" android:textDirection="ltr" android:textSize="14sp" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="24dp" android:orientation="horizontal"
+            android:gravity="end|center_vertical">
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/periodBudgetCancel"
+                style="@style/Text" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:minWidth="0dp" android:minHeight="48dp"
+                android:paddingStart="16dp" android:paddingEnd="16dp"
+                android:paddingTop="12dp" android:paddingBottom="12dp"
+                android:background="?attr/selectableItemBackground"
+                android:text="@string/cancel" android:textSize="14sp"
+                android:textAllCaps="false" android:gravity="center" />
+            <androidx.appcompat.widget.AppCompatButton android:id="@+id/periodBudgetSave"
+                style="@style/Text" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:layout_marginStart="8dp"
+                android:minWidth="0dp" android:minHeight="48dp"
+                android:paddingStart="16dp" android:paddingEnd="16dp"
+                android:paddingTop="12dp" android:paddingBottom="12dp"
+                android:background="@drawable/budget_dialog_primary"
+                android:stateListAnimator="@null" android:elevation="0dp"
+                android:backgroundTint="@null" android:text="@string/update_budget"
+                android:textColor="@color/white" android:textSize="14sp" android:textStyle="bold"
+                android:textAllCaps="false" android:gravity="center" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

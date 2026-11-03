@@ -1051,6 +1051,83 @@ class BudgetLifecycleTest {
         return createPaymentMethod(name)
     }
 
+    @Test fun styledBudgetDialogKeepsDraftAndFitsLocalesAndThemes(): Unit = runBlocking {
+        val screen = launch()
+        openBudget(screen)
+        val controller = model(screen)
+        fun dialog(activity: MainActivity): androidx.appcompat.app.AlertDialog {
+            val field = MainActivity::class.java.getDeclaredField("periodBudgetDialog").apply { isAccessible = true }
+            return field.get(activity) as androidx.appcompat.app.AlertDialog
+        }
+        for (language in listOf("he", "en", "ru")) for (dark in listOf(false, true)) {
+            app.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE)
+                .edit().putBoolean("dark", dark).commit()
+            screen.onActivity {
+                androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(
+                    androidx.core.os.LocaleListCompat.forLanguageTags(language))
+            }
+            screen.recreate()
+            awaitUi(screen) {
+                it.resources.configuration.locales[0].language == language &&
+                    (it.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) ==
+                    if (dark) Configuration.UI_MODE_NIGHT_YES else Configuration.UI_MODE_NIGHT_NO
+            }
+            awaitUi(screen) { it.findViewById<View>(R.id.budgetEditTotal).isEnabled }
+            screen.onActivity { it.findViewById<View>(R.id.budgetEditTotal).performClick() }
+            awaitUi(screen) { rootWith(R.id.periodBudgetSave) != null }
+            screen.onActivity { activity ->
+                dialog(activity).window!!.setLayout(
+                    (288 * activity.resources.displayMetrics.density).toInt(),
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+                dialog(activity).findViewById<EditText>(R.id.periodBudgetAmount)!!.setText("20000")
+            }
+            awaitUi(screen) { rootWith(R.id.periodBudgetSave)?.findViewById<View>(R.id.periodBudgetSave)?.width != 0 }
+            screen.onActivity { activity ->
+                val window = dialog(activity)
+                val input = window.findViewById<EditText>(R.id.periodBudgetAmount)!!
+                assertNotNull(input.background)
+                assertEquals(View.TEXT_DIRECTION_LTR, input.textDirection)
+                assertTrue(window.findViewById<TextView>(R.id.periodBudgetTitle)!!.text.isNotBlank())
+                val save = window.findViewById<TextView>(R.id.periodBudgetSave)!!
+                val cancel = window.findViewById<TextView>(R.id.periodBudgetCancel)!!
+                assertEquals(activity.getString(R.string.update_budget), save.text.toString())
+                val savePosition = IntArray(2); val cancelPosition = IntArray(2)
+                save.getLocationOnScreen(savePosition); cancel.getLocationOnScreen(cancelPosition)
+                if (language == "he") assertTrue(savePosition[0] + save.width <= cancelPosition[0])
+                else assertTrue(cancelPosition[0] + cancel.width <= savePosition[0])
+                for (button in listOf(save, cancel)) {
+                    assertTrue(button.height >= (48 * activity.resources.displayMetrics.density).toInt())
+                    assertTrue(button.layout.getLineBottom(button.layout.lineCount - 1) <=
+                        button.height - button.compoundPaddingTop - button.compoundPaddingBottom)
+                }
+            }
+            screen.onActivity { activity ->
+                val view = dialog(activity).window!!.decorView
+                val image = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+                view.draw(android.graphics.Canvas(image))
+                val path = java.io.File(checkNotNull(app.getExternalFilesDir(null)),
+                    "budget-dialog-${language}-${dark}.png")
+                path.outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                image.recycle()
+            }
+            screen.onActivity { dialog(it).findViewById<View>(R.id.periodBudgetCancel)!!.performClick() }
+            awaitUi(screen) { controller.periodBudgetDraft.value == null }
+            assertEquals(0L, success(app.repository.snapshot()).totalAllocatedMinor)
+        }
+        screen.onActivity {
+            it.findViewById<View>(R.id.budgetEditTotal).performClick()
+            dialog(it).findViewById<EditText>(R.id.periodBudgetAmount)!!.setText("123.45")
+        }
+        screen.recreate()
+        awaitUi(screen) { rootWith(R.id.periodBudgetSave) != null }
+        screen.onActivity {
+            assertEquals("123.45", dialog(it).findViewById<EditText>(R.id.periodBudgetAmount)!!.text.toString())
+            dialog(it).findViewById<View>(R.id.periodBudgetSave)!!.performClick()
+        }
+        awaitUi(screen) { controller.periodBudgetDraft.value == null }
+        assertEquals(12345L, success(app.repository.snapshot()).totalAllocatedMinor)
+    }
+
     @Test fun singleBudgetAndNameOnlyMethodsSurviveRecreation() = runBlocking {
         val screen = launch()
         openBudget(screen)

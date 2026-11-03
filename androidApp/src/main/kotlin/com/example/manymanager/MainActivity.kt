@@ -493,28 +493,37 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (periodBudgetDialog == null) {
-            val input = android.widget.EditText(this).apply {
-                inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-                setHint(R.string.monthly_budget)
-                id = R.id.periodBudgetAmount
-                textDirection = View.TEXT_DIRECTION_LTR
+            val form = layoutInflater.inflate(R.layout.dialog_period_budget, null)
+            form.findViewById<TextView>(R.id.periodBudgetTitle).text =
+                getString(R.string.budget_for_month, BudgetPeriodFormatter.format(this, state.period))
+            val input = form.findViewById<android.widget.EditText>(R.id.periodBudgetAmount).apply {
                 setText(state.text)
                 doAfterTextChanged { persistentViewModel.updatePeriodBudget(it.toString()) }
             }
             periodBudgetInput = input
-            val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle(getString(R.string.budget_for_month, BudgetPeriodFormatter.format(this, state.period)))
-                .setView(input).setPositiveButton(R.string.update_budget, null)
-                .setNegativeButton(R.string.cancel, null).create()
+            val dialog = androidx.appcompat.app.AlertDialog.Builder(this).setView(form).create()
             dialog.setCanceledOnTouchOutside(false)
             periodBudgetDialog = dialog
             activeDialog = dialog
             dialog.setOnCancelListener { persistentViewModel.closePeriodBudget() }
-            dialog.setOnShowListener {
-                dialog.getButton(-1).setOnClickListener { persistentViewModel.submitPeriodBudget() }
-                dialog.getButton(-2).setOnClickListener { persistentViewModel.closePeriodBudget() }
+            form.findViewById<View>(R.id.periodBudgetSave).setOnClickListener {
+                persistentViewModel.submitPeriodBudget()
             }
-            dialog.showWithRoundedSurface()
+            form.findViewById<View>(R.id.periodBudgetCancel).setOnClickListener {
+                persistentViewModel.closePeriodBudget()
+            }
+            dialog.show()
+            dialog.window?.apply {
+                setBackgroundDrawableResource(R.drawable.budget_dialog_surface)
+                decorView.clipToOutline = true
+                addFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+                setDimAmount(0.38f)
+                setGravity(android.view.Gravity.CENTER)
+                setLayout(
+                    (min(windowManager.currentWindowMetrics.bounds.width(), dp(440)) - dp(32)).coerceAtLeast(1),
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+            }
         }
         periodBudgetInput?.isEnabled = !state.submitting && !state.interrupted
         periodBudgetInput?.error = when {
@@ -524,8 +533,11 @@ class MainActivity : AppCompatActivity() {
             else -> null
         }
         periodBudgetDialog?.setCancelable(!state.submitting)
-        periodBudgetDialog?.getButton(-1)?.isEnabled = !state.submitting && !state.interrupted
-        periodBudgetDialog?.getButton(-2)?.isEnabled = !state.submitting
+        periodBudgetDialog?.findViewById<View>(R.id.periodBudgetSave)?.apply {
+            isEnabled = !state.submitting && !state.interrupted
+            alpha = if (isEnabled) 1f else 0.45f
+        }
+        periodBudgetDialog?.findViewById<View>(R.id.periodBudgetCancel)?.isEnabled = !state.submitting
     }
 
     private fun showAddSource(period: BudgetPeriod) {

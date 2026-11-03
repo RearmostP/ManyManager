@@ -4,7 +4,7 @@ Current requirements: [docs/README.md](../docs/README.md). Android and HTML shar
 
 | Feature | Android | HTML | Behavior |
 | --- | --- | --- | --- |
-| Budget management | `page_budget.xml`, `BudgetManagementUi.kt`, `MainActivity.kt` | `screens/budget.js`, `components/source-dialog.js` | Period arrows, one total, Update budget; captured period |
+| Budget management | `page_budget.xml`, `dialog_period_budget.xml`, `BudgetManagementUi.kt`, `MainActivity.kt` | `screens/budget.js`, `components/source-dialog.js` | Period arrows, one total, Update budget; captured period |
 | Payment methods | `dialog_add_source.xml`, `dialog_edit_source.xml`, `BudgetSourceDialogs.kt` | `components/source-dialog.js` | Name-only Add/Rename, stable IDs, no money entry |
 | Home | `page_home.xml`, `BudgetHomeUi.kt` | `screens/home.js` | Spending, remaining = budget − spending, expandable method spending |
 | Summary | `SummaryBreakdownUi.kt`, `AllExpensesUi.kt`, summary XML rows/panels | `screens/summary.js` | Category/method spending and count, inline expandable rows, All Expenses |

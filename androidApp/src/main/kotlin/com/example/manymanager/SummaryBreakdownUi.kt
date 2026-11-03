@@ -51,36 +51,44 @@ class SummaryBreakdownUi(private val root: View, private val onRetry: () -> Unit
             val countLabel = context.getString(R.string.breakdown_expense_count,
                 NumberFormat.getIntegerInstance(locale).format(count))
             row.tag = id
+            row.clipToOutline = true
             row.findViewById<TextView>(R.id.breakdownName).text = name
             row.findViewById<TextView>(R.id.breakdownAmount).text = amount
             row.findViewById<TextView>(R.id.breakdownCount).text = countLabel
-            row.contentDescription = "$name · $amount · $countLabel"
-            row.isClickable = true
-            row.isFocusable = true
+            val header = row.findViewById<View>(R.id.summaryGroupHeader)
+            header.contentDescription = "$name · $amount · $countLabel"
+            header.isClickable = true
+            header.isFocusable = true
             val pressed = android.util.TypedValue()
             context.theme.resolveAttribute(android.R.attr.selectableItemBackground, pressed, true)
-            row.foreground = context.getDrawable(pressed.resourceId)
+            header.foreground = context.getDrawable(pressed.resourceId)
             rows.addView(row)
             val list = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 tag = key
                 layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             }
-            fun bindExpansion() {
+            fun bindExpansion(animate: Boolean = false) {
+                list.animate().cancel()
+                list.alpha = 1f
                 val expanded = key in expandedGroups
                 row.findViewById<TextView>(R.id.breakdownChevron).text = if (expanded) "⌃" else "⌄"
-                ViewCompat.setStateDescription(row, context.getString(if (expanded) R.string.group_expanded else R.string.group_collapsed))
+                ViewCompat.setStateDescription(header, context.getString(if (expanded) R.string.group_expanded else R.string.group_collapsed))
                 if (expanded) {
-                    if (list.parent == null) rows.addView(list, rows.indexOfChild(row) + 1)
+                    if (list.parent == null) (row as LinearLayout).addView(list)
                     expenseRows.renderRows(list, snapshot,
-                        snapshot.expenses.filter { if (category) it.categoryId == id else it.sourceId == id })
-                } else rows.removeView(list)
+                        snapshot.expenses.filter { if (category) it.categoryId == id else it.sourceId == id }, category)
+                    if (animate && android.animation.ValueAnimator.areAnimatorsEnabled()) {
+                        list.alpha = .55f
+                        list.animate().alpha(1f).setDuration(140L).start()
+                    }
+                } else (row as LinearLayout).removeView(list)
             }
-            row.setOnClickListener {
+            header.setOnClickListener {
                 val scroll = root.rootView.findViewById<ScrollView>(R.id.pageScroll)
                 val top = scroll?.scrollY ?: 0
                 if (!expandedGroups.add(key)) expandedGroups.remove(key)
-                bindExpansion()
+                bindExpansion(animate = true)
                 scroll?.doOnPreDraw { scroll.scrollTo(0, top) }
             }
             bindExpansion()

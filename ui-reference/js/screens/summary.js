@@ -9,12 +9,17 @@ const panels=[
  ["payment_breakdown_title","payment_breakdown_description","no_payment_methods","payment_breakdown_explanation"],
  ["expense_list_title","expense_list_description","no_expenses",null]
 ];
-export function expenseRows(expenses){
+export function expenseRows(expenses,groupKind=null){
  return expenses.map(item=>{
    const category=previewModel.categories.find(value=>value.id===item.categoryId)?.name??tr("uncategorized");
    const source=previewModel.sources.find(value=>value.id===item.sourceId)?.name??"";
-   const label=[money(item.amountMinor),shortDate(state.language,parseCivilDate(item.date)),category,source,item.note].filter(Boolean).map(escapeValue).join(" · ");
-   return `<button class="chip" style="display:block;width:100%;text-align:start;margin-top:12px;white-space:normal" data-action="view-expense" data-id="${item.id}" aria-label="${label} · ${escapeValue(tr("expense_details"))}">${label}</button>`;
+   const date=shortDate(state.language,parseCivilDate(item.date));
+   const secondary=[date,...(groupKind==="category"?[source]:groupKind==="source"?[category]:[category,source])].filter(Boolean);
+   const label=[money(item.amountMinor),...secondary,item.note].filter(Boolean).join(" · ");
+   return `<button class="summary-expense-row" data-action="view-expense" data-id="${item.id}" aria-label="${escapeValue(label)} · ${escapeValue(tr("expense_details"))}">
+   <span class="expense-row-amount">${escapeValue(money(item.amountMinor))}</span>
+   <span class="expense-row-secondary">${secondary.map(escapeValue).join(" · ")}</span>
+   ${item.note?`<span class="expense-row-note">${escapeValue(item.note)}</span>`:""}</button>`;
  }).join("");
 }
 export function summary(){
@@ -27,8 +32,11 @@ export function summary(){
    const kind=state.tab===0?"category":"source",key=kind+":"+(item.id??"");
    const expanded=state.expandedSummaryGroups.has(key),listId="group-"+key;
    const expenses=snapshot.expenses.filter(expense=>kind==="category"?expense.categoryId===item.id:expense.sourceId===item.id);
-   return `<button class="chip summary-breakdown-row" data-action="expense-group" data-kind="${kind}" data-id="${item.id??""}" data-breakdown-id="${item.id??""}" aria-expanded="${expanded}" aria-controls="${listId}" aria-label="${escapeValue(label.join(" · "))}"><span class="summary-chevron" aria-hidden="true">${expanded?"⌃":"⌄"}</span>${label.map(value=>`<div>${escapeValue(value)}</div>`).join("")}</button>
-   <div id="${listId}" class="summary-inline-expenses" data-inline-group="${key}" ${expanded?"":"hidden"}>${expanded?expenseRows(expenses):""}</div>`;
+   return `<section class="summary-group-card">
+   <button class="summary-breakdown-row" data-action="expense-group" data-kind="${kind}" data-id="${item.id??""}" data-breakdown-id="${item.id??""}" aria-expanded="${expanded}" aria-controls="${listId}" aria-label="${escapeValue(label.join(" · "))}">
+   <span class="summary-group-name">${escapeValue(label[0])}</span><span class="summary-chevron" aria-hidden="true">${expanded?"⌃":"⌄"}</span>
+   <span class="summary-group-total">${escapeValue(label[1])}</span><span class="summary-group-count">${escapeValue(label[2])}</span></button>
+   <div id="${listId}" class="summary-inline-expenses" data-inline-group="${key}" ${expanded?"":"hidden"}>${expanded?expenseRows(expenses,kind):""}</div></section>`;
  }).join("");
  return `<section class="summary fade-in"><p class="intro">${tr("summary_intro")}</p><h1>${tr("expense_summary")}</h1>
  ${monthControls()}<div class="summary-amount"><span class="currency">${tr("ils_symbol")}</span><span class="number">${number(state.language,snapshot.spent/100)}</span></div>

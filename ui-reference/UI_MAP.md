@@ -1,5 +1,7 @@
 # UI map
 
+Approved unified cards on both platforms: Android `SummaryBreakdownUi.kt` / `row_summary_breakdown.xml` and web `js/screens/summary.js` / `css/screens/summary.css` place contextual expense rows inside one rounded group card. Header and rows are separate accessible actions with internal dividers. Android `row_summary_expense.xml` / `AllExpensesUi.kt` share the amount/secondary/two-line-note hierarchy across all three tabs. `tests/summary-cards.html` remains an optional populated browser fixture; `tests/summary-cards-checks.html` covers it. Native font metrics may differ; pixel parity is unverified.
+
 | Feature | Android source | Web implementation | Main interactions |
 | --- | --- | --- | --- |
 | App shell/navigation | `MainActivity.kt`, `activity_main.xml`, `AppearanceTransitionState.kt` | `index.html`, `js/app.js`, `js/state.js`, `css/base.css` | Menu, five pages, back history, overlays |

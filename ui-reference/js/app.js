@@ -203,7 +203,9 @@ document.addEventListener("click",async event=>{
       const key=button.dataset.kind+":"+(button.dataset.id||"");
       if(state.expandedSummaryGroups.has(key))state.expandedSummaryGroups.delete(key);
       else state.expandedSummaryGroups.add(key);
-      renderKeepScroll();break;
+      renderKeepScroll();
+      document.querySelector('[data-action="expense-group"][data-kind="'+button.dataset.kind+'"][data-id="'+(button.dataset.id||"")+'"]')?.focus({preventScroll:true});
+      break;
     }
     case "budget-toggle":
       state.budgetExpanded=!state.budgetExpanded;renderKeepScroll();break;

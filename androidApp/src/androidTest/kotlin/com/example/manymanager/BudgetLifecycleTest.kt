@@ -153,7 +153,7 @@ class BudgetLifecycleTest {
                 fun rowText(container: Int, id: String?): String {
                     val rows = activity.findViewById<android.widget.LinearLayout>(container)
                     val row = (0 until rows.childCount).map(rows::getChildAt).single { it.tag == id }
-                    return if (row is TextView) row.text.toString()
+                    return if (container == R.id.expenseRows) row.contentDescription.toString()
                         else row.findViewById<TextView>(R.id.breakdownAmount).text.toString()
                 }
                 assertEquals(money(1250), rowText(R.id.categorySummaryRows, category.id))
@@ -675,8 +675,8 @@ class BudgetLifecycleTest {
         screen.onActivity { controller.refresh() }
         awaitUi(screen) { (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.expenseCount == 1 }
         screen.onActivity {
-            val row = it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).getChildAt(0) as TextView
-            assertTrue(row.text.contains(it.getString(R.string.uncategorized)))
+            val row = it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).getChildAt(0)
+            assertTrue(row.contentDescription.contains(it.getString(R.string.uncategorized)))
             assertEquals("1.01", it.findViewById<TextView>(R.id.homeTotal).text.toString())
         }
         screen.onActivity {
@@ -742,9 +742,9 @@ class BudgetLifecycleTest {
             assertEquals(money(it, -100), ((homeRows.getChildAt(0) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
             assertEquals(money(it, -200), ((homeRows.getChildAt(1) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
             val list = rows(it, R.id.expenseRows)
-            val correctedRow = (0 until list.childCount).map(list::getChildAt).single { view -> view.tag == first.id } as TextView
-            assertTrue(correctedRow.text.contains(money(it, 400)))
-            assertTrue(correctedRow.text.contains("Renamed"))
+            val correctedRow = (0 until list.childCount).map(list::getChildAt).single { view -> view.tag == first.id }
+            assertTrue(correctedRow.findViewById<TextView>(R.id.summaryExpenseAmount).text.contains(money(it, 400)))
+            assertTrue(correctedRow.findViewById<TextView>(R.id.summaryExpenseSecondary).text.contains("Renamed"))
             it.findViewById<View>(R.id.addExpense).performClick()
         }
         awaitUi(screen) { rootWith(R.id.amount) != null }
@@ -811,7 +811,7 @@ class BudgetLifecycleTest {
         val period = success(app.repository.currentPeriod())
         val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 0))
         val category = success(app.repository.createCategory("Category"))
-        success(app.repository.createExpense(NewExpense(12345, period.start, source.id, category.id)))
+        success(app.repository.createExpense(NewExpense(12345, period.start, source.id, category.id, "Long note · הערה ארוכה · Длинная заметка ".repeat(40))))
         val snapshot = success(app.repository.snapshot())
         val screen = launch()
         for (language in listOf("he", "ru", "en")) for (night in listOf(false, true)) {
@@ -844,22 +844,109 @@ class BudgetLifecycleTest {
             screen.onActivity {
                 for (container in listOf(R.id.categorySummaryRows, R.id.sourceSummaryRows)) {
                     val row = content.findViewById<android.widget.LinearLayout>(container).getChildAt(0)
-                    assertTrue(row.isClickable)
-                    assertTrue(row.isFocusable)
-                    assertTrue(row.contentDescription.contains(longName))
+                    val header = row.findViewById<View>(R.id.summaryGroupHeader)
+                    assertFalse(row.isClickable)
+                    assertTrue(header.isClickable)
+                    assertTrue(header.isFocusable)
+                    assertTrue(header.contentDescription.contains(longName))
                     for (id in listOf(R.id.breakdownName, R.id.breakdownAmount, R.id.breakdownCount)) {
                         val text = row.findViewById<TextView>(id)
                         assertTrue(text.layout.height <= text.height - text.compoundPaddingTop - text.compoundPaddingBottom)
                         for (line in 0 until text.lineCount) assertTrue(text.layout.getLineWidth(line) <= text.width - text.compoundPaddingLeft - text.compoundPaddingRight + 1)
                     }
                     assertEquals(if (language == "he") View.LAYOUT_DIRECTION_RTL else View.LAYOUT_DIRECTION_LTR, row.layoutDirection)
-                    row.performClick()
-                    val list = content.findViewById<android.widget.LinearLayout>(container).getChildAt(1) as android.widget.LinearLayout
+                    header.performClick()
+                    val list = (row as android.widget.LinearLayout).getChildAt(1) as android.widget.LinearLayout
                     assertEquals(1, list.childCount)
-                    assertEquals(row.context.getString(R.string.group_expanded), androidx.core.view.ViewCompat.getStateDescription(row))
+                    assertEquals(row.context.getString(R.string.group_expanded), androidx.core.view.ViewCompat.getStateDescription(header))
+                }
+            }
+            awaitUi(screen) { content.findViewById<TextView>(R.id.summaryExpenseNote)?.layout != null }
+            screen.onActivity {
+                for (container in listOf(R.id.categorySummaryRows, R.id.sourceSummaryRows)) {
+                    val row = content.findViewById<android.widget.LinearLayout>(container).getChildAt(0)
+                    val list = (row as android.widget.LinearLayout).getChildAt(1) as android.widget.LinearLayout
+                    val expense = list.getChildAt(0)
+                    assertTrue(list.parent === row)
+                    assertNull(list.background)
+                    assertNull(expense.background)
+                    assertTrue(expense.isClickable && expense.isFocusable)
+                    assertTrue(expense.height >= (48 * content.resources.displayMetrics.density).toInt())
+                    val note = expense.findViewById<TextView>(R.id.summaryExpenseNote)
+                    assertEquals(2, note.maxLines)
+                    assertTrue(note.lineCount <= 2)
+                    assertTrue(note.layout.getEllipsisCount(note.lineCount - 1) > 0)
+                    val secondary = expense.findViewById<TextView>(R.id.summaryExpenseSecondary)
+                    assertTrue(secondary.layout.height <= secondary.height)
+                    assertTrue(expense.width <= row.width)
                 }
                 dialog.dismiss()
             }
+        }
+    }
+
+    @Test fun unifiedCardsKeepSeparateActionsAndContextualExpenseRows(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 0))
+        val category = success(app.repository.createCategory("Category"))
+        success(app.repository.createExpense(NewExpense(120, period.start, source.id, category.id, "Full note")))
+        success(app.repository.createExpense(NewExpense(30, period.start, source.id)))
+        val saved = success(app.repository.snapshot())
+        // A renderer-only fixture deliberately reuses an ID across the two grouping types.
+        val snapshot = saved.copy(
+            categories = saved.categories.map { it.copy(id = source.id) },
+            expenses = saved.expenses.map { if (it.categoryId == category.id) it.copy(categoryId = source.id) else it },
+            categoryBreakdown = saved.categoryBreakdown.map { if (it.categoryId == category.id) it.copy(categoryId = source.id) else it })
+        val screen = launch()
+        val controller = model(screen)
+        awaitUi(screen) { controller.activeBudget.value is PersistentDataState.Ready }
+        screen.onActivity { activity ->
+            val root = activity.findViewById<View>(R.id.summaryPage)
+            val expanded = mutableSetOf<String>()
+            var selected: String? = null
+            SummaryBreakdownUi(root, {}, { selected = it.id }, expanded).render(PersistentDataState.Ready(snapshot))
+            val categoryCard = activity.findViewById<View>(R.id.categorySummaryRows).findViewWithTag<android.widget.LinearLayout>(source.id)
+            val sourceCard = activity.findViewById<View>(R.id.sourceSummaryRows).findViewWithTag<android.widget.LinearLayout>(source.id)
+            val categoryHeader = categoryCard.findViewById<View>(R.id.summaryGroupHeader)
+            val sourceHeader = sourceCard.findViewById<View>(R.id.summaryGroupHeader)
+            assertFalse(categoryCard.isClickable)
+            categoryHeader.performClick()
+            assertEquals(setOf("category:" + source.id), expanded)
+            sourceHeader.performClick()
+            assertEquals(setOf("category:" + source.id, "source:" + source.id), expanded)
+            val categoryRows = inlineRows(activity, true, source.id)!!
+            val sourceRows = inlineRows(activity, false, source.id)!!
+            assertSame(categoryCard, categoryRows.parent)
+            assertSame(sourceCard, sourceRows.parent)
+            assertEquals(1, categoryRows.childCount)
+            assertEquals(2, sourceRows.childCount)
+            val row = categoryRows.getChildAt(0)
+            val secondary = row.findViewById<TextView>(R.id.summaryExpenseSecondary)
+            assertTrue(secondary.text.contains("Source"))
+            assertFalse(secondary.text.contains("Category"))
+            assertTrue(row.findViewById<TextView>(R.id.summaryExpenseAmount).textSize > secondary.textSize)
+            assertEquals(View.VISIBLE, row.findViewById<View>(R.id.summaryExpenseDivider).visibility)
+            row.performClick()
+            assertEquals(snapshot.expenses.single { it.categoryId != null }.id, selected)
+            assertEquals(2, expanded.size)
+            val sourceLabels = (0 until sourceRows.childCount).map {
+                sourceRows.getChildAt(it).findViewById<TextView>(R.id.summaryExpenseSecondary).text.toString()
+            }
+            assertTrue(sourceLabels.any { it.contains(activity.getString(R.string.uncategorized)) })
+            assertTrue(sourceLabels.any { it.contains("Category") })
+            assertTrue(sourceLabels.none { it.contains("Source") })
+            AllExpensesUi(activity.findViewById(R.id.allPanel), {}, {}).render(PersistentDataState.Ready(snapshot))
+            val all = activity.findViewById<android.widget.LinearLayout>(R.id.expenseRows)
+            assertEquals(2, all.childCount)
+            assertEquals(View.GONE, all.getChildAt(0).findViewById<View>(R.id.summaryExpenseDivider).visibility)
+            assertEquals(View.VISIBLE, all.getChildAt(1).findViewById<View>(R.id.summaryExpenseDivider).visibility)
+            val allCategory = (0 until all.childCount).map(all::getChildAt).single { it.tag == selected }
+            assertTrue(allCategory.findViewById<TextView>(R.id.summaryExpenseSecondary).text.let { it.contains("Source") && it.contains("Category") })
+            assertEquals("Full note", allCategory.findViewById<TextView>(R.id.summaryExpenseNote).text.toString())
+            assertTrue(allCategory.contentDescription.contains("Full note"))
+            sourceHeader.performClick()
+            assertEquals(setOf("category:" + source.id), expanded)
+            assertEquals(1, categoryRows.childCount)
         }
     }
 
@@ -889,13 +976,13 @@ class BudgetLifecycleTest {
             val scroll = it.findViewById<android.widget.ScrollView>(R.id.pageScroll)
             scroll.scrollTo(0, 70); originScroll = scroll.scrollY
             val rows = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
-            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == category.id }.performClick()
+            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == category.id }.findViewById<View>(R.id.summaryGroupHeader).performClick()
         }
         awaitUi(screen) { inlineRows(it, true, category.id)?.childCount == 1 }
         screen.onActivity {
             assertTrue(it.findViewById<View>(R.id.summaryPage).isShown)
             val card = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
-                .findViewWithTag<View>(category.id)
+                .findViewWithTag<View>(category.id).findViewById<View>(R.id.summaryGroupHeader)
             assertEquals(it.getString(R.string.group_expanded), androidx.core.view.ViewCompat.getStateDescription(card))
             card.performClick()
             assertNull(inlineRows(it, true, category.id))
@@ -998,7 +1085,7 @@ class BudgetLifecycleTest {
         screen.onActivity {
             it.findViewById<View>(R.id.sourceTab).performClick()
             val rows = it.findViewById<android.widget.LinearLayout>(R.id.sourceSummaryRows)
-            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == source.id }.performClick()
+            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == source.id }.findViewById<View>(R.id.summaryGroupHeader).performClick()
         }
         awaitUi(screen) { inlineRows(it, false, source.id)?.childCount == 2 }
         screen.onActivity {
@@ -1043,7 +1130,7 @@ class BudgetLifecycleTest {
             assertTrue(it.findViewById<View>(R.id.sourceTab).isSelected)
             it.findViewById<View>(R.id.categoryTab).performClick()
             val rows = it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows)
-            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == null }.performClick()
+            (0 until rows.childCount).map(rows::getChildAt).single { row -> row.tag == null }.findViewById<View>(R.id.summaryGroupHeader).performClick()
         }
         awaitUi(screen) { inlineRows(it, true, null)?.childCount == 1 }
         screen.onActivity { inlineRows(it, true, null)!!.getChildAt(0).performClick() }
@@ -1074,7 +1161,7 @@ class BudgetLifecycleTest {
         awaitUi(screen) { rootWith(R.id.nav1) != null }
         screen.onActivity { rootWith(R.id.nav1)!!.findViewById<View>(R.id.nav1).performClick() }
         awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows).childCount == 2 }
-        screen.onActivity { it.findViewById<View>(R.id.categorySummaryRows).findViewWithTag<View>(category.id).performClick() }
+        screen.onActivity { it.findViewById<View>(R.id.categorySummaryRows).findViewWithTag<View>(category.id).findViewById<View>(R.id.summaryGroupHeader).performClick() }
         awaitUi(screen) { inlineRows(it, true, category.id)?.childCount == 45 }
         var top = 0
         screen.onActivity {
@@ -1105,6 +1192,12 @@ class BudgetLifecycleTest {
         screen.recreate()
         awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && inlineRows(it, true, category.id)?.childCount == 45 }
         screen.onActivity {
+            val config = Configuration(it.resources.configuration)
+            config.uiMode = config.uiMode xor Configuration.UI_MODE_NIGHT_MASK
+            it.onConfigurationChanged(config)
+        }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && inlineRows(it, true, category.id)?.childCount == 45 }
+        screen.onActivity {
             assertTrue(it.findViewById<View>(R.id.categoryTab).isSelected)
             assertEquals(top, it.findViewById<android.widget.ScrollView>(R.id.pageScroll).scrollY)
             detailsBack(it)
@@ -1112,7 +1205,7 @@ class BudgetLifecycleTest {
         awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) == null }
         screen.onActivity {
             assertEquals(top, it.findViewById<android.widget.ScrollView>(R.id.pageScroll).scrollY)
-            it.findViewById<View>(R.id.categorySummaryRows).findViewWithTag<View>(otherCategory.id).performClick()
+            it.findViewById<View>(R.id.categorySummaryRows).findViewWithTag<View>(otherCategory.id).findViewById<View>(R.id.summaryGroupHeader).performClick()
         }
         awaitUi(screen) { inlineRows(it, true, otherCategory.id)?.childCount == 1 }
         screen.onActivity { inlineRows(it, true, otherCategory.id)!!.getChildAt(0).performClick() }
@@ -1123,7 +1216,7 @@ class BudgetLifecycleTest {
             assertTrue(it.findViewById<View>(R.id.categoryTab).isSelected)
             assertEquals(45, inlineRows(it, true, category.id)!!.childCount)
             it.findViewById<View>(R.id.sourceTab).performClick()
-            it.findViewById<View>(R.id.sourceSummaryRows).findViewWithTag<View>(source.id).performClick()
+            it.findViewById<View>(R.id.sourceSummaryRows).findViewWithTag<View>(source.id).findViewById<View>(R.id.summaryGroupHeader).performClick()
         }
         awaitUi(screen) { inlineRows(it, false, source.id)?.childCount == 45 }
         val moved = success(app.repository.snapshot()).expenses.first()

@@ -2,25 +2,32 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="wrap_content"
     android:orientation="vertical" android:background="@drawable/chip"
-    android:padding="14dp" android:layout_marginTop="12dp"
-    android:importantForAccessibility="yes" android:screenReaderFocusable="true">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:orientation="horizontal" android:gravity="center_vertical">
-        <TextView android:id="@+id/breakdownName" style="@style/Text"
-            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
-            android:textSize="14sp" android:textStyle="bold" android:textColor="@color/text"
-            android:importantForAccessibility="no" />
-        <TextView android:id="@+id/breakdownChevron" style="@style/Text"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginStart="8dp" android:textSize="14sp" android:textColor="@color/muted"
-            android:importantForAccessibility="no" />
+    android:layout_marginTop="12dp">
+    <LinearLayout android:id="@+id/summaryGroupHeader"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="16dp" android:minHeight="48dp"
+        android:importantForAccessibility="yes" android:screenReaderFocusable="true">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="top">
+            <TextView android:id="@+id/breakdownName" style="@style/Text"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:textSize="14sp" android:textStyle="bold" android:textColor="@color/text"
+                android:includeFontPadding="false" android:importantForAccessibility="no" />
+            <TextView android:id="@+id/breakdownChevron" style="@style/Text"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="12dp" android:textSize="14sp" android:textColor="@color/muted"
+                android:includeFontPadding="false" android:importantForAccessibility="no" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="6dp" android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:id="@+id/breakdownAmount" style="@style/Text"
+                android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+                android:textSize="16sp" android:textStyle="bold" android:textColor="@color/text"
+                android:includeFontPadding="false" android:importantForAccessibility="no" />
+            <TextView android:id="@+id/breakdownCount" style="@style/Text"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginStart="12dp" android:textSize="12sp" android:textColor="@color/muted"
+                android:includeFontPadding="false" android:importantForAccessibility="no" />
+        </LinearLayout>
     </LinearLayout>
-    <TextView android:id="@+id/breakdownAmount" style="@style/Text"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="6dp" android:textSize="14sp" android:textColor="@color/text"
-        android:importantForAccessibility="no" />
-    <TextView android:id="@+id/breakdownCount" style="@style/Text"
-        android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:layout_marginTop="4dp" android:textSize="12sp" android:textColor="@color/muted"
-        android:importantForAccessibility="no" />
 </LinearLayout>

@@ -1,7 +1,7 @@
 package com.example.manymanager
 
 import android.view.View
-import android.view.ViewGroup
+import android.view.LayoutInflater
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.example.manymanager.domain.Expense
@@ -14,7 +14,6 @@ class AllExpensesUi(private val root: View, private val onCorrect: (Expense) -> 
     private val statusId: Int = R.id.expensesEmpty,
     private val emptyMessage: Int = R.string.no_expenses) {
     private val context = root.context
-    private fun dp(n: Int) = (n * context.resources.displayMetrics.density).toInt()
     fun render(state: PersistentDataState, includes: (Expense) -> Boolean = { true }) {
         val rows = root.findViewById<LinearLayout>(rowsId)
         val status = root.findViewById<TextView>(statusId)
@@ -37,33 +36,40 @@ class AllExpensesUi(private val root: View, private val onCorrect: (Expense) -> 
     }
 
     /** Shared non-scrolling rows for All Expenses and inline Summary groups. */
-    fun renderRows(rows: LinearLayout, snapshot: com.example.manymanager.domain.BudgetSnapshot, expenses: List<Expense>) {
+    fun renderRows(rows: LinearLayout, snapshot: com.example.manymanager.domain.BudgetSnapshot, expenses: List<Expense>, groupCategory: Boolean? = null) {
         rows.removeAllViews()
         val categories = snapshot.categories.associateBy { it.id }
         val sources = snapshot.sources.associateBy { it.source.id }
         val locale = context.resources.configuration.locales[0]
         val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
-        expenses.forEach { expense ->
-            val labels = listOf(
-                context.getString(R.string.ils_amount, BudgetAmounts.number(expense.amountMinor, locale)),
-                expense.date.format(dateFormat),
-                categories[expense.categoryId]?.name ?: context.getString(R.string.uncategorized),
-                sources[expense.sourceId]?.source?.name.orEmpty(),
-            ) + listOfNotNull(expense.note?.takeIf { it.isNotBlank() })
-            rows.addView(TextView(context, null, 0, R.style.Text).apply {
-                text = labels.joinToString(" · ")
-                tag = expense.id
-                textSize = 14f
-                minHeight = dp(48)
-                setPadding(dp(14), dp(14), dp(14), dp(14))
-                setTextColor(context.getColor(R.color.text))
-                setBackgroundResource(R.drawable.chip)
-                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(12) }
-                isFocusable = true
-                contentDescription = text.toString() + ". " + context.getString(R.string.expense_details)
-                setOnClickListener { onCorrect(expense) }
-            })
+        expenses.forEachIndexed { index, expense ->
+            val amount = context.getString(R.string.ils_amount, BudgetAmounts.number(expense.amountMinor, locale))
+            val category = categories[expense.categoryId]?.name ?: context.getString(R.string.uncategorized)
+            val source = sources[expense.sourceId]?.source?.name.orEmpty()
+            val secondary = (listOf(expense.date.format(dateFormat)) + when (groupCategory) {
+                true -> listOf(source)
+                false -> listOf(category)
+                null -> listOf(category, source)
+            }).filter(String::isNotBlank).joinToString(" · ")
+            val row = LayoutInflater.from(context).inflate(R.layout.row_summary_expense, rows, false)
+            row.tag = expense.id
+            row.findViewById<View>(R.id.summaryExpenseDivider).visibility =
+                if (index > 0 || groupCategory != null) View.VISIBLE else View.GONE
+            row.findViewById<TextView>(R.id.summaryExpenseAmount).text = amount
+            row.findViewById<TextView>(R.id.summaryExpenseSecondary).text = secondary
+            row.findViewById<TextView>(R.id.summaryExpenseNote).apply {
+                text = expense.note.orEmpty()
+                visibility = if (expense.note.isNullOrBlank()) View.GONE else View.VISIBLE
+            }
+            row.isFocusable = true
+            row.isClickable = true
+            row.contentDescription = listOfNotNull(amount, secondary, expense.note?.takeIf(String::isNotBlank),
+                context.getString(R.string.expense_details)).joinToString(" · ")
+            val pressed = android.util.TypedValue()
+            context.theme.resolveAttribute(android.R.attr.selectableItemBackground, pressed, true)
+            row.foreground = context.getDrawable(pressed.resourceId)
+            row.setOnClickListener { onCorrect(expense) }
+            rows.addView(row)
         }
     }
 }

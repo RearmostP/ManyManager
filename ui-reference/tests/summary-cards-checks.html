@@ -1,0 +1,64 @@
+<!doctype html><meta charset="utf-8"><title>Unified summary card checks</title>
+<pre id="results">Running…</pre>
+<script type="module">
+const output=document.querySelector("#results"),results=[];
+const check=(value,label)=>{if(!value)throw Error(label);results.push("PASS "+label);output.textContent=results.join("\n")};
+try{
+ const frame=document.createElement("iframe");frame.src="summary-cards.html";frame.style="width:320px;height:850px";document.body.append(frame);
+ const wait=async predicate=>{const end=performance.now()+15000;while(!predicate()){if(performance.now()>end)throw Error("timeout");await new Promise(r=>setTimeout(r,20))}};
+ await wait(()=>frame.contentDocument?.querySelector("iframe")?.contentDocument?.documentElement.dataset.fixtureReady);
+ const appFrame=frame.contentDocument.querySelector("iframe"),doc=appFrame.contentDocument,win=appFrame.contentWindow,errors=[];
+ win.addEventListener("error",event=>errors.push(event.message));win.addEventListener("unhandledrejection",event=>errors.push(String(event.reason)));
+ const click=selector=>{const element=doc.querySelector(selector);if(!element)throw Error(selector);element.click()};
+ const type=(selector,value)=>{const input=doc.querySelector(selector);input.value=value;input.dispatchEvent(new win.Event("input",{bubbles:true}))};
+ const nav=index=>{click("#menu-button");click('[data-action="navigate"][data-index="'+index+'"]')};
+ await wait(()=>doc.querySelectorAll(".summary-group-card").length===3);
+ check(doc.querySelectorAll('.summary-breakdown-row[aria-expanded="true"]').length===2,"multiple groups independently expanded");
+ check(new Set([...doc.querySelectorAll('[data-kind="category"]')].map(x=>x.dataset.id)).size===3,"duplicate names and null category have distinct identities");
+ check([...doc.querySelectorAll(".summary-group-card")].every(card=>card.querySelector(".summary-breakdown-row").parentElement===card&&card.querySelector(".summary-inline-expenses").parentElement===card),"header and rows inside one outer card");
+ check(!doc.querySelector("button button"),"no nested interactive buttons");
+ const row=doc.querySelector(".summary-expense-row"),id=row.dataset.id,card=row.closest(".summary-group-card"),categoryId=card.querySelector("[data-id]").dataset.id;
+ check(row.querySelector(".expense-row-amount")&&row.querySelector(".expense-row-secondary")&&row.querySelector(".expense-row-note"),"amount secondary and note hierarchy");
+ check(!row.querySelector(".expense-row-secondary").textContent.includes(card.querySelector(".summary-group-name").textContent),"category omitted within category group");
+ for(const language of ["he","en","ru"]){
+   nav(2);click('[data-action="toggle-setting"][data-key="language"]');click('[data-action="language"][data-value="'+language+'"]');await wait(()=>doc.documentElement.lang===language);
+   for(const theme of ["light","dark"]){
+     nav(2);if(!doc.querySelector('[data-action="theme"][data-value="'+theme+'"]'))click('[data-action="toggle-setting"][data-key="theme"]');
+     click('[data-action="theme"][data-value="'+theme+'"]');nav(1);click('[data-action="tab"][data-index="0"]');
+     await new Promise(r=>setTimeout(r,30));
+     const note=doc.querySelector(".expense-row-note");
+     check(note.getBoundingClientRect().height<=parseFloat(win.getComputedStyle(note).lineHeight)*2+1,language+" "+theme+" note clamped to two lines");
+     check([...doc.querySelectorAll(".summary-group-card")].every(card=>card.scrollWidth<=card.clientWidth+1)&&doc.querySelector("#page-scroll").scrollWidth<=doc.querySelector("#page-scroll").clientWidth+1,language+" "+theme+" long names fit 320px");
+     check([...doc.querySelectorAll(".summary-expense-row,.summary-breakdown-row")].every(button=>button.getBoundingClientRect().height>=48),language+" "+theme+" touch targets");
+   }
+ }
+ click('[data-action="tab"][data-index="1"]');
+ const sourceCard=doc.querySelector(".summary-breakdown-row");sourceCard.click();
+ const sourceList=doc.querySelector(".summary-inline-expenses:not([hidden])");
+ check(sourceList.querySelectorAll(".summary-expense-row").length>=1,"source group expands");
+ check(doc.activeElement.matches('.summary-breakdown-row[aria-expanded="true"]'),"header retains keyboard focus after toggling");
+ check(win.matchMedia("(prefers-reduced-motion: reduce)").matches?win.getComputedStyle(sourceList).animationName==="none":win.getComputedStyle(sourceList).animationDuration==="0.14s","transition respects motion preference without animating height");
+ check([...sourceList.querySelectorAll(".expense-row-secondary")].every(line=>!line.textContent.includes(sourceCard.querySelector(".summary-group-name").textContent)),"source omitted within source group");
+ click('[data-action="tab"][data-index="0"]');
+ const scroller=doc.querySelector("#page-scroll");scroller.scrollTop=120;const top=scroller.scrollTop;
+ click('[data-action="view-expense"][data-id="'+id+'"]');
+ check(doc.querySelector("#expense-details")&&!doc.querySelector("#expense-details input"),"row opens read-only details immediately");
+ check(doc.querySelector('[data-kind="category"][data-id="'+categoryId+'"]').getAttribute("aria-expanded")==="true"&&doc.querySelector("#app").inert,"row click leaves group expanded beneath modal");
+ click('[data-action="begin-expense-edit"]');type("#details-note","Updated note");click('[data-action="save-expense-details"]');
+ check(doc.querySelector("#expense-details").textContent.includes("Updated note"),"save returns updated read-only details");
+ click('#expense-details [data-action="close-overlay"]');
+ check(scroller.scrollTop===top&&doc.querySelector('[data-action="view-expense"][data-id="'+id+'"] .expense-row-note').textContent==="Updated note","close restores scroll and refreshed row");
+ click('[data-action="view-expense"][data-id="'+id+'"]');click('[data-action="begin-expense-edit"]');
+ type("#details-categoryId","");click('[data-action="save-expense-details"]');
+ check(doc.querySelector("#expense-details")&&!doc.querySelector("#details-categoryId"),"moving out of group keeps saved details open by ID");
+ click('#expense-details [data-action="close-overlay"]');
+ const nullHeader=doc.querySelector('[data-kind="category"][data-id=""]');if(nullHeader.getAttribute("aria-expanded")!=="true")nullHeader.click();
+ check(doc.querySelector('[data-inline-group="category:"] [data-id="'+id+'"]'),"moved expense appears under Uncategorized");
+ click('[data-action="tab"][data-index="2"]');
+ check(!doc.querySelector(".summary-group-card")&&doc.querySelectorAll(".summary-expense-row").length===4,"All Expenses remains ungrouped");
+ click('[data-action="view-expense"][data-id="'+id+'"]');click('[data-action="begin-expense-edit"]');click('[data-action="delete-expense"]');click('[data-action="confirm-delete-expense"]');
+ check(!doc.querySelector("#expense-details")&&doc.querySelectorAll(".summary-expense-row").length===3,"confirmed deletion updates ungrouped rows");
+ check(errors.length===0,"no runtime errors or unhandled rejections after fixture load");
+ output.textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
+}catch(error){output.textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}
+</script>

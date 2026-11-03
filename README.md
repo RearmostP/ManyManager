@@ -1,9 +1,9 @@
-# ManyManager
+# ManyManager Simple
 
-Android budget and expense manager.
+Android budget and expense manager on `original`.
 
-- [Current ManyManager documentation](docs/manymanager/README.md)
-- [Release guide](docs/manymanager/release.md)
+- [Current application documentation](docs/README.md)
+- [Release guide](docs/release.md)
 - [UI design reference](ui-reference/README.md)
 
-Permanent development branches: `main` (ManyManager) and `original` (ManyManager Simple). Variant documentation is organized under `docs/manymanager/` and `docs/manymanager-simple/`; Simple documentation is not written yet. On `original`, inspect the branch code until its own documentation exists.
+Documentation describes the checked-out branch.

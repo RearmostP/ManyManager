@@ -1,3 +1,5 @@
+> Historical record: this document preserves decisions and verification at the time of delivery, including superseded scope. For current confirmed behavior and requirements, read the [ManyManager README](../README.md).
+
 # קבלת אחסון מתמשך — ManyManager
 
 דוח זה מתעד את היקף עשרת השלבים ו־0.1.0 המקורי. ההרחבה המאוחרת שאושרה — פרטי הוצאה תחילה, עריכה מלאה באותו חלון, מחיקה באישור ורשימות מקבוצה — מתועדת ב[דוח ההמשך](expense-details.md). היא מחליפה בפיתוח את מגבלת הסכום בלבד, אך אינה משנה את תכולת ה־APK ‏0.1.0 שכבר נחתם.

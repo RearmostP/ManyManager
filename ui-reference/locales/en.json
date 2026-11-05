@@ -1,4 +1,7 @@
 {
+  "category_general": "General",
+  "add_subcategory": "Add subcategory",
+  "no_subcategories": "No subcategories yet",
   "app_name": "My expenses",
   "open_menu": "Open menu",
   "menu_button_label": "Open menu",

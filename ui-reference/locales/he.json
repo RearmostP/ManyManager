@@ -1,4 +1,7 @@
 {
+  "category_general": "כללי",
+  "add_subcategory": "הוספת תת־קטגוריה",
+  "no_subcategories": "עדיין אין תת־קטגוריות",
   "app_name": "ההוצאות שלי",
   "open_menu": "פתיחת תפריט",
   "menu_button_label": "פתיחת תפריט",

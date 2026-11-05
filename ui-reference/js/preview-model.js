@@ -44,8 +44,8 @@ export function snapshotFor(date,expenses=previewModel.expenses){
     return {source,spent:sourceSpent,expenseCount:selected.filter(item=>item.sourceId===source.id).length};
   });
   const bySpending=(a,b)=>a.spent===b.spent?(a.id===b.id?0:a.id===null?-1:b.id===null?1:a.id<b.id?-1:1):a.spent>b.spent?-1:1;
-  const categoryBreakdown=[...new Set(selected.map(item=>item.categoryId))].map(id=>{
-    const rows=selected.filter(item=>item.categoryId===id);
+  const categoryBreakdown=[...new Set(selected.map(item=>mainCategoryId(item.categoryId)))].map(id=>{
+    const rows=selected.filter(item=>mainCategoryId(item.categoryId)===id);
     return {id,name:previewModel.categories.find(item=>item.id===id)?.name??null,
       spent:safe(rows.reduce((sum,item)=>sum+BigInt(item.amountMinor),0n)),expenseCount:rows.length};
   }).sort(bySpending);
@@ -90,10 +90,16 @@ export function deleteExpense(id){
   return true;
 }
 
-export function addCategory(name){
+export function mainCategoryId(id){return previewModel.categories.find(item=>item.id===id)?.parentId??id}
+export function categoryPath(id){
+  const category=previewModel.categories.find(item=>item.id===id);
+  const parent=previewModel.categories.find(item=>item.id===category?.parentId);
+  return category?(parent?`${parent.name} › ${category.name}`:category.name):null;
+}
+export function addCategory(name,parentId=null){
   const clean=name.trim();
-  if(!clean)return null;
-  const category={id:`category-${previewModel.nextCategoryId++}`,name:clean};
+  if(!clean||(parentId!==null&&!previewModel.categories.some(item=>item.id===parentId&&!item.parentId)))return null;
+  const category={id:`category-${previewModel.nextCategoryId++}`,name:clean,parentId};
   previewModel.categories.push(category);changed();
   return category;
 }

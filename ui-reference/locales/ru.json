@@ -1,4 +1,7 @@
 {
+  "category_general": "Общее",
+  "add_subcategory": "Добавить подкатегорию",
+  "no_subcategories": "Подкатегорий пока нет",
   "app_name": "Мои расходы",
   "open_menu": "Открыть меню",
   "menu_button_label": "Открыть меню",

@@ -1,5 +1,5 @@
 import {state} from "../state.js";
-import {previewModel,snapshotFor} from "../preview-model.js";
+import {previewModel,snapshotFor,categoryPath,mainCategoryId} from "../preview-model.js";
 import {parseCivilDate} from "../budget-period.js";
 import {shortDate,number} from "../i18n.js";
 import {tr,monthControls,money,escapeValue} from "../render-helpers.js";
@@ -11,7 +11,7 @@ const panels=[
 ];
 export function expenseRows(expenses,groupKind=null){
  return expenses.map(item=>{
-   const category=previewModel.categories.find(value=>value.id===item.categoryId)?.name??tr("uncategorized");
+   const category=categoryPath(item.categoryId)??tr("uncategorized");
    const source=previewModel.sources.find(value=>value.id===item.sourceId)?.name??"";
    const date=shortDate(state.language,parseCivilDate(item.date));
    const secondary=[date,...(groupKind==="category"?[source]:groupKind==="source"?[category]:[category,source])].filter(Boolean);
@@ -22,6 +22,16 @@ export function expenseRows(expenses,groupKind=null){
    ${item.note?`<span class="expense-row-note">${escapeValue(item.note)}</span>`:""}</button>`;
  }).join("");
 }
+function categorySections(expenses,id,kind){
+  const children=previewModel.categories.filter(item=>item.parentId===id);
+  if(kind!=="category"||!id||!children.length)return expenseRows(expenses,kind);
+  return [{id,name:tr("category_general")},...children].map(group=>{
+    const rows=expenses.filter(item=>item.categoryId===group.id);
+    if(!rows.length)return "";
+    const total=rows.reduce((sum,item)=>sum+BigInt(item.amountMinor),0n);
+    return `<section class="subcategory-section"><h3>${escapeValue(group.name)} · ${escapeValue(money(Number(total)))}</h3>${expenseRows(rows,kind)}</section>`;
+  }).join("");
+}
 export function summary(){
  const keys=panels[state.tab];
  const snapshot=snapshotFor(state.currentDate);
@@ -31,12 +41,12 @@ export function summary(){
    const label=[item.name??tr("uncategorized"),money(item.spent),tr("breakdown_expense_count",number(state.language,item.expenseCount))];
    const kind=state.tab===0?"category":"source",key=kind+":"+(item.id??"");
    const expanded=state.expandedSummaryGroups.has(key),listId="group-"+key;
-   const expenses=snapshot.expenses.filter(expense=>kind==="category"?expense.categoryId===item.id:expense.sourceId===item.id);
+   const expenses=snapshot.expenses.filter(expense=>kind==="category"?mainCategoryId(expense.categoryId)===item.id:expense.sourceId===item.id);
    return `<section class="summary-group-card">
    <button class="summary-breakdown-row" data-action="expense-group" data-kind="${kind}" data-id="${item.id??""}" data-breakdown-id="${item.id??""}" aria-expanded="${expanded}" aria-controls="${listId}" aria-label="${escapeValue(label.join(" · "))}">
    <span class="summary-group-name">${escapeValue(label[0])}</span><span class="summary-chevron" aria-hidden="true">${expanded?"⌃":"⌄"}</span>
    <span class="summary-group-total">${escapeValue(label[1])}</span><span class="summary-group-count">${escapeValue(label[2])}</span></button>
-   <div id="${listId}" class="summary-inline-expenses" data-inline-group="${key}" ${expanded?"":"hidden"}>${expanded?expenseRows(expenses,kind):""}</div></section>`;
+   <div id="${listId}" class="summary-inline-expenses" data-inline-group="${key}" ${expanded?"":"hidden"}>${expanded?categorySections(expenses,item.id,kind):""}</div></section>`;
  }).join("");
  return `<section class="summary fade-in"><p class="intro">${tr("summary_intro")}</p><h1>${tr("expense_summary")}</h1>
  ${monthControls()}<div class="summary-amount"><span class="currency">${tr("ils_symbol")}</span><span class="number">${number(state.language,snapshot.spent/100)}</span></div>

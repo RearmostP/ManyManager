@@ -15,6 +15,8 @@ import {expenseDetails,expenseDetailsBody} from "./components/expense-details.js
 import {categoryDialog,beginCategoryCreation,confirmCategoryCreation} from "./components/category-dialog.js";
 import {sourceDialog,canConfirmSourceEdit,budgetDialog} from "./components/source-dialog.js";
 
+import {categoryPicker,openCategoryPicker,chooseCategory,selectCategory} from "./components/category-picker.js";
+
 const app=document.getElementById("app");
 const page=document.getElementById("page");
 const scroll=document.getElementById("page-scroll");
@@ -31,20 +33,20 @@ function render(){
   menuButton.setAttribute("aria-label",translate("menu_button_label"));
   menuButton.innerHTML=icon("menu");
   page.innerHTML=[home,summary,settings,budget,categories][state.page]();
-  if(["expense-details","delete-expense"].includes(state.overlay)){
+  if(["expense-details","delete-expense"].includes(state.overlay)||(state.overlay==="category-picker"&&state.pickerReturnOverlay==="expense-details")){
     if(!overlay.querySelector("#expense-details"))overlay.innerHTML=expenseDetails();
     const panel=overlay.querySelector("#expense-details");
     const focused=document.activeElement,focusId=panel.contains(focused)?focused.id:null;
     panel.innerHTML=expenseDetailsBody();
-    panel.inert=state.overlay==="delete-expense";
+    panel.inert=state.overlay!=="expense-details";
     if(panel.inert)panel.setAttribute("aria-hidden","true");else panel.removeAttribute("aria-hidden");
-    overlay.querySelector("[data-expense-delete-confirmation]")?.remove();
+    overlay.querySelector("[data-expense-child-overlay]")?.remove();
     if(panel.inert){
-      const confirmation=document.createElement("div");confirmation.dataset.expenseDeleteConfirmation="";
-      confirmation.innerHTML=expenseDelete();overlay.append(confirmation);
+      const confirmation=document.createElement("div");confirmation.dataset.expenseChildOverlay="";
+      confirmation.innerHTML=state.overlay==="category-picker"?categoryPicker():expenseDelete();overlay.append(confirmation);
     }else if(focusId)panel.querySelector("#"+CSS.escape(focusId))?.focus({preventScroll:true});
   }else overlay.innerHTML=({
-    menu:drawer,expense,"add-category":categoryDialog,
+    menu:drawer,expense,"add-category":categoryDialog,"category-picker":categoryPicker,
     "add-source":sourceDialog,"edit-source":sourceDialog,"edit-budget":budgetDialog
   })[state.overlay]?.()??"";
   app.inert=Boolean(state.overlay);
@@ -147,8 +149,16 @@ document.addEventListener("click",async event=>{
       }
       closeOverlay();renderKeepScroll();break;
     }
-    case "expense-category":
-      state.expenseDraft.categoryId=button.dataset.id??null;renderKeepScroll();break;
+    case "open-category":
+      state.categoryManagementId=button.dataset.id;renderKeepScroll();break;
+    case "open-category-picker":
+      openCategoryPicker();renderKeepScroll();break;
+    case "category-picker-back":
+      state.pickerParentId=null;renderKeepScroll();break;
+    case "choose-category":
+      chooseCategory(button.dataset.id??null);renderKeepScroll();break;
+    case "select-category":
+      selectCategory(button.dataset.id);renderKeepScroll();break;
     case "expense-source":
       state.expenseDraft.sourceId=button.dataset.id;renderKeepScroll();break;
     case "expense":

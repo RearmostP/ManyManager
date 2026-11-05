@@ -49,7 +49,7 @@ try{
  click('#expense-details [data-action="close-overlay"]');
  check(scroller.scrollTop===top&&doc.querySelector('[data-action="view-expense"][data-id="'+id+'"] .expense-row-note').textContent==="Updated note","close restores scroll and refreshed row");
  click('[data-action="view-expense"][data-id="'+id+'"]');click('[data-action="begin-expense-edit"]');
- type("#details-categoryId","");click('[data-action="save-expense-details"]');
+ click('[data-action="open-category-picker"]');click('[data-action="choose-category"]:not([data-id])');click('[data-action="save-expense-details"]');
  check(doc.querySelector("#expense-details")&&!doc.querySelector("#details-categoryId"),"moving out of group keeps saved details open by ID");
  click('#expense-details [data-action="close-overlay"]');
  const nullHeader=doc.querySelector('[data-kind="category"][data-id=""]');if(nullHeader.getAttribute("aria-expanded")!=="true")nullHeader.click();

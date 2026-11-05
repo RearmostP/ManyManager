@@ -159,6 +159,11 @@ to {
 [dir=rtl] .month-row .icon {
   transform:scaleX(-1)}
 
+.categories-page h1,#picker-title{overflow-wrap:anywhere}
+.category-field,.category-option{width:100%;text-align:start;white-space:normal;overflow-wrap:anywhere}
+.category-option{margin-top:8px}
+.subcategory-section{border-top:1px solid var(--line)}
+.subcategory-section h3{padding:14px 16px;font-size:13px;overflow-wrap:anywhere;color:var(--muted)}
 .expense-choices{display:flex;flex-direction:column;gap:8px}
 .expense-choices .chip{text-align:start;font-size:14px}
 .new-category{display:block;width:100%;margin-top:8px;text-align:start;font-size:14px;color:var(--blue)}

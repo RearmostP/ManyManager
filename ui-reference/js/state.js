@@ -7,7 +7,8 @@ export const state={
   currentDate:new Date(),budgetMonth:periodFor(new Date()).start,
   expenseDraft:{amount:"",date:"",note:"",categoryId:null,sourceId:null},
   expenseEditId:null,expenseOriginal:null,expandedSummaryGroups:new Set(),expenseEditing:false,expenseDetailsError:null,
-  categoryDraft:"",categoryReturnOverlay:null,
+  categoryDraft:"",categoryReturnOverlay:null,categoryParentId:null,categoryManagementId:null,
+  pickerParentId:null,pickerReturnOverlay:null,
   sourceDraft:{name:"",sourceId:null},budgetDraft:"",
   dialogMonth:null
 };
@@ -28,7 +29,9 @@ export function cancelExpenseEdit(){
   state.expenseDraft=savedExpenseDraft(previewModel.expenses.find(item=>item.id===state.expenseEditId));
 }
 export function closeOverlay(){
-  if(state.overlay==="add-category"){
+  if(state.overlay==="category-picker"){
+    state.overlay=state.pickerReturnOverlay;state.pickerParentId=null;
+  }else if(state.overlay==="add-category"){
     state.overlay=state.categoryReturnOverlay;
     state.categoryReturnOverlay=null;
   }else if(state.overlay==="delete-expense")state.overlay="expense-details";
@@ -37,6 +40,7 @@ export function closeOverlay(){
 }
 export function goBack(scrollElement){
   if(state.overlay){closeOverlay();return true}
+  if(state.page===4&&state.categoryManagementId){state.categoryManagementId=null;return true}
   if(state.page===0&&state.budgetExpanded){state.budgetExpanded=false;return true}
   if(state.page===0)return false;
   const previous=state.history.pop()||{page:0,tab:0,scroll:0};

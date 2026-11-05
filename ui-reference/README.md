@@ -28,15 +28,28 @@ Each expense requires a payment method and a positive amount, with optional cate
 
 Hebrew RTL, Russian/English LTR and light/dark appearances remain supported. Native dialogs, fonts, IME and system bars can differ from HTML; pixel parity is not asserted.
 
+## Optional subcategories (HTML prototype only)
+
+One category field opens a two-step picker. A main category without children selects immediately; a parent opens General plus its subcategories. General assigns directly to the parent. Back returns to main categories and Cancel preserves all draft fields. Details and expense rows show the selected path.
+
+Category management opens a parent’s children and offers Add subcategory. Stable category IDs and optional parent IDs allow exactly two levels. Summary cards combine parent and child expenses once, with nonempty General/child sections when expanded. The fixture reuses the ₪100 and ₪250 records for direct Food and Supermarket expenses; Health has no children. Budget and payment methods are unchanged.
+
+This is an initial, experimental design for testing and feedback, not a finalized interface. The flow currently exists only in the HTML prototype and awaits Android implementation.
+
 ## Checks
 
 Serve the preview and open:
 
+- `tests/subcategories.html`: two-level picker/management, General, draft preservation, stable IDs, exact totals, editing/deletion and 320px locale/theme layouts.
 - `tests/single-budget-ui.html`: real budget entry, name-only method forms, remaining balance and summaries.
 - `tests/stage6.html`: single budget example, zero budget, required method, rename, edit/delete and 9th/10th boundary moves.
 - `tests/stage8.html`: expense/category forms and real app events.
 - `tests/stage9.html`: spending breakdown consistency and real app events.
 - `tests/expense-details.html`: read-only/edit/delete flows and narrow locale/theme layouts.
 - `tests/summary-cards-checks.html`: unified card/expansion/detail interactions.
+
+For a narrow visual review, `tests/subcategories.html?visual=picker&lang=he&theme=light` leaves the picker open after the checks; `lang=ru` / `en` and `theme=dark` are also supported. The long mixed-language name intentionally stress-tests wrapping.
+
+Subcategory verification: Chrome headless passed all seven check pages (228 assertions), including 34 new subcategory assertions and 320px Hebrew/Russian/English light/dark layout checks. Real Samsung-device usability remains unverified.
 
 Checks use only isolated memory. Historical result counts are not fresh verification; see the current task report for actual outcomes. Android additionally tests transactions, populated version-1 migration and overflow rollback. Keep this preview focused on visual behavior rather than reproducing production persistence or lifecycle.

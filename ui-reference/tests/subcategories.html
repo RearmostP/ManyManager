@@ -1,0 +1,90 @@
+<!doctype html><meta charset="utf-8"><base href="../"><title>Optional subcategory checks</title>
+<pre id="results">Running…</pre>
+<script type="module">
+import {previewModel,addCategory,addSource,createExpense,updateExpense,deleteExpense,snapshotFor,categoryPath} from "../js/preview-model.js";
+import {state} from "../js/state.js";
+import {summary} from "../js/screens/summary.js";
+import {loadLanguage} from "../js/i18n.js";
+const results=[],out=document.querySelector("#results");
+const check=(v,label)=>{if(!v)throw Error(label);results.push("PASS "+label)};
+try{
+ const parent=addCategory("Food"),child=addCategory("Supermarket",parent.id),plain=addCategory("Health"),source=addSource("Cash");
+ check(!addCategory("Third level",child.id)&&!addCategory("Invalid","missing")&&!addCategory("  ",parent.id),"two levels and required name");
+ const input={amountMinor:100,date:"2026-11-10",sourceId:source.id,categoryId:parent.id};
+ const direct=createExpense(input),sub=createExpense({...input,amountMinor:250,categoryId:child.id});
+ const date=new Date(2026,10,10);
+ let snap=snapshotFor(date);
+ check(snap.spent===350&&snap.categoryBreakdown.length===1&&snap.categoryBreakdown[0].spent===350&&snap.categoryBreakdown[0].expenseCount===2,"parent total = direct + children exactly once");
+ check(categoryPath(child.id)==="Food › Supermarket","category path");
+ await loadLanguage("en");state.language="en";state.currentDate=date;state.tab=0;state.expandedSummaryGroups.add("category:"+parent.id);
+ const host=document.createElement("div");host.innerHTML=summary();
+ check(host.querySelectorAll(".subcategory-section").length===2&&host.querySelectorAll(".summary-expense-row").length===2,"General and child sections each show their expenses once");
+ check(host.querySelectorAll(".subcategory-section h3")[0].textContent.includes("1")&&host.querySelectorAll(".subcategory-section h3")[1].textContent.includes("2.5"),"section amounts show direct and child spending");
+ check(updateExpense(direct.id,{...direct,categoryId:child.id,amountMinor:200}),"edit category and amount");
+ check(snapshotFor(date).categoryBreakdown[0].spent===450,"edit recalculates");
+ check(deleteExpense(sub.id)&&snapshotFor(date).categoryBreakdown[0].spent===200,"delete recalculates");
+ const frame=document.createElement("iframe");frame.src="index.html";frame.style="width:320px;height:850px";document.body.append(frame);
+ const wait=async fn=>{const end=performance.now()+15000;while(!fn()){if(performance.now()>end)throw Error("timeout");await new Promise(r=>setTimeout(r,20))}};
+ await wait(()=>frame.contentDocument?.querySelector('[data-action="expense"]'));
+ const doc=frame.contentDocument,win=frame.contentWindow;
+ const click=s=>{const el=doc.querySelector(s);if(!el)throw Error("Missing "+s);el.click()};
+ const type=(s,value)=>{const el=doc.querySelector(s);el.value=value;el.dispatchEvent(new win.Event("input",{bubbles:true}))};
+ const nav=i=>{click("#menu-button");click('[data-action="navigate"][data-index="'+i+'"]')};
+ const long="אוכל לבית · Продукты для всей семьи · Household food ".repeat(4).trim();
+ nav(4);click('[data-action="add-category"]');type("#category-name",long);click('[data-action="confirm-category"]');
+ click('[data-action="open-category"]');check(doc.querySelector('[data-action="add-category"]'),"management opens parent");
+ click('[data-action="add-category"]');type("#category-name","   ");click('[data-action="confirm-category"]');
+ check(!doc.querySelector("#category-error").hidden,"subcategory name required");
+ type("#category-name","Supermarket");click('[data-action="confirm-category"]');
+ check(doc.querySelector(".category-row").textContent==="Supermarket","subcategory created under opened parent");
+ click('[data-action="back"]');check(doc.querySelectorAll('[data-action="open-category"]').length===1,"management back shows only main categories");
+ nav(3);click('[data-action="add-source"]');type("#source-name","Cash");click('[data-action="confirm-add-source"]');
+ nav(0);click('[data-action="expense"]');type("#amount","1");type("#expense-note","Keep draft");click('[data-action="expense-source"]');
+ const draftDate=doc.querySelector("#expense-date").value;
+ click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');
+ check(doc.querySelector('[data-action="select-category"]')&&doc.querySelectorAll('[data-action="choose-category"]').length===1,"parent opens General and child in same picker");
+ click('[data-action="category-picker-back"]');click('[data-action="choose-category"][data-id]');
+ click('[data-action="close-overlay"]');
+ check(doc.querySelector("#amount").value==="1"&&doc.querySelector("#expense-note").value==="Keep draft"&&doc.querySelector("#expense-date").value===draftDate,"Back and Cancel preserve all draft fields");
+ click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');click('[data-action="select-category"]');
+ check(doc.querySelector("#expense-category").textContent===long,"General displays parent alone");
+ click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');click('[data-action="choose-category"][data-id]');
+ check(doc.querySelector("#expense-category").textContent===long+" › Supermarket","child path in single field");
+ click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');click('[data-action="close-overlay"]');
+ check(doc.querySelector("#expense-category").textContent===long+" › Supermarket","Cancel preserves previous child selection");
+ click('[data-action="save-expense"]');nav(1);click('[data-action="expense-group"]');
+ check(doc.querySelectorAll(".subcategory-section").length===1&&doc.querySelectorAll(".summary-expense-row").length===1,"empty General omitted and no duplicate expense");
+ click('[data-action="view-expense"]');check(doc.querySelector('[data-value="categoryId"]').textContent===long+" › Supermarket","details show path");
+ click('[data-action="begin-expense-edit"]');click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');click('[data-action="select-category"]');click('[data-action="save-expense-details"]');
+ check(doc.querySelector('[data-value="categoryId"]').textContent===long,"edit child to direct parent");
+ click('#expense-details [data-action="close-overlay"]');
+ nav(0);click('[data-action="expense"]');click('[data-action="open-category-picker"]');click('[data-action="add-category"]');
+ type("#category-name","Health");click('[data-action="confirm-category"]');
+ check(doc.querySelector("#expense-category").textContent==="Health","category creation from picker returns selected category");
+ click('[data-action="open-category-picker"]');[...doc.querySelectorAll('[data-action="choose-category"]')].find(el=>el.textContent==="Health").click();
+ check(doc.querySelector("#expense-category").textContent==="Health"&&!doc.querySelector("#picker-title"),"category without children selects immediately");
+ click('[data-action="close-overlay"]');
+ for(const language of ["he","ru","en"]){
+  nav(2);click('[data-action="toggle-setting"][data-key="language"]');click('[data-action="language"][data-value="'+language+'"]');await wait(()=>doc.documentElement.lang===language);
+  for(const theme of ["light","dark"]){
+   nav(2);if(!doc.querySelector('[data-action="theme"]'))click('[data-action="toggle-setting"][data-key="theme"]');
+   click('[data-action="theme"][data-value="'+theme+'"]');nav(1);click('[data-action="view-expense"]');click('[data-action="begin-expense-edit"]');click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');
+   await new Promise(r=>setTimeout(r,30));
+   check([...doc.querySelectorAll(".dialog-panel,.category-option")].every(el=>el.scrollWidth<=el.clientWidth+1),language+" "+theme+" long picker labels fit 320px");
+   check(doc.documentElement.dir===(language==="he"?"rtl":"ltr"),language+" "+theme+" direction");
+   click('[data-action="close-overlay"]');click('[data-action="cancel-expense-edit"]');click('#expense-details [data-action="close-overlay"]');
+  }
+ }
+ out.textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
+ const visual=new URLSearchParams(location.search);
+ if(visual.has("visual")){
+   out.hidden=true;document.body.style.margin="0";
+   frame.style="display:block;width:320px;height:100vh;border:0";
+   nav(2);click('[data-action="toggle-setting"][data-key="language"]');click('[data-action="language"][data-value="'+(visual.get("lang")||"he")+'"]');
+   await wait(()=>doc.documentElement.lang===(visual.get("lang")||"he"));
+   nav(2);if(!doc.querySelector('[data-action="theme"]'))click('[data-action="toggle-setting"][data-key="theme"]');
+   click('[data-action="theme"][data-value="'+(visual.get("theme")||"light")+'"]');nav(1);
+   if(visual.get("visual")==="picker"){click('[data-action="view-expense"]');click('[data-action="begin-expense-edit"]');click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]')}
+ }
+}catch(error){out.textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}
+</script>

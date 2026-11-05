@@ -8,7 +8,6 @@
 import {civilDate,parseCivilDate,periodKey} from "../js/budget-period.js";
 import {previewModel,addCategory,addSource,createExpense,updateExpense,snapshotFor,parseAmount} from "../js/preview-model.js";
 import {state,closeOverlay} from "../js/state.js";
-import {beginCategoryCreation,confirmCategoryCreation} from "../js/components/category-dialog.js";
 import {expense,canSaveExpense} from "../js/components/expense-sheet.js";
 import {expenseDetails} from "../js/components/expense-details.js";
 const updateAmount=(id,amountMinor)=>{const item=previewModel.expenses.find(item=>item.id===id);return item&&updateExpense(id,{...item,amountMinor})};
@@ -42,7 +41,7 @@ try {
  check(!updateAmount(original.id,Number.MAX_SAFE_INTEGER)&&original.amountMinor===456,"correction overflow atomic");
  state.expenseDraft={amount:"1.01",date:"2026-11-10",note:"draft",sourceId:second.id,categoryId:null};state.overlay="expense";
  check(!canSaveExpense(),"category required before saving");
- beginCategoryCreation();state.categoryDraft="New";check(confirmCategoryCreation(),"category inside draft");
+ state.expenseDraft.categoryId=category.id;check(canSaveExpense(),"confirmed existing category enables save");
  check(state.expenseDraft.amount==="1.01"&&state.expenseDraft.date==="2026-11-10"&&state.expenseDraft.note==="draft"&&state.expenseDraft.sourceId===second.id,"complete draft retained");
  const host=document.createElement("div");host.innerHTML=expense();
  check(host.querySelector("#expense-date").type==="date"&&!host.querySelector('[data-action="save-expense"]').disabled,"date picker and enabled save");
@@ -64,10 +63,11 @@ try {
  const type=(selector,value)=>{const element=doc.querySelector(selector);element.value=value;element.dispatchEvent(new frame.contentWindow.Event("input",{bubbles:true}))};
  click("#menu-button");click('[data-action="navigate"][data-index="3"]');click('[data-action="add-source"]');
  type("#source-name","Event cash");click('[data-action="confirm-add-source"]');
+ click("#menu-button");click('[data-action="navigate"][data-index="4"]');click('[data-action="add-category"]');type("#category-name","Event category");click('[data-action="confirm-category"]');
  click("#menu-button");click('[data-action="navigate"][data-index="0"]');click('[data-action="expense"]');
  type("#amount","12.34");type("#expense-note","event note");click('[data-action="expense-source"]');
  const date=doc.querySelector("#expense-date").value;
- click('[data-action="add-category"]');type("#category-name","Event category");click('[data-action="confirm-category"]');
+ click('[data-action="open-expense-category"]');click('[data-action="select-category"]');
  check(doc.querySelector("#amount").value==="12.34"&&doc.querySelector("#expense-note").value==="event note"&&doc.querySelector("#expense-date").value===date,"app events preserve category draft");
  check(!doc.querySelector('[data-action="save-expense"]').disabled,"app events enable save");
  click('[data-action="save-expense"]');

@@ -50,52 +50,54 @@ try{
  nav(3);click('[data-action="add-source"]');type("#source-name","Cash");click('[data-action="confirm-add-source"]');
  nav(0);click('[data-action="expense"]');type("#amount","1");type("#expense-note","Empty category list");click('[data-action="expense-source"]');
  check(doc.querySelector('[data-action="save-expense"]').disabled,"form requires category even with valid amount date and method");
- click('[data-action="open-category-picker"]');
- check(!doc.querySelector('[data-action="choose-category"]')&&doc.querySelector('[data-action="add-category"]'),"empty picker offers Add category and no Uncategorized");
- click('[data-action="close-overlay"]');
- check(doc.querySelector("#expense-note").value==="Empty category list"&&doc.querySelector('[data-action="save-expense"]').disabled,"empty picker Cancel preserves draft and required validation");
+ check(doc.querySelector("[data-category-empty]").textContent==="יש ליצור תחילה קטגוריה במסך ניהול קטגוריות.","empty form explains Category Management");
+ check(!doc.querySelector('[data-action="add-category"],[data-action="open-category-picker"],[data-action="open-expense-category"]'),"empty creation flow has no creation shortcut or picker trigger");
  click('[data-action="close-overlay"]');
  const long="אוכל לבית · Продукты для всей семьи · Household food ".repeat(4).trim();
  nav(4);click('[data-action="add-category"]');type("#category-name",long);click('[data-action="confirm-category"]');
- click('[data-action="open-category"]');check(doc.querySelector('[data-action="add-category"]'),"management opens parent");
+ click('[data-action="open-category"]');check(doc.querySelector('[data-action="add-category"]'),"management opens parent and retains creation");
  click('[data-action="add-category"]');type("#category-name","   ");click('[data-action="confirm-category"]');
  check(!doc.querySelector("#category-error").hidden,"subcategory name required");
  type("#category-name","Supermarket");click('[data-action="confirm-category"]');
  check(doc.querySelector(".category-row").textContent==="Supermarket","subcategory created under opened parent");
  click('[data-action="back"]');check(doc.querySelectorAll('[data-action="open-category"]').length===1,"management back shows only main categories");
- nav(0);click('[data-action="expense"]');type("#amount","1");type("#expense-note","Keep draft");click('[data-action="expense-source"]');
+ click('[data-action="add-category"]');type("#category-name","Health");click('[data-action="confirm-category"]');
+ nav(0);click('[data-action="expense"]');
+ const selectedLabel=()=>doc.querySelector('.expense-main-category[aria-pressed="true"] .category-choice-label')?.textContent;
+ const openMain=name=>[...doc.querySelectorAll('[data-action="open-expense-category"]')].find(el=>el.querySelector(".category-choice-label").textContent===name).click();
+ check(doc.querySelectorAll('[data-action="open-expense-category"]').length===2,"main categories immediately visible inside creation form");
+ check(!doc.querySelector('[data-action="add-category"],[data-action="open-category-picker"]'),"creation form has no category creation action or trigger");
+ type("#amount","1");type("#expense-note","Keep draft");click('[data-action="expense-source"]');
  const draftDate=doc.querySelector("#expense-date").value;
- click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');
- check(doc.querySelector('[data-action="select-category"]')&&doc.querySelectorAll('[data-action="choose-category"]').length===1,"parent opens actual child and footer confirmation in same picker");
- check(doc.querySelectorAll(".category-option").length===1&&doc.querySelector(".category-option").textContent==="Supermarket"&&doc.querySelector("#picker-title").textContent===long,"no synthetic parent or Uncategorized rows");
- click('[data-action="category-picker-back"]');click('[data-action="choose-category"][data-id]');
- click('[data-action="close-overlay"]');
- check(doc.querySelector("#amount").value==="1"&&doc.querySelector("#expense-note").value==="Keep draft"&&doc.querySelector("#expense-date").value===draftDate,"Back and Cancel preserve all draft fields");
- click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');click('[data-action="select-category"]');
- check(doc.querySelector("#expense-category").textContent===long,"parent confirmation displays parent alone without saving expense");
- click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');click('[data-action="choose-category"][data-id]');
- check(doc.querySelector("#expense-category").textContent===long+" › Supermarket","child path in single field");
- click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');click('[data-action="close-overlay"]');
- check(doc.querySelector("#expense-category").textContent===long+" › Supermarket","Cancel preserves previous child selection");
+ click('[data-action="open-expense-category"]');
+ check(doc.querySelector('[data-action="select-category"]')&&doc.querySelectorAll('[data-action="choose-category"]').length===1,"inline parent opens actual child and footer confirmation");
+ check(!doc.querySelector('[data-action="add-category"]')&&doc.querySelector(".category-option").textContent==="Supermarket"&&doc.querySelector("#picker-title").textContent===long,"subcategory view has no creation or synthetic rows");
+ click('[data-action="category-picker-back"]');
+ check(doc.querySelectorAll('[data-action="open-expense-category"]').length===2&&!doc.querySelector("#picker-title"),"Back returns to inline main list");
+ click('[data-action="open-expense-category"]');click('[data-action="close-overlay"]');
+ check(doc.querySelector("#amount").value==="1"&&doc.querySelector("#expense-note").value==="Keep draft"&&doc.querySelector("#expense-date").value===draftDate&&!selectedLabel(),"Back and Cancel preserve every draft field and unconfirmed category");
+ click('[data-action="open-expense-category"]');click('[data-action="select-category"]');
+ check(selectedLabel()===long&&doc.querySelectorAll(".expense-main-category.selected").length===1,"parent confirmation marks one inline row without saving");
+ click('[data-action="open-expense-category"]');click('[data-action="choose-category"][data-id]');
+ check(selectedLabel()===long+" › Supermarket","child path displayed in selected inline row");
+ openMain("Health");click('[data-action="close-overlay"]');
+ check(selectedLabel()===long+" › Supermarket","browsing another parent and Cancel retain previous child selection");
  click('[data-action="save-expense"]');nav(1);click('[data-action="expense-group"]');
  check(doc.querySelectorAll(".subcategory-section").length===1&&doc.querySelectorAll(".summary-expense-row").length===1,"empty General omitted and no duplicate expense");
  click('[data-action="view-expense"]');check(doc.querySelector('[data-value="categoryId"]').textContent===long+" › Supermarket","details show path");
  click('[data-action="begin-expense-edit"]');click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');click('[data-action="select-category"]');click('[data-action="save-expense-details"]');
  check(doc.querySelector('[data-value="categoryId"]').textContent===long,"edit child to direct parent");
  click('#expense-details [data-action="close-overlay"]');
- nav(0);click('[data-action="expense"]');click('[data-action="open-category-picker"]');click('[data-action="add-category"]');
- type("#category-name","Health");click('[data-action="confirm-category"]');
- check(doc.querySelector("#expense-category").textContent==="Health","category creation from picker returns selected category");
- click('[data-action="open-category-picker"]');[...doc.querySelectorAll('[data-action="choose-category"]')].find(el=>el.textContent==="Health").click();
+ nav(0);click('[data-action="expense"]');openMain("Health");
  check(doc.querySelector("#picker-title").textContent==="Health"&&!doc.querySelector(".category-option")&&doc.querySelector('[data-action="select-category"]'),"parent without children opens empty view with confirmation");
  click('[data-action="select-category"]');
- check(doc.querySelector("#expense-category").textContent==="Health"&&!doc.querySelector("#picker-title")&&doc.querySelector('[data-action="save-expense"]'),"parent without children confirms draft only");
- click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]');
- click('[data-action="category-picker-back"]');
- check(doc.querySelectorAll('[data-action="choose-category"]').length===2,"Back returns main list");
+ check(selectedLabel()==="Health"&&doc.querySelector('[data-action="save-expense"]'),"parent without children confirms inline draft only");
+ click('[data-action="open-expense-category"]');click('[data-action="category-picker-back"]');
+ check(selectedLabel()==="Health"&&doc.querySelectorAll('[data-action="open-expense-category"]').length===2,"Back retains confirmed parent within inline list");
  click('[data-action="close-overlay"]');
- check(doc.querySelector("#expense-category").textContent==="Health","browsing another parent and Back Cancel preserve confirmed draft");
- click('[data-action="close-overlay"]');
+ const listSeed=doc.createElement("script");listSeed.type="module";
+ listSeed.textContent='import {addCategory} from "./js/preview-model.js";for(let i=0;i<24;i++)addCategory("קטגוריה ארוכה · Длинная категория · Long category "+i);document.documentElement.dataset.listReady="true";';
+ doc.body.append(listSeed);await wait(()=>doc.documentElement.dataset.listReady);
  for(const language of ["he","ru","en"]){
   nav(2);click('[data-action="toggle-setting"][data-key="language"]');click('[data-action="language"][data-value="'+language+'"]');await wait(()=>doc.documentElement.lang===language);
   for(const theme of ["light","dark"]){
@@ -106,6 +108,16 @@ try{
    check(doc.querySelector('[data-action="select-category"]').textContent===({he:"בחירה בקטגוריה הראשית",ru:"Выбрать основную категорию",en:"Select main category"})[language],language+" "+theme+" footer localized");
    check(doc.documentElement.dir===(language==="he"?"rtl":"ltr"),language+" "+theme+" direction");
    click('[data-action="close-overlay"]');click('[data-action="cancel-expense-edit"]');click('#expense-details [data-action="close-overlay"]');
+   nav(0);click('[data-action="expense"]');
+   check(doc.querySelectorAll(".expense-main-category").length===26&&!doc.querySelector('[data-action="add-category"],[data-action="open-category-picker"]'),language+" "+theme+" full inline list and no creation shortcuts");
+   check([...doc.querySelectorAll(".expense-main-category")].every(el=>el.scrollWidth<=el.clientWidth+1&&el.getBoundingClientRect().height>=48),language+" "+theme+" inline labels fit 320px with touch targets");
+   const list=doc.querySelector("#expense-category"),sheet=doc.querySelector(".sheet");
+   check(win.getComputedStyle(list).overflowY==="visible"&&list.scrollHeight<=list.clientHeight+1&&sheet.scrollHeight>sheet.clientHeight,language+" "+theme+" long list uses form scrolling");
+   click('[data-action="open-expense-category"]');
+   check(!doc.querySelector('[data-action="add-category"]'),language+" "+theme+" subcategory view has no creation shortcut");
+   click('[data-action="select-category"]');
+   check(selectedLabel()===long&&doc.querySelector('[data-action="save-expense"]').disabled,language+" "+theme+" inline confirmation retains other required validation");
+   click('[data-action="close-overlay"]');
   }
  }
  // Seed historical data explicitly inside the isolated app, bypassing new-write validation.
@@ -135,6 +147,7 @@ try{
    await wait(()=>doc.documentElement.lang===(visual.get("lang")||"he"));
    nav(2);if(!doc.querySelector('[data-action="theme"]'))click('[data-action="toggle-setting"][data-key="theme"]');
    click('[data-action="theme"][data-value="'+(visual.get("theme")||"light")+'"]');nav(1);
+   if(visual.get("visual")==="creation"){nav(0);click('[data-action="expense"]')}
    if(visual.get("visual")==="picker"){click('[data-action="view-expense"]');click('[data-action="begin-expense-edit"]');click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id]')}
  }
 }catch(error){out.textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}

@@ -58,12 +58,11 @@ try {
  const sourceIds=[...doc.querySelectorAll('[data-action="edit-source"]')].map(item=>item.dataset.id);
  const dates=periodFor(new Date()),date=civilDate(dates.start),newDate=civilDate(dates.endExclusive);
  async function add(amount,sourceId,categoryName){
+   if(categoryName){nav(4);click('[data-action="add-category"]');type("#category-name",categoryName);click('[data-action="confirm-category"]')}
    nav(0);click('[data-action="expense"]');type("#amount",amount);type("#expense-date",date);
    click('[data-action="expense-source"][data-id="'+sourceId+'"]');
-   if(!categoryName){
-     click('[data-action="open-category-picker"]');[...doc.querySelectorAll('[data-action="choose-category"]')].find(el=>el.textContent==="Other").click();click('[data-action="select-category"]');
-   }
-   if(categoryName){click('[data-action="add-category"]');type("#category-name",categoryName);click('[data-action="confirm-category"]')}
+   [...doc.querySelectorAll('[data-action="open-expense-category"]')].filter(el=>el.querySelector(".category-choice-label").textContent===(categoryName??"Other")).at(-1).click();
+   click('[data-action="select-category"]');
    click('[data-action="save-expense"]');await Promise.resolve();
  }
  await add("1",sourceIds[0],"Same");await add("2",sourceIds[1],"Same");await add("0.5",sourceIds[0],"Other");

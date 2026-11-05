@@ -27,7 +27,7 @@ export function categoryPicker(){
   ${parent?`<button class="chip" data-action="category-picker-back">${tr("back")}</button>`:""}
   <h2 id="picker-title">${escapeValue(parent?.name??tr("expense_category"))}</h2>
   ${previewModel.categories.filter(item=>parent?item.parentId===parent.id:!item.parentId).map(item=>row(item.id,item.name)).join("")}
-  ${parent?"":`<button class="chip new-category" data-action="add-category">${tr("new_category")}</button>`}
+  ${parent||state.pickerReturnOverlay==="expense"?"":`<button class="chip new-category" data-action="add-category">${tr("new_category")}</button>`}
   <div class="dialog-actions category-picker-footer"><button data-action="close-overlay">${tr("cancel")}</button>${parent?`<button class="primary" data-action="select-category" data-id="${parent.id}">${tr("select_main_category")}</button>`:""}</div>
   </section></div></div>`;
 }

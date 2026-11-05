@@ -162,6 +162,8 @@ to {
 .categories-page h1,#picker-title{overflow-wrap:anywhere}
 .category-field,.category-option{width:100%;text-align:start;white-space:normal;overflow-wrap:anywhere}
 .category-option{margin-top:8px}
+.expense-main-category{display:flex;align-items:center;justify-content:space-between;gap:10px;white-space:normal;overflow-wrap:anywhere}
+.category-choice-label{min-width:0}
 .category-picker-footer{flex-wrap:wrap}
 .category-picker-footer button{max-width:100%;white-space:normal;overflow-wrap:anywhere}
 .subcategory-section{border-top:1px solid var(--line)}

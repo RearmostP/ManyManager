@@ -151,10 +151,13 @@ document.addEventListener("click",async event=>{
     }
     case "open-category":
       state.categoryManagementId=button.dataset.id;renderKeepScroll();break;
+    case "open-expense-category":
+      openCategoryPicker();chooseCategory(button.dataset.id);renderKeepScroll();break;
     case "open-category-picker":
       openCategoryPicker();renderKeepScroll();break;
     case "category-picker-back":
-      state.pickerParentId=null;renderKeepScroll();break;
+      if(state.pickerReturnOverlay==="expense")closeOverlay();else state.pickerParentId=null;
+      renderKeepScroll();break;
     case "choose-category":
       chooseCategory(button.dataset.id??null);renderKeepScroll();break;
     case "select-category":

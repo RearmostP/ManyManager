@@ -118,7 +118,9 @@ class BudgetLifecycleTest {
             val source = success(writer.seedMethodAndBudget("Reopened source", period, 10000))
             val zero = success(writer.seedMethodAndBudget("Zero source", period, 0))
             val categorized = success(writer.createExpense(NewExpense(1250, period.start, source.id, category.id, "Saved note")))
-            val uncategorized = success(writer.createExpense(NewExpense(250, period.start, zero.id)))
+            disk.dao().insertExpense(com.example.simple.manymanager.data.local.ExpenseEntity(
+                source.calculatorId, "legacy-reopen", 250, period.startEpochDay, null, zero.id))
+            val uncategorized = success(writer.expense("legacy-reopen"))
             val saved = success(writer.snapshot())
             disk.close()
             disk = openFile()
@@ -266,6 +268,7 @@ class BudgetLifecycleTest {
     @Test fun expenseSaveRecreationCategoryDraftAndAmountCorrection() = runBlocking {
         val period = success(app.repository.currentPeriod())
         val source = success(app.repository.seedMethodAndBudget("Cash", period, 0))
+        val category = success(app.repository.createCategory("Food"))
         val screen = launch()
         val controller = model(screen)
         awaitUi(screen) { controller.sources.value is SourceListState.Ready && controller.categories.value is CategoryListState.Ready }
@@ -276,14 +279,12 @@ class BudgetLifecycleTest {
             root.findViewById<EditText>(R.id.amount).setText("12.34")
             root.findViewById<EditText>(R.id.expenseNote).setText("Keep note")
             root.findViewById<android.widget.LinearLayout>(R.id.expenseSourceChoices).getChildAt(0).performClick()
-            root.findViewById<View>(R.id.expenseNewCategory).performClick()
+            assertEquals(View.GONE, root.findViewById<View>(R.id.expenseNewCategory).visibility)
+            root.findViewById<android.widget.LinearLayout>(R.id.expenseCategoryChoices).findViewWithTag<View>(category.id).performClick()
         }
-        awaitUi(screen) { rootWith(R.id.categoryNameInput) != null }
-        screen.onActivity {
-            rootWith(R.id.categoryNameInput)!!.findViewById<EditText>(R.id.categoryNameInput).setText("Food")
-            controller.submitCategoryCreation()
-        }
-        awaitUi(screen) { controller.expenseCreationState.value?.draft?.categoryId != null && rootWith(R.id.categoryNameInput) == null }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
+        screen.onActivity { rootWith(R.id.categoryPickerRows)!!.findViewById<View>(android.R.id.button1).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.draft?.categoryId == category.id && rootWith(R.id.categoryPickerRows) == null }
         val draft = controller.expenseCreationState.value!!.draft
         assertEquals("12.34", draft.amount)
         assertEquals("Keep note", draft.note)
@@ -400,6 +401,7 @@ class BudgetLifecycleTest {
     @Test fun failedExpenseWritePreservesInputAndUnknownRestoreCannotSubmit() = runBlocking {
         val period = success(app.repository.currentPeriod())
         success(app.repository.seedMethodAndBudget("Cash", period, 0))
+        val category = success(app.repository.createCategory("Food"))
         val screen = launch()
         val controller = model(screen)
         awaitUi(screen) { controller.sources.value is SourceListState.Ready }
@@ -409,6 +411,7 @@ class BudgetLifecycleTest {
             val root = rootWith(R.id.amount)!!
             root.findViewById<EditText>(R.id.amount).setText("1.01")
             root.findViewById<EditText>(R.id.expenseNote).setText("retry")
+            controller.selectExpenseCategory(category.id)
             root.findViewById<android.widget.LinearLayout>(R.id.expenseSourceChoices).getChildAt(0).performClick()
         }
         val draft = controller.expenseCreationState.value!!.draft
@@ -427,8 +430,9 @@ class BudgetLifecycleTest {
         awaitUi(screen) { (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.expenseCount == 1 }
         screen.onActivity {
             val row = it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).getChildAt(0)
-            assertTrue(row.contentDescription.contains(it.getString(R.string.uncategorized)))
-            assertEquals("1.01", it.findViewById<TextView>(R.id.homeTotal).text.toString())
+            assertTrue(row.contentDescription.contains(category.name))
+            assertEquals(BudgetAmounts.number(101, it.resources.configuration.locales[0]),
+                it.findViewById<TextView>(R.id.homeTotal).text.toString())
         }
         screen.onActivity {
             controller.restoreExpenseCreation(ExpenseCreationState.fromBundle(ExpenseCreationState(draft, submitting = true).toBundle()))
@@ -450,7 +454,7 @@ class BudgetLifecycleTest {
         val catB = success(app.repository.createCategory("Same"))
         val first = success(app.repository.createExpense(NewExpense(100, period.start, a.id, catA.id)))
         success(app.repository.createExpense(NewExpense(200, period.start, b.id, catB.id)))
-        success(app.repository.createExpense(NewExpense(300, period.start, a.id)))
+        success(app.repository.legacyExpense(300, period.start, a.id))
         val screen = launch()
         val controller = model(screen)
         fun rows(activity: MainActivity, id: Int) = activity.findViewById<android.widget.LinearLayout>(id)
@@ -642,7 +646,7 @@ class BudgetLifecycleTest {
         val source = success(app.repository.seedMethodAndBudget("Source", period, 0))
         val category = success(app.repository.createCategory("Category"))
         success(app.repository.createExpense(NewExpense(120, period.start, source.id, category.id, "Full note")))
-        success(app.repository.createExpense(NewExpense(30, period.start, source.id)))
+        success(app.repository.legacyExpense(30, period.start, source.id))
         val saved = success(app.repository.snapshot())
         // A renderer-only fixture deliberately reuses an ID across the two grouping types.
         val snapshot = saved.copy(
@@ -716,7 +720,7 @@ class BudgetLifecycleTest {
         val otherCategory = success(app.repository.createCategory("Same"))
         val first = success(app.repository.createExpense(NewExpense(100, period.start, source.id, category.id)))
         success(app.repository.createExpense(NewExpense(200, period.start, otherSource.id, otherCategory.id)))
-        success(app.repository.createExpense(NewExpense(50, period.start, source.id)))
+        success(app.repository.legacyExpense(50, period.start, source.id))
         val screen = launch()
         val controller = model(screen)
         screen.onActivity { it.findViewById<View>(R.id.menuButton).performClick() }
@@ -758,20 +762,21 @@ class BudgetLifecycleTest {
             root.findViewById<EditText>(R.id.expenseDetailsNote).setText("Edited")
             controller.updateExpenseDraft(controller.expenseCreationState.value!!.draft.copy(
                 sourceId = otherSource.id, date = period.endExclusive))
-            root.findViewById<View>(R.id.expenseDetailsNewCategory).performClick()
+            root.findViewById<View>(R.id.expenseDetailsCategory).performClick()
         }
-        awaitUi(screen) { rootWith(R.id.categoryNameInput) != null }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
         val beforeCategory = controller.expenseCreationState.value!!.draft
         screen.onActivity {
-            rootWith(R.id.categoryNameInput)!!.findViewById<EditText>(R.id.categoryNameInput).setText("Created from details")
-            controller.submitCategoryCreation()
+            rootWith(R.id.categoryPickerRows)!!.findViewWithTag<View>(otherCategory.id).performClick()
+            rootWith(R.id.categoryPickerRows)!!.findViewById<View>(android.R.id.button1).performClick()
         }
-        awaitUi(screen) { controller.categoryCreation.value == null &&
-            controller.expenseCreationState.value?.draft?.categoryId != category.id }
+        awaitUi(screen) { controller.expenseCreationState.value?.draft?.categoryId == otherCategory.id }
         val selected = controller.expenseCreationState.value!!.draft
         assertEquals(beforeCategory.copy(categoryId = selected.categoryId), selected)
         screen.onActivity {
             controller.updateExpenseDraft(selected.copy(categoryId = null))
+            assertFalse(controller.canSaveExpense())
+            controller.updateExpenseDraft(selected)
             rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.deleteExpenseDetails).performClick()
         }
         awaitUi(screen) { rootWith(android.R.id.button1) != null && controller.expenseCreationState.value?.confirmingDelete == true }
@@ -797,7 +802,7 @@ class BudgetLifecycleTest {
             controller.expenseCreationState.value?.original?.date == period.endExclusive }
         assertNotNull(rootWith(R.id.expenseDetailsTitle))
         assertEquals(first.copy(amountMinor = 123, date = period.endExclusive, sourceId = otherSource.id,
-            categoryId = null, note = "Edited"), success(app.repository.expense(first.id)))
+            categoryId = otherCategory.id, note = "Edited"), success(app.repository.expense(first.id)))
         awaitUi(screen) { inlineRows(it, true, category.id) == null }
         screen.onActivity {
             assertEquals(View.GONE, rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.expenseDetailsAmount).visibility)
@@ -825,9 +830,9 @@ class BudgetLifecycleTest {
         val source = success(app.repository.seedMethodAndBudget("Same", period, 100))
         val otherSource = success(app.repository.seedMethodAndBudget("Same", period, 0))
         val category = success(app.repository.createCategory("Food"))
-        val first = success(app.repository.createExpense(NewExpense(30, period.start, source.id)))
+        val first = success(app.repository.legacyExpense(30, period.start, source.id))
         val second = success(app.repository.createExpense(NewExpense(20, period.start, source.id, category.id)))
-        val other = success(app.repository.createExpense(NewExpense(10, period.start, otherSource.id)))
+        val other = success(app.repository.legacyExpense(10, period.start, otherSource.id))
         val screen = launch()
         val controller = model(screen)
         screen.onActivity { it.findViewById<View>(R.id.menuButton).performClick() }
@@ -1041,6 +1046,16 @@ class BudgetLifecycleTest {
         }
     }
 
+    /** Historical fixtures bypass new-write validation deliberately. */
+    private suspend fun ManyManagerRepository.legacyExpense(amount: Long, date: java.time.LocalDate, source: String): DataResult<Expense> {
+        val calculator = success(snapshot()).calculator.id
+        val id = java.util.UUID.randomUUID().toString()
+        val db = app.database
+        db.dao().insertExpense(com.example.simple.manymanager.data.local.ExpenseEntity(
+            calculator, id, amount, date.toEpochDay(), null, source))
+        return expense(id)
+    }
+
     private fun <T> success(result: DataResult<T>): T {
         assertTrue("Expected success, got $result", result is DataResult.Success)
         return (result as DataResult.Success).value
@@ -1128,6 +1143,221 @@ class BudgetLifecycleTest {
         assertEquals(12345L, success(app.repository.snapshot()).totalAllocatedMinor)
     }
 
+    @Test fun categoryHierarchyBrowsingConfirmationManagementAndLegacyEditing(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createPaymentMethod("Cash"))
+        val screen = launch()
+        val controller = model(screen)
+        awaitUi(screen) { controller.categories.value is CategoryListState.Ready && controller.sources.value is SourceListState.Ready }
+        screen.onActivity { it.findViewById<View>(R.id.addExpense).performClick() }
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        screen.onActivity { activity ->
+            val root = rootWith(R.id.amount)!!
+            root.findViewById<EditText>(R.id.amount).setText("1.23")
+            root.findViewById<EditText>(R.id.expenseNote).setText("Keep draft")
+            root.findViewById<android.widget.LinearLayout>(R.id.expenseSourceChoices).getChildAt(0).performClick()
+            assertEquals(activity.getString(R.string.category_management_required), root.findViewById<TextView>(R.id.expenseCategoriesEmpty).text)
+            assertFalse(root.findViewById<View>(R.id.saveExpense).isEnabled)
+            assertNull(controller.submitExpenseCreation())
+            root.findViewById<View>(R.id.closeDialog).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.amount) == null }
+        // Create through Category Management, then open the main category and create a real child.
+        screen.onActivity { it.findViewById<View>(R.id.menuButton).performClick() }
+        awaitUi(screen) { rootWith(R.id.nav4) != null }
+        screen.onActivity { rootWith(R.id.nav4)!!.findViewById<View>(R.id.nav4).performClick() }
+        awaitUi(screen) { it.findViewById<View>(R.id.categoriesPage).isShown }
+        screen.onActivity { it.findViewById<View>(R.id.categoryAdd).performClick() }
+        awaitUi(screen) { rootWith(R.id.categoryNameInput) != null }
+        screen.onActivity {
+            rootWith(R.id.categoryNameInput)!!.findViewById<EditText>(R.id.categoryNameInput).setText("Food")
+            rootWith(R.id.categoryNameInput)!!.findViewById<View>(android.R.id.button1).performClick()
+        }
+        awaitUi(screen) { controller.categoryCreation.value == null && it.findViewById<android.widget.LinearLayout>(R.id.categoryRows).childCount == 1 }
+        val parent = success(app.repository.observeCategories().first()).single()
+        assertNull(parent.parentId)
+        screen.onActivity {
+            it.findViewById<View>(R.id.categoryRows).findViewWithTag<View>(parent.id).performClick()
+            assertEquals(it.getString(R.string.add_subcategory), it.findViewById<TextView>(R.id.categoryAdd).text)
+            it.findViewById<View>(R.id.categoryAdd).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.categoryNameInput) != null }
+        screen.onActivity {
+            rootWith(R.id.categoryNameInput)!!.findViewById<EditText>(R.id.categoryNameInput).setText("Food")
+            rootWith(R.id.categoryNameInput)!!.findViewById<View>(android.R.id.button1).performClick()
+        }
+        awaitUi(screen) { controller.categoryCreation.value == null && (controller.categories.value as? CategoryListState.Ready)?.categories?.size == 2 }
+        val child = success(app.repository.observeCategories().first()).single { it.parentId == parent.id }
+        screen.recreate()
+        awaitUi(screen) { it.findViewById<TextView>(R.id.categoryPageTitle).text.toString() == parent.name }
+        screen.onActivity {
+            assertEquals(1, it.findViewById<android.widget.LinearLayout>(R.id.categoryRows).childCount)
+            it.findViewById<View>(R.id.categoryBack).performClick()
+            it.findViewById<View>(R.id.categoryBack).performClick()
+            it.findViewById<View>(R.id.addExpense).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        screen.onActivity {
+            val root = rootWith(R.id.amount)!!
+            root.findViewById<EditText>(R.id.amount).setText("1.23")
+            root.findViewById<EditText>(R.id.expenseNote).setText("Keep draft")
+            root.findViewById<android.widget.LinearLayout>(R.id.expenseSourceChoices).getChildAt(0).performClick()
+        }
+        val initial = controller.expenseCreationState.value!!.draft
+        fun openParent() = rootWith(R.id.amount)!!.findViewById<View>(R.id.expenseCategoryChoices).findViewWithTag<View>(parent.id).performClick()
+        screen.onActivity { openParent() }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
+        screen.onActivity {
+            val picker = rootWith(R.id.categoryPickerRows)!!
+            assertEquals(1, picker.findViewById<android.widget.LinearLayout>(R.id.categoryPickerRows).childCount)
+            assertEquals(initial, controller.expenseCreationState.value!!.draft)
+            picker.findViewById<View>(android.R.id.button2).performClick()
+        }
+        assertEquals(initial, controller.expenseCreationState.value!!.draft)
+        screen.onActivity { openParent() }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
+        screen.onActivity { rootWith(R.id.categoryPickerRows)!!.findViewById<View>(android.R.id.button1).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.draft?.categoryId == parent.id }
+        val direct = controller.expenseCreationState.value!!.draft
+        assertEquals(initial.copy(categoryId = parent.id), direct)
+        screen.onActivity { openParent() }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
+        screen.onActivity { rootWith(R.id.categoryPickerRows)!!.findViewById<View>(R.id.categoryPickerBack).performClick() }
+        assertEquals(direct, controller.expenseCreationState.value!!.draft)
+        screen.onActivity { openParent() }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
+        screen.onActivity { rootWith(R.id.categoryPickerRows)!!.findViewWithTag<View>(child.id).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.draft?.categoryId == child.id }
+        assertEquals(initial.copy(categoryId = child.id), controller.expenseCreationState.value!!.draft)
+        assertEquals(0, success(app.repository.snapshot()).expenseCount)
+        screen.recreate()
+        awaitUi(screen) { rootWith(R.id.amount) != null }
+        screen.onActivity {
+            val row = rootWith(R.id.amount)!!.findViewById<View>(R.id.expenseCategoryChoices).findViewWithTag<TextView>(parent.id)
+            assertTrue(row.isSelected)
+            assertTrue(row.text.toString().contains("Food / Food"))
+            rootWith(R.id.amount)!!.findViewById<View>(R.id.saveExpense).performClick()
+        }
+        awaitUi(screen) { controller.expenseCreationState.value == null }
+        val savedDate = initial.date!!
+        val saved = success(app.repository.snapshot(success(app.repository.periodContaining(savedDate)))).expenses.single()
+        assertEquals(child.id, saved.categoryId)
+        val legacy = success(app.repository.legacyExpense(50, period.start, source.id))
+        screen.onActivity { controller.openExpenseDetails(legacy.id) }
+        awaitUi(screen) { controller.expenseCreationState.value?.original?.id == legacy.id }
+        screen.onActivity {
+            controller.editExpense()
+            assertFalse(controller.canSaveExpense())
+            assertNull(controller.submitExpenseCreation())
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.expenseDetailsCategory).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
+        screen.onActivity {
+            rootWith(R.id.categoryPickerRows)!!.findViewWithTag<View>(parent.id).performClick()
+            rootWith(R.id.categoryPickerRows)!!.findViewById<View>(android.R.id.button1).performClick()
+        }
+        awaitUi(screen) { controller.canSaveExpense() }
+        screen.onActivity { controller.submitExpenseCreation() }
+        awaitUi(screen) { controller.expenseCreationState.value?.editing == false }
+        assertEquals(parent.id, success(app.repository.expense(legacy.id)).categoryId)
+    }
+
+    @Test fun categoryPickerWrapsLongNamesAndFooterInNarrowLocalesAndThemes(): Unit = runBlocking {
+        val screen = launch()
+        val categories = listOf(Category("test", "parent", "קטגוריה ארוכה · Long category · Длинная категория ".repeat(3)),
+            Category("test", "child", "תת־קטגוריה · Subcategory · Подкатегория ".repeat(4), "parent"))
+        for (language in listOf("he", "en", "ru")) for (dark in listOf(false, true)) {
+            app.getSharedPreferences("appearance", android.content.Context.MODE_PRIVATE).edit().putBoolean("dark", dark).commit()
+            screen.recreate()
+            lateinit var picker: CategoryPickerDialog
+            screen.onActivity { activity ->
+                val config = Configuration(activity.resources.configuration).apply {
+                    val locale = java.util.Locale.forLanguageTag(language); setLocale(locale); setLayoutDirection(locale)
+                }
+                val themed = androidx.appcompat.view.ContextThemeWrapper(activity, R.style.AppTheme).apply { applyOverrideConfiguration(config) }
+                picker = CategoryPickerDialog(themed, categories, "child", "parent") { fail("Browsing must not confirm") }
+                picker.show()
+                picker.dialog.window!!.setLayout((320 * activity.resources.displayMetrics.density).toInt(), android.view.ViewGroup.LayoutParams.WRAP_CONTENT)
+            }
+            awaitUi(screen) { picker.dialog.findViewById<View>(android.R.id.button1)?.width != 0 }
+            screen.onActivity { activity ->
+                val confirm = picker.dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)
+                assertEquals(picker.dialog.context.getString(R.string.select_main_category), confirm.text.toString())
+                for (id in listOf(android.R.id.button1, android.R.id.button2, R.id.categoryPickerBack)) {
+                    val button = picker.dialog.findViewById<TextView>(id)!!
+                    assertTrue(button.height >= (48 * activity.resources.displayMetrics.density).toInt())
+                    assertTrue(button.layout.getLineBottom(button.layout.lineCount - 1) <=
+                        button.height - button.compoundPaddingTop - button.compoundPaddingBottom)
+                }
+                val row = picker.dialog.findViewById<android.widget.LinearLayout>(R.id.categoryPickerRows)!!.getChildAt(0) as TextView
+                assertTrue(row.layout.lineCount > 1)
+                assertTrue(row.isSelected)
+                val view = picker.dialog.window!!.decorView
+                val image = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+                view.draw(android.graphics.Canvas(image))
+                val path = java.io.File(checkNotNull(app.getExternalFilesDir(null)), "category-picker-${language}-${dark}.png")
+                path.outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                image.recycle()
+                picker.dispose()
+            }
+        }
+    }
+
+    @Test fun hierarchySummaryGroupsDirectAndChildOnceAndShowsSavedPaths(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createPaymentMethod("Cash"))
+        val parent = success(app.repository.createCategory("Food"))
+        val child = success(app.repository.createCategory("Supermarket", parent.id))
+        val direct = success(app.repository.createExpense(NewExpense(10000, period.start, source.id, parent.id)))
+        val nested = success(app.repository.createExpense(NewExpense(25000, period.start, source.id, child.id)))
+        success(app.repository.legacyExpense(500, period.start, source.id))
+        val screen = launch()
+        screen.onActivity { it.findViewById<View>(R.id.menuButton).performClick() }
+        awaitUi(screen) { rootWith(R.id.nav1) != null }
+        screen.onActivity { rootWith(R.id.nav1)!!.findViewById<View>(R.id.nav1).performClick() }
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.categorySummaryRows).childCount == 2 }
+        screen.onActivity { activity ->
+            val row = activity.findViewById<View>(R.id.categorySummaryRows).findViewWithTag<View>(parent.id)
+            assertEquals(activity.getString(R.string.ils_amount, BudgetAmounts.number(35000, activity.resources.configuration.locales[0])),
+                row.findViewById<TextView>(R.id.breakdownAmount).text)
+            row.findViewById<View>(R.id.summaryGroupHeader).performClick()
+        }
+        awaitUi(screen) { inlineRows(it, true, parent.id)?.childCount == 4 }
+        screen.onActivity { activity ->
+            val sections = inlineRows(activity, true, parent.id)!!
+            assertTrue((sections.getChildAt(0) as TextView).text.startsWith(activity.getString(R.string.category_general)))
+            assertTrue((sections.getChildAt(2) as TextView).text.startsWith(child.name))
+            val directRows = sections.getChildAt(1) as android.widget.LinearLayout
+            val childRows = sections.getChildAt(3) as android.widget.LinearLayout
+            assertEquals(1, directRows.childCount)
+            assertEquals(1, childRows.childCount)
+            assertEquals(direct.id, directRows.getChildAt(0).tag)
+            assertEquals(nested.id, childRows.getChildAt(0).tag)
+            childRows.getChildAt(0).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null }
+        screen.onActivity { activity ->
+            assertEquals("Food / Supermarket", rootWith(R.id.expenseDetailsTitle)!!.findViewById<TextView>(R.id.expenseDetailsCategoryValue).text.toString())
+            detailsBack(activity)
+            activity.findViewById<View>(R.id.allTab).performClick()
+        }
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).childCount == 3 }
+        screen.onActivity { activity ->
+            val row = activity.findViewById<View>(R.id.expenseRows).findViewWithTag<View>(nested.id)
+            assertTrue(row.findViewById<TextView>(R.id.summaryExpenseSecondary).text.contains("Food / Supermarket"))
+            activity.findViewById<View>(R.id.sourceTab).performClick()
+            activity.findViewById<View>(R.id.sourceSummaryRows).findViewWithTag<View>(source.id).findViewById<View>(R.id.summaryGroupHeader).performClick()
+        }
+        awaitUi(screen) { inlineRows(it, false, source.id)?.childCount == 3 }
+        screen.onActivity { activity ->
+            val row = inlineRows(activity, false, source.id)!!.findViewWithTag<View>(nested.id)
+            assertTrue(row.findViewById<TextView>(R.id.summaryExpenseSecondary).text.contains("Food / Supermarket"))
+        }
+        assertEquals(2, success(app.repository.observeCategories().first()).size)
+        assertEquals(35500L, success(app.repository.snapshot()).totalSpentMinor)
+        assertEquals(3, success(app.repository.snapshot()).categoryBreakdown.sumOf { it.expenseCount })
+    }
+
     @Test fun singleBudgetAndNameOnlyMethodsSurviveRecreation() = runBlocking {
         val screen = launch()
         openBudget(screen)
@@ -1145,8 +1375,9 @@ class BudgetLifecycleTest {
         val cash = success(app.repository.observeSources().first()).single()
         val card = success(app.repository.createPaymentMethod("Card"))
         val period = success(app.repository.currentPeriod())
-        success(app.repository.createExpense(NewExpense(10000, period.start, cash.id)))
-        success(app.repository.createExpense(NewExpense(25000, period.start, card.id)))
+        val category = success(app.repository.createCategory("Food"))
+        success(app.repository.createExpense(NewExpense(10000, period.start, cash.id, category.id)))
+        success(app.repository.createExpense(NewExpense(25000, period.start, card.id, category.id)))
         awaitUi(screen) {
             (controller.activeBudget.value as? PersistentDataState.Ready)?.snapshot?.remainingMinor == 1965000L
         }

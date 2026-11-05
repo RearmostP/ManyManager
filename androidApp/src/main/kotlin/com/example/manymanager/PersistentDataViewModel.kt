@@ -139,8 +139,8 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
 
     fun retryCategories() { categoryRefresh.update { it + 1 } }
 
-    fun beginCategoryCreation(fromExpense: Boolean) {
-        if (creation.value == null) creation.value = CategoryCreationState(fromExpense)
+    fun beginCategoryCreation(fromExpense: Boolean, parentId: String? = null) {
+        if (creation.value == null) creation.value = CategoryCreationState(fromExpense, parentId = parentId)
     }
 
     fun restoreCategoryCreation(restored: CategoryCreationState) {
@@ -169,7 +169,7 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         if (current.submitting || current.result is DataResult.Success) return null
         creation.value = current.copy(submitting = true, result = null, interrupted = false)
         return viewModelScope.launch {
-            val result = repository.createCategory(current.name)
+            val result = repository.createCategory(current.name, current.parentId)
             currentCoroutineContext().ensureActive()
             creation.value = current.copy(result = result, interrupted = false)
         }
@@ -335,8 +335,8 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
             (state.expenseId == null || (state.original != null && state.editing)) && draft.date != null &&
             BudgetAmounts.positive(draft.amount) is DataResult.Success &&
             (sources.value as? SourceListState.Ready)?.sources?.any { it.id == draft.sourceId } == true &&
-            (draft.categoryId == null ||
-                (categories.value as? CategoryListState.Ready)?.categories?.any { it.id == draft.categoryId } == true)
+            draft.categoryId != null &&
+            (categories.value as? CategoryListState.Ready)?.categories?.any { it.id == draft.categoryId } == true
     }
     fun submitExpenseCreation(): Job? {
         val current = expenseCreation.value ?: return null
@@ -347,6 +347,7 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
             amount is DataResult.Failure -> amount.error
             current.draft.date == null -> DataError.InvalidDate
             current.draft.sourceId == null -> DataError.MissingEntity(EntityKind.SOURCE, "")
+            current.draft.categoryId == null -> DataError.MissingEntity(EntityKind.CATEGORY, "")
             else -> null
         }
         if (error != null) { expenseCreation.value = current.copy(error = error); return null }

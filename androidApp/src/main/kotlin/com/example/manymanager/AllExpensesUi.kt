@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.example.simple.manymanager.domain.Expense
+import com.example.simple.manymanager.domain.categoryPath
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 
@@ -38,13 +39,12 @@ class AllExpensesUi(private val root: View, private val onCorrect: (Expense) -> 
     /** Shared non-scrolling rows for All Expenses and inline Summary groups. */
     fun renderRows(rows: LinearLayout, snapshot: com.example.simple.manymanager.domain.BudgetSnapshot, expenses: List<Expense>, groupCategory: Boolean? = null) {
         rows.removeAllViews()
-        val categories = snapshot.categories.associateBy { it.id }
         val sources = snapshot.sources.associateBy { it.source.id }
         val locale = context.resources.configuration.locales[0]
         val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
         expenses.forEachIndexed { index, expense ->
             val amount = context.getString(R.string.ils_amount, BudgetAmounts.number(expense.amountMinor, locale))
-            val category = categories[expense.categoryId]?.name ?: context.getString(R.string.uncategorized)
+            val category = snapshot.categories.categoryPath(expense.categoryId) ?: context.getString(R.string.uncategorized)
             val source = sources[expense.sourceId]?.source?.name.orEmpty()
             val secondary = (listOf(expense.date.format(dateFormat)) + when (groupCategory) {
                 true -> listOf(source)

@@ -34,7 +34,8 @@ class SingleBudgetMigrationTest {
         }
         helper.runMigrationsAndValidate(name, 2, true, ManyManagerDatabase.MIGRATION_1_2).close()
         val db = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
-            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2, ManyManagerDatabase.MIGRATION_2_3)
+            .addCallback(ManyManagerDatabase.HIERARCHY_CALLBACK).build()
         try {
             val dao = db.dao()
             assertEquals(2_000_000L, dao.periodBudget("a",100)!!.amountMinor)

@@ -43,6 +43,7 @@ class CategoryCreationDialog(
     fun show() { dialog.showWithRoundedSurface() }
 
     fun render(state: CategoryCreationState) {
+        dialog.setTitle(if (state.parentId == null) R.string.add_category_action else R.string.add_subcategory)
         if (input.text.toString() != state.name) {
             input.setText(state.name)
             input.setSelection(input.length())

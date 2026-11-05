@@ -266,6 +266,7 @@ class MainActivity : AppCompatActivity() {
             findViewById(R.id.categoriesPage), ::navigateBack, ::showAddCategory,
             persistentViewModel::retryCategories
         )
+        categoryManagementUi?.parentId = savedInstanceState?.getString("categoryManagementParent")
         listOf(R.id.previousMonth, R.id.nextMonth).forEach { id ->
             findViewById<View>(id).apply {
                 isEnabled = false
@@ -340,6 +341,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun navigateBack() {
+        if (page == 4 && categoryManagementUi?.back() == true) return
         if (page == 0 && budgetState.breakdownExpanded) {
             homeBudgetUi?.setExpanded(false)
             return
@@ -618,7 +620,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showAddCategory(fromExpense: ExpenseSheetDialog?) {
         if (fromExpense == null) dismissActiveDialogImmediately()
-        persistentViewModel.beginCategoryCreation(fromExpense != null)
+        persistentViewModel.beginCategoryCreation(false, categoryManagementUi?.parentId)
         renderCategoryCreation(persistentViewModel.categoryCreation.value)
     }
 
@@ -793,6 +795,7 @@ class MainActivity : AppCompatActivity() {
             outState.putBundle("expenseCreation", it.toBundle())
         }
         persistentViewModel.periodBudgetDraft.value?.let { outState.putBundle("periodBudget", it.toBundle()) }
+        outState.putString("categoryManagementParent", categoryManagementUi?.parentId)
         outState.putStringArrayList("expandedSummaryGroups", ArrayList(expandedSummaryGroups))
         summaryDialogScroll?.let { outState.putInt("summaryDialogScroll", it) }
         persistentViewModel.categoryCreation.value?.let {

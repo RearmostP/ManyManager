@@ -4,7 +4,7 @@
     android:orientation="vertical">
     <ImageButton android:id="@+id/categoryBack" style="@style/IconButton"
         android:src="@drawable/ic_right" android:contentDescription="@string/back" />
-    <TextView style="@style/Text" android:layout_width="match_parent"
+    <TextView android:id="@+id/categoryPageTitle" style="@style/Text" android:layout_width="match_parent"
         android:layout_height="wrap_content" android:layout_marginTop="12dp"
         android:text="@string/expense_categories" android:textSize="34sp"
         android:textStyle="bold" android:accessibilityHeading="true" />

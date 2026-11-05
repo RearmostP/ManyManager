@@ -33,6 +33,8 @@ class ExpenseDetailsDialog(
     private var datePicker: DatePickerDialog? = null
     private var confirmation: AlertDialog? = null
     private var categoryNames: Map<String, String> = emptyMap()
+    private var categoryOptions: List<Category> = emptyList()
+    private var categoryPicker: CategoryPickerDialog? = null
     private var sourceNames: Map<String, String> = emptyMap()
 
     private fun text(id: Int = View.NO_ID, size: Float = 16f) = TextView(activity).apply {
@@ -92,7 +94,16 @@ class ExpenseDetailsDialog(
     }
     private val amount = input(R.id.expenseDetailsAmount, true)
     private val date = action(R.string.expense_date, R.id.expenseDetailsDate)
-    private val category = Spinner(activity).apply { id = R.id.expenseDetailsCategory; minimumHeight = dp(48) }
+    private val category = action(R.string.choose_category, R.id.expenseDetailsCategory).apply {
+        setOnClickListener {
+            if (canInteract()) {
+                categoryPicker?.dispose()
+                categoryPicker = CategoryPickerDialog(activity, categoryOptions, state?.draft?.categoryId) { id ->
+                    state?.draft?.let { onDraft(it.copy(categoryId = id)) }
+                }.also { it.show() }
+            }
+        }
+    }
     private val source = Spinner(activity).apply { id = R.id.expenseDetailsSource; minimumHeight = dp(48) }
     private val note = input(R.id.expenseDetailsNote)
     private val amountField = field(R.string.expense_amount, R.id.expenseDetailsAmountValue, amount)
@@ -133,7 +144,7 @@ class ExpenseDetailsDialog(
     val dialog: AlertDialog = AlertDialog.Builder(activity).create()
 
     init {
-        categoryField.container.addView(newCategory)
+        // Category creation is available only in Category Management.
         noteField = field(R.string.optional_note, R.id.expenseDetailsNoteValue, note)
         header.addView(title, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         header.addView(close, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
@@ -184,14 +195,17 @@ class ExpenseDetailsDialog(
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (!rendering && canInteract() && parent?.selectedItemPosition == position) {
                     val choice = parent.selectedItem as? Choice ?: return
-                    if (choice.id != (if (spinner === category) state?.draft?.categoryId else state?.draft?.sourceId)) select(choice.id)
+                    if (choice.id != (state?.draft?.sourceId)) select(choice.id)
                 }
             }
         }
     }
     fun render(value: ExpenseCreationState, categories: CategoryListState, sources: SourceListState, canSave: Boolean) {
         state = value
-        if (categories is CategoryListState.Ready) categoryNames = categories.categories.associate { it.id to it.name }
+        if (categories is CategoryListState.Ready) {
+            categoryOptions = categories.categories
+            categoryNames = categories.categories.associate { it.id to (categoryOptions.categoryPath(it.id) ?: it.name) }
+        }
         if (sources is SourceListState.Ready) sourceNames = sources.sources.associate { it.id to it.name }
         val saved = value.original
         val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(activity.resources.configuration.locales[0])
@@ -209,14 +223,13 @@ class ExpenseDetailsDialog(
         }
         fields.visibility = if (saved == null) View.GONE else View.VISIBLE
         noteField.container.visibility = if (editing || !saved?.note.isNullOrBlank()) View.VISIBLE else View.GONE
-        newCategory.visibility = if (editing) View.VISIBLE else View.GONE
+        newCategory.visibility = View.GONE
         newCategory.isEnabled = canInteract()
         rendering = true
         if (amount.text.toString() != value.draft.amount) amount.setText(value.draft.amount)
         if (note.text.toString() != value.draft.note) note.setText(value.draft.note)
         date.text = value.draft.date?.format(formatter).orEmpty()
-        bindChoices(category, listOf(Choice(null, activity.getString(R.string.uncategorized))) +
-            categoryNames.map { Choice(it.key, it.value) }, value.draft.categoryId) { id -> state?.draft?.let { onDraft(it.copy(categoryId = id)) } }
+        category.text = categoryNames[value.draft.categoryId] ?: activity.getString(R.string.choose_category)
         bindChoices(source, sourceNames.map { Choice(it.key, it.value) }, value.draft.sourceId) { id -> state?.draft?.let { onDraft(it.copy(sourceId = id)) } }
         rendering = false
         edit.visibility = if (editing || saved == null) View.GONE else View.VISIBLE
@@ -231,6 +244,8 @@ class ExpenseDetailsDialog(
             value.interrupted -> R.string.expense_save_interrupted
             value.loading -> R.string.expense_edit_loading
             value.error != null -> expenseErrorMessage(value.error)
+            editing && categoryOptions.none { it.parentId == null } -> R.string.category_management_required
+            editing && value.draft.categoryId == null -> R.string.choose_category
             editing && parsed is DataResult.Failure -> expenseErrorMessage(parsed.error)
             editing && (sources is SourceListState.Failed || categories is CategoryListState.Failed) -> R.string.expense_edit_retry
             else -> null
@@ -269,6 +284,7 @@ class ExpenseDetailsDialog(
         }
     }
     fun dispose() {
+        categoryPicker?.dispose(); categoryPicker = null
         confirmation?.setOnCancelListener(null); confirmation?.dismiss(); confirmation = null
         datePicker?.dismiss(); datePicker = null
         dialog.dismiss()

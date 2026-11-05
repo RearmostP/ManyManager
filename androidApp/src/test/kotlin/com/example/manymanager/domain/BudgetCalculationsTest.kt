@@ -93,6 +93,22 @@ class BudgetCalculationsTest {
         assertTrue(empty.sourceBreakdown.isEmpty())
     }
 
+    @Test fun parentTotalsIncludeDirectAndChildExpensesExactlyOnceAndPathsUseIds() {
+        val categories = listOf(Category("local", "food", "Food"), Category("local", "shop", "Food", "food"))
+        val rows = listOf(expense("direct", 100, category = "food"),
+            expense("child", 250, category = "shop"), expense("legacy", 50))
+        val result = BudgetCalculations.snapshot(calculator, period, categories, sources, 1000, rows)
+        assertEquals(CategorySummary("food", 350, 2), result.categoryBreakdown.first())
+        assertEquals(CategorySummary(null, 50, 1), result.categoryBreakdown.last())
+        assertEquals(400L, result.totalSpentMinor)
+        assertEquals(3, result.categoryBreakdown.sumOf { it.expenseCount })
+        assertEquals("Food / Food", categories.categoryPath("shop"))
+        assertEquals("food", categories.mainCategoryId("shop"))
+        assertEquals("Food / Renamed", categories.map {
+            if (it.id == "shop") it.copy(name = "Renamed") else it
+        }.categoryPath("shop"))
+    }
+
     private fun snapshot(expenses: List<Expense>, budget: Long = 0L) =
-        BudgetCalculations.snapshot(calculator, period, emptyList(), sources, budget, expenses)
+        BudgetCalculations.snapshot(calculator, period, listOf(Category("local", "cat", "Category")), sources, budget, expenses)
 }

@@ -120,9 +120,13 @@ class ManyManagerRepository(
         if (input.amountMinor <= 0) reject(DataError.NonPositiveAmount)
         val period = expensePeriod(calculator, input.date)
         requireSource(calculator.id, input.sourceId)
-        input.categoryId?.let { id ->
-            if (dao.categories(calculator.id).none { it.id == id })
-                reject(DataError.MissingEntity(EntityKind.CATEGORY, id))
+        val id = input.categoryId ?: reject(DataError.MissingEntity(EntityKind.CATEGORY, ""))
+        val categories = dao.categories(calculator.id)
+        val category = categories.firstOrNull { it.id == id }
+            ?: reject(DataError.MissingEntity(EntityKind.CATEGORY, id))
+        category.parentId?.let { parentId ->
+            if (categories.none { it.id == parentId && it.parentId == null })
+                reject(DataError.MissingEntity(EntityKind.CATEGORY, parentId))
         }
         return period
     }
@@ -131,8 +135,10 @@ class ManyManagerRepository(
         try { configuredCalculator(calculator).periodContaining(date) }
         catch (_: DateTimeException) { reject(DataError.InvalidDate) }
 
-    suspend fun createCategory(name: String): DataResult<Category> = execute { calculator ->
-        val category = CategoryEntity(calculator.id, UUID.randomUUID().toString(), cleanName(name))
+    suspend fun createCategory(name: String, parentId: String? = null): DataResult<Category> = execute { calculator ->
+        if (parentId != null && dao.categories(calculator.id).none { it.id == parentId && it.parentId == null })
+            reject(DataError.MissingEntity(EntityKind.CATEGORY, parentId))
+        val category = CategoryEntity(calculator.id, UUID.randomUUID().toString(), cleanName(name), parentId)
         dao.insertCategory(category)
         category.domain()
     }
@@ -235,7 +241,7 @@ class ManyManagerRepository(
     private fun reject(error: DataError): Nothing = throw Rejected(error)
 
     private fun CalculatorEntity.domain() = Calculator(id, periodStartDay, currencyCode)
-    private fun CategoryEntity.domain() = Category(calculatorId, id, name)
+    private fun CategoryEntity.domain() = Category(calculatorId, id, name, parentId)
     private fun BudgetSourceEntity.domain() = BudgetSource(calculatorId, id, name)
     private fun ExpenseEntity.domain() = Expense(
         calculatorId, id, amountMinor, LocalDate.ofEpochDay(dateEpochDay), categoryId, sourceId, note

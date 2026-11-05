@@ -105,7 +105,7 @@
     <string name="expense_positive_amount">יש להזין סכום גדול מאפס, עם עד שתי ספרות אחרי הנקודה</string>
     <string name="expense_amount_overflow">הסכום או הסכומים המצטברים גדולים מדי</string>
     <string name="expense_invalid_date">יש לבחור תאריך תקין</string>
-    <string name="expense_missing_choice">יש לבחור אמצעי תשלום וקטגוריה קיימת או ללא קטגוריה</string>
+    <string name="expense_missing_choice">יש לבחור אמצעי תשלום וקטגוריה קיימת</string>
     <string name="expense_save_error">שמירת ההוצאה נכשלה. הערכים נשמרו בטופס; אפשר לנסות שוב.</string>
     <string name="expense_saving">שומר…</string>
     <string name="expense_save_interrupted">תוצאת השמירה הקודמת אינה ידועה. אי אפשר לשלוח שוב מטופס זה. יש לסגור ולבדוק את כל ההוצאות לפני התחלת פעולה חדשה.</string>
@@ -129,4 +129,10 @@
     <string name="edit">עריכה</string>
     <string name="group_expanded">הקבוצה מורחבת</string>
     <string name="group_collapsed">הקבוצה מכווצת</string>
+    <string name="category_management_required">יש ליצור תחילה קטגוריה במסך ניהול קטגוריות.</string>
+    <string name="select_main_category">בחירה בקטגוריה הראשית</string>
+    <string name="choose_category">בחירת קטגוריה</string>
+    <string name="category_general">כללי</string>
+    <string name="add_subcategory">הוספת תת־קטגוריה</string>
+    <string name="no_subcategories">עדיין אין תת־קטגוריות</string>
 </resources>

@@ -37,7 +37,7 @@ class ManyManagerDatabaseTest {
     private val category get() = CategoryEntity(owner, "category-a", "Food")
 
     @Before fun open() {
-        database = Room.inMemoryDatabaseBuilder(context, ManyManagerDatabase::class.java).build()
+        database = Room.inMemoryDatabaseBuilder(context, ManyManagerDatabase::class.java).addCallback(ManyManagerDatabase.HIERARCHY_CALLBACK).build()
     }
 
     @After fun close() {
@@ -75,7 +75,7 @@ class ManyManagerDatabaseTest {
     @Test fun recordsSurviveClosingAndReopeningFileDatabase() = runBlocking {
         val name = newTestFile()
         database.close()
-        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
+        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).addMigrations(ManyManagerDatabase.MIGRATION_1_2, ManyManagerDatabase.MIGRATION_2_3).addCallback(ManyManagerDatabase.HIERARCHY_CALLBACK).build()
         seedRelationships()
         val allocation = PeriodBudgetEntity(owner, period, 12345L)
         val categorized = expense("categorized")
@@ -86,7 +86,7 @@ class ManyManagerDatabaseTest {
         database.close()
 
         database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
-            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2, ManyManagerDatabase.MIGRATION_2_3).addCallback(ManyManagerDatabase.HIERARCHY_CALLBACK).build()
         assertEquals(CalculatorEntity(owner), database.dao().initializeLocalCalculator())
         assertEquals(1L, count("calculators"))
         assertEquals(allocation, database.dao().periodBudget(owner, period))
@@ -231,7 +231,7 @@ class ManyManagerDatabaseTest {
         }
         database.close()
         database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
-            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2, ManyManagerDatabase.MIGRATION_2_3).addCallback(ManyManagerDatabase.HIERARCHY_CALLBACK).build()
         assertEquals(CalculatorEntity(owner, 15, "EUR"), database.dao().initializeLocalCalculator())
         assertEquals(listOf(category), database.dao().categories(owner))
         assertEquals(listOf(source), database.dao().sources(owner))

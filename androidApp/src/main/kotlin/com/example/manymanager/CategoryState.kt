@@ -14,6 +14,7 @@ sealed interface CategoryListState {
 /** Form/operation state is separate from the observed list and contains no View references. */
 data class CategoryCreationState(
     val fromExpense: Boolean,
+    val parentId: String? = null,
     val name: String = "",
     val submitting: Boolean = false,
     val result: DataResult<Category>? = null,
@@ -21,6 +22,7 @@ data class CategoryCreationState(
 ) {
     fun toBundle() = Bundle().apply {
         putBoolean("fromExpense", fromExpense)
+        putString("parentId", parentId)
         putString("name", name)
         putBoolean("submitting", submitting)
         putBoolean("interrupted", interrupted)
@@ -28,6 +30,7 @@ data class CategoryCreationState(
             putString("createdId", it.id)
             putString("createdOwner", it.calculatorId)
             putString("createdName", it.name)
+            putString("createdParent", it.parentId)
         }
     }
 
@@ -35,10 +38,11 @@ data class CategoryCreationState(
         fun fromBundle(bundle: Bundle): CategoryCreationState {
             val category = bundle.getString("createdId")?.let { id ->
                 Category(checkNotNull(bundle.getString("createdOwner")), id,
-                    bundle.getString("createdName").orEmpty())
+                    bundle.getString("createdName").orEmpty(), bundle.getString("createdParent"))
             }
             return CategoryCreationState(
                 fromExpense = bundle.getBoolean("fromExpense"),
+                parentId = bundle.getString("parentId"),
                 name = bundle.getString("name").orEmpty(),
                 result = category?.let { DataResult.Success(it) },
                 // A new process must never silently repeat a possibly committed request.

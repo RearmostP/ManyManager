@@ -2,6 +2,8 @@
 <resources>
     <item name="periodBudgetAmount" type="id" />
     <item name="categoryNameInput" type="id" />
+    <item name="categoryPickerRows" type="id" />
+    <item name="categoryPickerBack" type="id" />
     <item name="closeExpenseDetails" type="id" />
     <item name="expenseDetailsTitle" type="id" />
     <item name="expenseDetailsAmount" type="id" />

@@ -28,15 +28,15 @@ Each new or edited expense requires a payment method, a positive amount, a civil
 
 Hebrew RTL, Russian/English LTR and light/dark appearances remain supported. Native dialogs, fonts, IME and system bars can differ from HTML; pixel parity is not asserted.
 
-## Optional subcategories (HTML prototype only)
+## Optional subcategories
 
 Expense creation immediately displays a compact inline list of main categories. The confirmed row is highlighted with a checkmark and shows the selected parent or parent/child path. Long lists use the form’s normal scrolling, with no nested category viewport. Every main category opens a view titled with its name and listing only actual user-created subcategories. The footer’s Select main category button (Hebrew: בחירה בקטגוריה הראשית) confirms the parent directly, including when it has no children. Selecting a child confirms its parent/child path. Both actions update only the draft; Save in the expense form saves the expense. In expense creation, Back returns to the inline main list; editing retains its separate picker. Cancel preserves the previously confirmed category and all other draft fields. Browsing never changes the draft selection. No Uncategorized or synthetic General row is selectable.
 
 Category management opens a parent’s children and offers Add subcategory. Stable category IDs and optional parent IDs allow exactly two levels. Summary cards combine parent and child expenses once, with nonempty General/child sections when expanded. The fixture reuses the ₪100 and ₪250 records for direct Food and Supermarket expenses; Health has no children. Budget and payment methods are unchanged.
 
-The former repeated parent row was a synthetic picker option, not a stored child. Creating a main category creates only that category. Genuine same-name children remain selectable by their own stable IDs. General remains only a summary section for direct-parent expenses. Existing uncategorized records remain visible and included in totals, but saving an edit requires an explicit category. New writes require a valid category in both the form and preview model. Expense creation has no Add category or Add subcategory shortcuts, including in its subcategory view. An empty list shows a localized instruction to create a category in Category Management and Save stays disabled. Category Management retains both creation actions. This requirement is currently specific to the HTML preview; Android behavior is unchanged.
+The former repeated parent row was a synthetic picker option, not a stored child. Creating a main category creates only that category. Genuine same-name children remain selectable by their own stable IDs. General remains only a summary section for direct-parent expenses. Existing uncategorized records remain visible and included in totals, but saving an edit requires an explicit category. New writes require a valid category in both the form and preview model. Expense creation has no Add category or Add subcategory shortcuts, including in its subcategory view. An empty list shows a localized instruction to create a category in Category Management and Save stays disabled. Category Management retains both creation actions. The native XML/Views implementation follows this selection and validation model with persistent Room hierarchy storage.
 
-This is the final design for now for the ManyManager Simple HTML preview. The flow currently exists only in the HTML prototype and awaits Android implementation.
+This is the approved category experience for ManyManager Simple. The preview stays in memory; Android persists the hierarchy and validates writes through its repository and database.
 
 ## Checks
 

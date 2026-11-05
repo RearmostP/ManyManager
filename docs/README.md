@@ -7,7 +7,7 @@ This document describes `original`. `main` belongs to the personal edition; do n
 - Each calculator and budget period has one directly stored non-negative budget in exact integer `Long` minor units (agorot). There is no hidden budget source.
 - Remaining = period budget − every expense dated within that period. A ₪20,000 budget with ₪100 cash and ₪250 card spending leaves ₪19,650. The cash/card breakdown shows ₪100/₪250 and counts; methods have no allocations or balances.
 - Payment methods are name-only records, available across periods. Creation and renaming never request or modify money. Stable UUID identities survive renaming; duplicate names remain separate.
-- Each expense requires a method, a positive exact amount and a civil date; category and note remain optional. Null category means localized Uncategorized. Every reference belongs to the same calculator. Zero budgets and negative remaining balances are allowed.
+- Each expense requires a method, a positive exact amount and a civil date; a main category or actual subcategory is required for new expenses and saved edits; note remains optional. Historical null categories remain localized Uncategorized and stay in totals. Every reference belongs to the same calculator. Zero budgets and negative remaining balances are allowed.
 - The existing `BudgetPeriodCalculator` defines civil-date intervals `[start, endExclusive)`: by default the 10th through the 9th. Dates are epoch days, not UTC-midnight timestamps. Supported start days remain 1–28.
 - New periods start at zero budget, with no copying or carry-over. Methods remain available. Moving an expense across a period boundary recalculates both periods.
 - One local calculator initializes idempotently with start day 10 and ILS; business data starts empty. There is no calculator, currency or period-start settings UI.
@@ -15,9 +15,11 @@ This document describes `original`. `main` belongs to the personal edition; do n
 
 ## Storage and migration
 
-Room schema **2** stores calculators, categories, payment methods (legacy table name `budget_sources`), `period_budgets` and expenses in app-private `databases/many-manager.db`. `period_budgets` is keyed by calculator and period start and references the calculator directly. Legacy source class/field names remain internal identifiers for payment methods, including expense `sourceId`.
+Room schema **3** stores calculators, categories, payment methods (legacy table name `budget_sources`), `period_budgets` and expenses in app-private `databases/many-manager.db`. `period_budgets` is keyed by calculator and period start and references the calculator directly. Legacy source class/field names remain internal identifiers for payment methods, including expense `sourceId`.
 
-Registered `MIGRATION_1_2` sums each old calculator/period’s source allocations into one budget, using exact Kotlin aggregation rather than SQLite SUM. It preserves all source IDs, including unallocated sources, expenses, references, categories, civil dates, notes and calculator settings. Negative legacy allocations or totals outside `Long` abort migration transactionally; data is never reset. Both exported schemas are retained. Future changes require a version increment and tested migration; destructive fallback is forbidden.
+Registered `MIGRATION_1_2` sums each old calculator/period’s source allocations into one budget, using exact Kotlin aggregation rather than SQLite SUM. It preserves all source IDs, including unallocated sources, expenses, references, categories, civil dates, notes and calculator settings. Negative legacy allocations or totals outside `Long` abort migration transactionally; data is never reset. All exported schemas are retained. Future changes require a version increment and tested migration; destructive fallback is forbidden.
+
+Registered `MIGRATION_2_3` adds nullable category parent IDs, a calculator-scoped self foreign key and its index. It stages expenses transactionally while rebuilding categories and restores every expense unchanged, including historical null assignments. Existing flat categories become roots. Hierarchy triggers installed for fresh/opened databases and migrations reject self-parenting, missing/foreign parents, cycles and deeper nesting. A stored expense has one category ID: a child derives its parent from the category record, so independently mismatched parent/child assignments cannot be represented. No synthetic children are stored.
 
 `ManyManagerApplication` owns Room and the repository. `ManyManagerRepository` owns validation, transactions, observations and mutations. `setPeriodBudget` replaces a selected period’s amount; `createPaymentMethod` and `renameSource` only change method records. Expense create/update/delete validate resulting snapshots before commit, including both periods for moves. Budget, category and method spending are computed in `BudgetCalculations`; no mutable balance table exists.
 
@@ -29,7 +31,11 @@ Budget Management retains period arrows and shows one total with an Update budge
 
 Home shows active-period spending, remaining and total budget. Expanding shows spending by payment method. Summary retains All Expenses, Categories and Payment Methods with spending, counts and expandable inline expense rows in unified rounded cards. Methods without expenses are omitted from spending summaries.
 
-Expense creation, read-only details, full in-place editing, confirmed deletion, category creation/return, civil-date picker and optional note behavior remain. Save edits the same ID and returns to saved details. Cancel/Back discards edits; deletion requires confirmation. Closing details preserves Summary tab, expansion and scroll.
+Expense creation immediately shows a compact inline list of main categories in the form's normal scroll. A selected row shows a checkmark and the confirmed parent or parent/child path. Opening a parent lists only real children; choosing a child or the footer's Select main category confirms only the draft. Back/Cancel preserves the prior selection and every other draft field. Editing uses a separate two-level picker with the same confirmation rules. No Uncategorized, synthetic General or creation shortcuts appear in expense selection. With no main categories, a localized Category Management explanation appears and saving is disabled.
+
+Category Management lists main categories; opening one shows its children and Add subcategory. Main creation creates only a root, and child creation requires a name and the selected root. Exactly two levels are supported. Stable IDs preserve expense assignments through name changes. Summary parent totals/counts combine direct and child expenses exactly once; expanded parents with children show nonempty General/child sections and subtotals. General is presentation only. Details, All Expenses and payment-method expense lists show category paths.
+
+Read-only details, full in-place editing, confirmed deletion, civil-date picker and optional note behavior remain. Save edits the same ID and returns to saved details. Cancel/Back discards edits; deletion requires confirmation. Closing details preserves Summary tab, expansion and scroll.
 
 Hebrew (default RTL), Russian and English (LTR), and light/dark appearance remain supported. Appearance preferences stay outside Room. Simple’s applicationId and Android namespace are `com.example.simple.manymanager`. The personal edition retains `com.example.manymanager`. The packages install separately and do not automatically share or transfer app-private data. Version and signing are unchanged. Exported Room schemas are also retained under the renamed database class’s schema directory for migration tests.
 
@@ -62,6 +68,12 @@ Focused checks cover the ₪20,000 example, zero budget, method rename, edits/de
 Android Studio Gradle passed debug assembly, lint, 32 JVM tests and test APK assembly. The connected Android device run passed 66 instrumentation tests, including populated schema 1→2 migration, exact maximum/overflow rollback and real Activity/dialog integration.
 
 Chrome headless passed HTML checks: single budget model 14, expense forms 32, summary 35, expense details 65, unified cards 37 and single-budget UI 11. A 320px Hebrew budget screen screenshot was inspected. These results do not establish pixel parity, manual accessibility, API 30 runtime or arbitrary process-death behavior.
+
+## Verification of the category hierarchy change
+
+Android Studio Gradle passed debug assembly, lint, 33 JVM tests and test APK assembly. The connected Samsung-device run passed 72 instrumentation tests using the isolated `com.example.simple.manymanager.uitest` target, test Application/preferences and UUID test databases; neither installed production edition was cleared or uninstalled. Device execution used a local Gradle init script to override only the test run's application IDs.
+
+Coverage includes populated 1→3 and 2→3 migrations, retained direct/null assignments and calculator settings, database/repository depth and ownership rejection, mandatory category writes, legacy edits, management creation, same-name children, browsing/cancel/draft preservation, recreation, parent/child Summary sections and exact totals/counts, and category paths in details/lists. Picker layouts were checked at 320dp in all three languages and both themes; Hebrew light and Russian dark screenshots were visually inspected. These results do not establish pixel parity, manual accessibility, API 30 runtime or arbitrary process-death behavior.
 
 ## Implementation map
 

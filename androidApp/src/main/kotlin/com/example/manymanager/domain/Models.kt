@@ -3,7 +3,17 @@ package com.example.simple.manymanager.domain
 import java.time.LocalDate
 
 data class Calculator(val id: String, val periodStartDay: Int, val currencyCode: String)
-data class Category(val calculatorId: String, val id: String, val name: String)
+data class Category(val calculatorId: String, val id: String, val name: String, val parentId: String? = null)
+
+/** The stored assignment is one stable ID; its parent is derived, never independently assigned. */
+fun List<Category>.mainCategoryId(id: String?): String? =
+    firstOrNull { it.id == id }?.let { it.parentId ?: it.id }
+
+fun List<Category>.categoryPath(id: String?): String? =
+    firstOrNull { it.id == id }?.let { category ->
+        val parent = firstOrNull { it.id == category.parentId }
+        if (parent == null) category.name else "${parent.name} / ${category.name}"
+    }
 data class BudgetSource(val calculatorId: String, val id: String, val name: String)
 data class Expense(
     val calculatorId: String, val id: String, val amountMinor: Long, val date: LocalDate,

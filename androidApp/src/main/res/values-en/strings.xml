@@ -105,7 +105,7 @@
     <string name="expense_positive_amount">Enter an amount greater than zero with up to two decimal places</string>
     <string name="expense_amount_overflow">The amount or resulting totals are too large</string>
     <string name="expense_invalid_date">Choose a valid date</string>
-    <string name="expense_missing_choice">Choose a payment method and an existing category or Uncategorized</string>
+    <string name="expense_missing_choice">Choose a payment method and a valid category</string>
     <string name="expense_save_error">Could not save expense. Your input is preserved; you can retry.</string>
     <string name="expense_saving">Saving…</string>
     <string name="expense_save_interrupted">The previous save outcome is unknown. This form cannot be submitted again. Close it and inspect All expenses before starting a new operation.</string>
@@ -129,4 +129,10 @@
     <string name="edit">Edit</string>
     <string name="group_expanded">Group expanded</string>
     <string name="group_collapsed">Group collapsed</string>
+    <string name="category_management_required">First create a category in Category Management.</string>
+    <string name="select_main_category">Select main category</string>
+    <string name="choose_category">Choose a category</string>
+    <string name="category_general">General</string>
+    <string name="add_subcategory">Add subcategory</string>
+    <string name="no_subcategories">No subcategories yet</string>
 </resources>

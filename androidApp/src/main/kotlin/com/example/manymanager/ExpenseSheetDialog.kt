@@ -21,6 +21,7 @@ import android.widget.TextView
 import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.doOnPreDraw
 import androidx.core.widget.doAfterTextChanged
+import com.example.simple.manymanager.domain.categoryPath
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -42,6 +43,8 @@ class ExpenseSheetDialog(
     private var operation = ExpenseCreationState(draft)
     private var rendering = false
     private var datePicker: android.app.DatePickerDialog? = null
+    private var categoryPicker: CategoryPickerDialog? = null
+    private var categoryState: CategoryListState = CategoryListState.Loading
     private val resources get() = context.resources
     private val host: FrameLayout
     private var sheetView: View? = null
@@ -112,7 +115,7 @@ class ExpenseSheetDialog(
         content.findViewById<View>(R.id.saveExpense).setOnClickListener { if (!isDismissing) onSubmit() }
         renderCategories(categories)
         renderSources(sources)
-        content.findViewById<View>(R.id.expenseNewCategory).setOnClickListener { onAddCategory() }
+        content.findViewById<View>(R.id.expenseNewCategory).visibility = View.GONE
     }
 
     private fun changeDraft(value: ExpenseDraft) {
@@ -137,6 +140,7 @@ class ExpenseSheetDialog(
             contentDescription = context.getString(R.string.expense_date) + ": " + text
         }
         rendering = false
+        renderCategories(categoryState)
         val parsed = BudgetAmounts.positive(draft.amount)
         val locked = state.submitting || state.interrupted
         listOf(R.id.amount, R.id.expenseNote, R.id.expenseDate, R.id.expenseNewCategory).forEach {
@@ -170,9 +174,11 @@ class ExpenseSheetDialog(
 
     /** Refreshes only category choices, leaving every other draft field and its view intact. */
     fun renderCategories(state: CategoryListState) {
+        categoryState = state
         val content = sheetView ?: return
         val status = content.findViewById<TextView>(R.id.expenseCategoriesEmpty)
-        val message = state.statusMessage()
+        val message = if (state is CategoryListState.Ready && state.categories.none { it.parentId == null })
+            R.string.category_management_required else state.statusMessage()
         status.visibility = if (message == null) View.GONE else View.VISIBLE
         message?.let { status.setText(it) }
         status.setOnClickListener { onRetryCategories() }
@@ -182,7 +188,32 @@ class ExpenseSheetDialog(
         val container = content.findViewById<LinearLayout>(R.id.expenseCategoryChoices)
         container.removeAllViews()
         if (state is CategoryListState.Ready) {
-            bindChoices(container, listOf(null to context.getString(R.string.uncategorized)) + state.categories.map { it.id to it.name }, false)
+            val selectedParent = state.categories.firstOrNull { it.id == draft.categoryId }?.let { it.parentId ?: it.id }
+            state.categories.filter { it.parentId == null }.forEach { parent ->
+                val selected = selectedParent == parent.id
+                container.addView(TextView(context, null, 0, R.style.Text).apply {
+                    text = if (selected) state.categories.categoryPath(draft.categoryId) else parent.name
+                    setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, if (selected) R.drawable.ic_check else 0, 0)
+                    compoundDrawablePadding = dp(10)
+                    setTextColor(context.getColor(if (selected) R.color.blue else R.color.text))
+                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                        bottomMargin = dp(8)
+                    }
+                    tag = parent.id
+                    textSize = 14f; minHeight = dp(48)
+                    setPadding(dp(14), dp(14), dp(14), dp(14))
+                    setBackgroundResource(if (selected) R.drawable.chip_active else R.drawable.chip)
+                    isSelected = selected; isClickable = true; isFocusable = true
+                    setOnClickListener {
+                        if (operation.submitting || operation.interrupted) return@setOnClickListener
+                        categoryPicker?.dispose()
+                        categoryPicker = CategoryPickerDialog(context, state.categories, draft.categoryId, parent.id) { id ->
+                            changeDraft(draft.copy(categoryId = id))
+                            renderCategories(categoryState)
+                        }.also { it.show() }
+                    }
+                })
+            }
         }
     }
 
@@ -218,6 +249,7 @@ class ExpenseSheetDialog(
         options.forEach { (id, name) ->
             container.addView(TextView(context, null, 0, R.style.Text).apply {
                 text = name
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8) }
                 tag = id
                 textSize = 14f
                 minHeight = dp(48)
@@ -330,6 +362,7 @@ class ExpenseSheetDialog(
 
     /** Used when the Activity replaces its UI or is destroyed; never leave a window behind. */
     fun dismissImmediately() {
+        categoryPicker?.dispose(); categoryPicker = null
         datePicker?.dismiss()
         datePicker = null
         openingDraw?.removeListener()

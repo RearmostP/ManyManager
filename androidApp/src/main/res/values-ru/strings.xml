@@ -105,7 +105,7 @@
     <string name="expense_positive_amount">Введите сумму больше нуля, не более двух знаков после запятой</string>
     <string name="expense_amount_overflow">Сумма или итоговые значения слишком велики</string>
     <string name="expense_invalid_date">Выберите корректную дату</string>
-    <string name="expense_missing_choice">Выберите способ оплаты и категорию или «Без категории»</string>
+    <string name="expense_missing_choice">Выберите способ оплаты и существующую категорию</string>
     <string name="expense_save_error">Не удалось сохранить расход. Введённые данные сохранены; можно повторить.</string>
     <string name="expense_saving">Сохранение…</string>
     <string name="expense_save_interrupted">Результат предыдущего сохранения неизвестен. Повторная отправка недоступна. Закройте форму и проверьте все расходы перед новой операцией.</string>
@@ -129,4 +129,10 @@
     <string name="edit">Изменить</string>
     <string name="group_expanded">Группа развёрнута</string>
     <string name="group_collapsed">Группа свёрнута</string>
+    <string name="category_management_required">Сначала создайте категорию на экране управления категориями.</string>
+    <string name="select_main_category">Выбрать основную категорию</string>
+    <string name="choose_category">Выберите категорию</string>
+    <string name="category_general">Общее</string>
+    <string name="add_subcategory">Добавить подкатегорию</string>
+    <string name="no_subcategories">Подкатегорий пока нет</string>
 </resources>

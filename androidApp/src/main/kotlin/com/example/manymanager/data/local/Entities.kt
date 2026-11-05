@@ -19,9 +19,14 @@ data class CalculatorEntity(
         entity = CalculatorEntity::class,
         parentColumns = ["id"], childColumns = ["calculatorId"],
         onDelete = ForeignKey.RESTRICT,
+    ), ForeignKey(
+        entity = CategoryEntity::class,
+        parentColumns = ["calculatorId", "id"], childColumns = ["calculatorId", "parentId"],
+        onDelete = ForeignKey.RESTRICT,
     )],
+    indices = [Index(value = ["calculatorId", "parentId"])],
 )
-data class CategoryEntity(val calculatorId: String, val id: String, val name: String)
+data class CategoryEntity(val calculatorId: String, val id: String, val name: String, val parentId: String? = null)
 
 @Entity(
     tableName = "budget_sources",

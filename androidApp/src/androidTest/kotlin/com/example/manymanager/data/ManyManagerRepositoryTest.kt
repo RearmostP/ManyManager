@@ -38,7 +38,7 @@ class ManyManagerRepositoryTest {
     @Before fun open() = runBlocking {
         database = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext<Context>(), ManyManagerDatabase::class.java
-        ).build()
+        ).addCallback(ManyManagerDatabase.HIERARCHY_CALLBACK).build()
         initialization = CompletableDeferred(Result.success(database.dao().initializeLocalCalculator()))
         repository = ManyManagerRepository(database, initialization, clock)
     }
@@ -61,8 +61,8 @@ class ManyManagerRepositoryTest {
         val card = success(repository.createPaymentMethod("Card"))
         assertEquals(0L, snapshot().totalAllocatedMinor)
         success(repository.setPeriodBudget(period, 2_000_000))
-        val first = success(repository.createExpense(NewExpense(10_000, period.start, cash.id)))
-        success(repository.createExpense(NewExpense(25_000, period.start, card.id)))
+        val first = success(repository.createExpense(NewExpense(10_000, period.start, cash.id, categoryId = repository.requiredCategory())))
+        success(repository.createExpense(NewExpense(25_000, period.start, card.id, categoryId = repository.requiredCategory())))
         assertEquals(1_965_000L, snapshot().remainingMinor)
         assertEquals(10_000L, snapshot().sourceBreakdown.single { it.source.id == cash.id }.spentMinor)
         assertEquals(25_000L, snapshot().sourceBreakdown.single { it.source.id == card.id }.spentMinor)
@@ -88,7 +88,7 @@ class ManyManagerRepositoryTest {
 
     @Test fun renameFailureKeepsExistingExpenseAndBudget() = runBlocking {
         val cash = success(repository.createPaymentMethod("Cash"))
-        val expense = success(repository.createExpense(NewExpense(1, period.start, cash.id)))
+        val expense = success(repository.createExpense(NewExpense(1, period.start, cash.id, categoryId = repository.requiredCategory())))
         database.openHelper.writableDatabase.execSQL("""
             CREATE TRIGGER test_rename_failure BEFORE UPDATE ON budget_sources
             BEGIN SELECT RAISE(ABORT, 'test failure'); END
@@ -571,7 +571,7 @@ class ManyManagerRepositoryTest {
         val source = success(repository.seedMethodAndBudget("Cash", period, 0))
         val category = success(repository.createCategory("Food"))
         val before = success(repository.createExpense(NewExpense(123, period.start.minusDays(1), source.id, category.id, "note")))
-        val current = success(repository.createExpense(NewExpense(7, period.start, source.id)))
+        val current = success(repository.createExpense(NewExpense(7, period.start, source.id, categoryId = repository.requiredCategory())))
         val currentSnapshot = snapshot()
         assertEquals(listOf(current), currentSnapshot.expenses)
         assertEquals(7L, currentSnapshot.totalSpentMinor)
@@ -627,16 +627,16 @@ class ManyManagerRepositoryTest {
 
     @Test fun expenseOverflowAndStorageFailuresRollbackCreationAndCorrection() = runBlocking {
         val source = success(repository.seedMethodAndBudget("Cash", period, 0))
-        val first = success(repository.createExpense(NewExpense(Long.MAX_VALUE - 1, period.start, source.id)))
-        val second = success(repository.createExpense(NewExpense(1, period.start, source.id)))
-        assertEquals(DataError.AmountOverflow, error(repository.createExpense(NewExpense(1, period.start, source.id))))
+        val first = success(repository.createExpense(NewExpense(Long.MAX_VALUE - 1, period.start, source.id, categoryId = repository.requiredCategory())))
+        val second = success(repository.createExpense(NewExpense(1, period.start, source.id, categoryId = repository.requiredCategory())))
+        assertEquals(DataError.AmountOverflow, error(repository.createExpense(NewExpense(1, period.start, source.id, categoryId = repository.requiredCategory()))))
         assertEquals(DataError.AmountOverflow, error(repository.updateAmount(second.id, 2)))
         assertEquals(setOf(first, second), snapshot().expenses.toSet())
         database.openHelper.writableDatabase.execSQL("CREATE TRIGGER reject_expense BEFORE UPDATE ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
         assertTrue(error(repository.updateAmount(second.id, 3)) is DataError.StorageFailure)
         assertEquals(second, snapshot().expenses.single { it.id == second.id })
         database.openHelper.writableDatabase.execSQL("CREATE TRIGGER reject_insert BEFORE INSERT ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
-        assertTrue(error(repository.createExpense(NewExpense(1, period.start.minusDays(1), source.id))) is DataError.StorageFailure)
+        assertTrue(error(repository.createExpense(NewExpense(1, period.start.minusDays(1), source.id, categoryId = repository.requiredCategory()))) is DataError.StorageFailure)
         assertEquals(2, snapshot().expenseCount)
     }
 
@@ -648,7 +648,7 @@ class ManyManagerRepositoryTest {
             fun repo(db: ManyManagerDatabase) = ManyManagerRepository(db, initialization, clock)
             disk.dao().initializeLocalCalculator()
             val source = success(repo(disk).seedMethodAndBudget("Cash", period, 0))
-            val expense = success(repo(disk).createExpense(NewExpense(999, period.start, source.id, note = "durable")))
+            val expense = success(repo(disk).createExpense(NewExpense(999, period.start, source.id, categoryId = repo(disk).requiredCategory(), note = "durable")))
             success(repo(disk).updateAmount(expense.id, 1001))
             disk.close()
             disk = Room.databaseBuilder(context, ManyManagerDatabase::class.java, file).build()
@@ -683,7 +683,7 @@ class ManyManagerRepositoryTest {
         success(repository.createCategory("Unused"))
         val first = success(repository.createExpense(NewExpense(29, period.start, a.id, catA.id)))
         success(repository.createExpense(NewExpense(11, period.start, b.id, catB.id)))
-        success(repository.createExpense(NewExpense(18, period.start, b.id)))
+        fixtureExpense("legacy-breakdown", 18, period.start, b.id)
         fun verify(value: BudgetSnapshot, spent: Long) {
             assertEquals(spent, value.totalSpentMinor)
             assertEquals(spent, BudgetCalculations.sum(value.categoryBreakdown.map { it.spentMinor }))
@@ -734,17 +734,19 @@ class ManyManagerRepositoryTest {
         assertEquals(0L, after.sources.single { it.source.id == a.id }.spentMinor)
 
         assertEquals(d.id, after.categoryBreakdown.single().categoryId)
-        val cleared = success(repository.updateExpense(original.id, NewExpense(123, period.start, b.id, null, "")))
-        assertNull(cleared.categoryId)
+        assertEquals(DataError.MissingEntity(EntityKind.CATEGORY, ""),
+            error(repository.updateExpense(original.id, NewExpense(123, period.start, b.id, null, ""))))
+        val cleared = success(repository.updateExpense(original.id, NewExpense(123, period.start, b.id, c.id, "")))
+        assertEquals(c.id, cleared.categoryId)
         assertNull(cleared.note)
         assertEquals(original.id, cleared.id)
         assertEquals(1, snapshot().expenseCount)
-        assertNull(snapshot().categoryBreakdown.single().categoryId)
+        assertEquals(c.id, snapshot().categoryBreakdown.single().categoryId)
     }
 
     @Test fun fullUpdateRejectsInvalidInputsAndForeignOwnershipWithoutMutation() = runBlocking {
         val source = success(repository.seedMethodAndBudget("Cash", period, 0))
-        val original = success(repository.createExpense(NewExpense(1, period.start, source.id)))
+        val original = success(repository.createExpense(NewExpense(1, period.start, source.id, categoryId = repository.requiredCategory())))
         database.openHelper.writableDatabase.execSQL("INSERT INTO calculators VALUES ('foreign', 10, 'ILS')")
         database.dao().insertSource(BudgetSourceEntity("foreign", "foreign-source", "Cash"))
         database.dao().insertCategory(CategoryEntity("foreign", "foreign-category", "Food"))
@@ -770,19 +772,19 @@ class ManyManagerRepositoryTest {
     @Test fun fullUpdateAndDeleteRollbackStorageAndCrossPeriodOverflow() = runBlocking {
         val source = success(repository.seedMethodAndBudget("Cash", period, 0))
         val oldPeriod = success(repository.periodContaining(period.start.minusDays(1)))
-        val original = success(repository.createExpense(NewExpense(1, oldPeriod.start, source.id)))
-        success(repository.createExpense(NewExpense(Long.MAX_VALUE, period.start, source.id)))
-        assertEquals(DataError.AmountOverflow, error(repository.updateExpense(original.id, NewExpense(1, period.start, source.id))))
+        val original = success(repository.createExpense(NewExpense(1, oldPeriod.start, source.id, categoryId = repository.requiredCategory())))
+        success(repository.createExpense(NewExpense(Long.MAX_VALUE, period.start, source.id, categoryId = repository.requiredCategory())))
+        assertEquals(DataError.AmountOverflow, error(repository.updateExpense(original.id, NewExpense(1, period.start, source.id, categoryId = repository.requiredCategory()))))
         assertEquals(original, success(repository.expense(original.id)))
         // The old period is also checked after moving the row, not only its destination.
         database.dao().insertExpense(ExpenseEntity(owner, "raw-max", Long.MAX_VALUE, oldPeriod.startEpochDay, null, source.id))
         database.dao().insertExpense(ExpenseEntity(owner, "raw-one", 1, oldPeriod.startEpochDay, null, source.id))
         val future = BudgetPeriodCalculator(10, clock).next(period)
-        assertEquals(DataError.AmountOverflow, error(repository.updateExpense(original.id, NewExpense(1, future.start, source.id))))
+        assertEquals(DataError.AmountOverflow, error(repository.updateExpense(original.id, NewExpense(1, future.start, source.id, categoryId = repository.requiredCategory()))))
         assertEquals(original, success(repository.expense(original.id)))
         database.openHelper.writableDatabase.execSQL("DELETE FROM expenses WHERE id IN ('raw-max', 'raw-one')")
         database.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_full BEFORE UPDATE ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
-        assertTrue(error(repository.updateExpense(original.id, NewExpense(2, oldPeriod.start, source.id, note = "new"))) is DataError.StorageFailure)
+        assertTrue(error(repository.updateExpense(original.id, NewExpense(2, oldPeriod.start, source.id, categoryId = repository.requiredCategory(), note = "new"))) is DataError.StorageFailure)
         assertEquals(original, success(repository.expense(original.id)))
         database.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_delete BEFORE DELETE ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
         assertTrue(error(repository.deleteExpense(original.id)) is DataError.StorageFailure)
@@ -793,7 +795,7 @@ class ManyManagerRepositoryTest {
         val source = success(repository.seedMethodAndBudget("Cash", period, 100))
         val category = success(repository.createCategory("Food"))
         val first = success(repository.createExpense(NewExpense(30, period.start, source.id, category.id)))
-        val other = success(repository.createExpense(NewExpense(20, period.start, source.id)))
+        val other = success(repository.createExpense(NewExpense(20, period.start, source.id, categoryId = repository.requiredCategory())))
         val before = snapshot()
         success(repository.deleteExpense(first.id))
         val after = snapshot()
@@ -803,7 +805,7 @@ class ManyManagerRepositoryTest {
         assertEquals(20L, after.totalSpentMinor)
         assertEquals(80L, after.remainingMinor)
         assertEquals(1, after.expenseCount)
-        assertEquals(listOf(CategorySummary(null, 20, 1)), after.categoryBreakdown)
+        assertEquals(listOf(CategorySummary(category.id, 20, 1)), after.categoryBreakdown)
         assertEquals(DataError.MissingEntity(EntityKind.EXPENSE, first.id), error(repository.deleteExpense(first.id)))
         assertEquals(listOf(other), snapshot().expenses)
     }
@@ -824,6 +826,10 @@ class ManyManagerRepositoryTest {
         database.dao().insertExpense(ExpenseEntity(owner, id, amount, date.toEpochDay(),
             categoryId, sourceId))
     }
+
+    /** Explicit valid-category fixture for tests unrelated to category selection. */
+    private suspend fun ManyManagerRepository.requiredCategory(): String =
+        success(observeCategories().first()).firstOrNull()?.id ?: success(createCategory("Test category")).id
 
     private suspend fun snapshot() = success(repository.snapshot(period))
 

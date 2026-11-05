@@ -12,7 +12,8 @@ import java.time.ZoneId
 class BudgetTestApplication : ManyManagerApplication() {
     val clock = MovingClock()
     override val database by lazy {
-        Room.inMemoryDatabaseBuilder(this, ManyManagerDatabase::class.java).build()
+        Room.inMemoryDatabaseBuilder(this, ManyManagerDatabase::class.java)
+            .addCallback(ManyManagerDatabase.HIERARCHY_CALLBACK).build()
     }
     private val memoryRepository by lazy { ManyManagerRepository(database, databaseInitialization, clock) }
     // Only the file-reopen acceptance fixture replaces this; production has no such switch.

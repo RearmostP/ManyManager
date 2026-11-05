@@ -58,7 +58,7 @@ export function createExpense(input){
   const date=parseCivilDate(input.date);
   if(!Number.isSafeInteger(input.amountMinor)||input.amountMinor<=0||!date||
     !previewModel.sources.some(item=>item.id===input.sourceId)||
-    (input.categoryId!=null&&!previewModel.categories.some(item=>item.id===input.categoryId)))return null;
+    !isValidCategory(input.categoryId))return null;
   const expense={id:`expense-${previewModel.nextExpenseId}`,amountMinor:input.amountMinor,
     date:input.date,sourceId:input.sourceId,categoryId:input.categoryId??null,note:input.note||null};
   try{snapshotFor(date,[...previewModel.expenses,expense])}catch{return null}
@@ -70,7 +70,7 @@ export function updateExpense(id,input){
   const date=parseCivilDate(input.date);
   if(!original||!date||!Number.isSafeInteger(input.amountMinor)||input.amountMinor<=0||
     !previewModel.sources.some(item=>item.id===input.sourceId)||
-    (input.categoryId!=null&&!previewModel.categories.some(item=>item.id===input.categoryId)))return false;
+    !isValidCategory(input.categoryId))return false;
   const updated={id:original.id,amountMinor:input.amountMinor,date:input.date,
     sourceId:input.sourceId,categoryId:input.categoryId??null,note:input.note||null};
   const candidate=previewModel.expenses.map(item=>item.id===id?updated:item);
@@ -90,6 +90,10 @@ export function deleteExpense(id){
   return true;
 }
 
+export function isValidCategory(id){
+  const category=previewModel.categories.find(item=>item.id===id);
+  return Boolean(category&&(!category.parentId||previewModel.categories.some(parent=>parent.id===category.parentId&&!parent.parentId)));
+}
 export function mainCategoryId(id){return previewModel.categories.find(item=>item.id===id)?.parentId??id}
 export function categoryPath(id){
   const category=previewModel.categories.find(item=>item.id===id);

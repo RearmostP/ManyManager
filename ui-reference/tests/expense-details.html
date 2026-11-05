@@ -19,13 +19,13 @@ try {
  check(snapshotFor(before).spent===0&&snapshotFor(start).spent===123,"both periods update across 9/10");
  check(snapshotFor(start).allocated===100&&snapshotFor(start).remaining===-23,"zero source negative balance allocations unchanged");
  check(snapshotFor(start).categoryBreakdown[0].id===d.id&&snapshotFor(start).sourceBreakdown[0].id===b.id,"groups use stable IDs");
- check(updateExpense(id,{...first,categoryId:null,note:""}),"clear category and note");
- check(first.categoryId===null&&!first.note,"optional values clear");
+ check(!updateExpense(id,{...first,categoryId:null}),"cannot clear required category");
+ check(updateExpense(id,{...first,note:""})&&first.categoryId===d.id&&!first.note,"clear optional note and retain category");
  const saved=JSON.stringify(previewModel.expenses);
  for(const input of [{...first,amountMinor:0},{...first,amountMinor:-1},{...first,sourceId:"missing"},{...first,categoryId:"missing"},{...first,date:"2026-02-30"}]){
    check(!updateExpense(id,input)&&JSON.stringify(previewModel.expenses)===saved,"invalid update atomic "+JSON.stringify(input));
  }
- const max=createExpense({amountMinor:Number.MAX_SAFE_INTEGER,date:"2026-12-10",sourceId:a.id});
+ const max=createExpense({amountMinor:Number.MAX_SAFE_INTEGER,date:"2026-12-10",sourceId:a.id,categoryId:c.id});
  check(!updateExpense(id,{...first,date:"2026-12-10"})&&first.date==="2026-11-10"&&max.amountMinor===Number.MAX_SAFE_INTEGER,"destination overflow rollback");
  let observed=0;const stop=observePreview(()=>observed++);
  check(updateExpense(id,{...first,amountMinor:124}),"valid update after rejection");
@@ -35,7 +35,7 @@ try {
  check(!host.querySelector("input,textarea,select")&&host.querySelector('[data-action="begin-expense-edit"]'),"details ordinary display text");
  check(!host.querySelector('[data-field="note"]'),"missing note hidden");
  state.expenseEditing=true;host.innerHTML=expenseDetails();
- check(host.querySelector("#details-note").value===""&&host.querySelector("#details-categoryId").textContent==="Uncategorized","empty note/category editable");
+ check(host.querySelector("#details-note").value===""&&host.querySelector("#details-categoryId").textContent==="Same","empty note and category editable");
  state.expenseDraft.note="Discard";closeOverlay();
  check(!state.expenseEditing&&state.expenseDraft.note===""&&state.overlay==="expense-details","Back cancels draft before closing");
  closeOverlay();check(state.overlay===null,"Back from read-only closes");
@@ -60,12 +60,15 @@ try {
  async function add(amount,sourceId,categoryName){
    nav(0);click('[data-action="expense"]');type("#amount",amount);type("#expense-date",date);
    click('[data-action="expense-source"][data-id="'+sourceId+'"]');
+   if(!categoryName){
+     click('[data-action="open-category-picker"]');[...doc.querySelectorAll('[data-action="choose-category"]')].find(el=>el.textContent==="Other").click();click('[data-action="select-category"]');
+   }
    if(categoryName){click('[data-action="add-category"]');type("#category-name",categoryName);click('[data-action="confirm-category"]')}
    click('[data-action="save-expense"]');await Promise.resolve();
  }
- await add("1",sourceIds[0],"Same");await add("2",sourceIds[1],"Same");await add("0.5",sourceIds[0],null);
+ await add("1",sourceIds[0],"Same");await add("2",sourceIds[1],"Same");await add("0.5",sourceIds[0],"Other");
  nav(1);
- check(doc.querySelectorAll('[data-action="expense-group"]').length===3,"duplicate category names and null remain distinct");
+ check(doc.querySelectorAll('[data-action="expense-group"]').length===3,"duplicate category names and Other remain distinct");
  const firstCard=[...doc.querySelectorAll('[data-action="expense-group"][data-kind="category"][data-id]:not([data-id=""])')].at(-1);
  const categoryId=firstCard.dataset.id;firstCard.click();
  check(doc.querySelectorAll('[data-inline-group] [data-action="view-expense"]').length===1,"one-expense group expands inline");
@@ -82,18 +85,18 @@ try {
  type("#details-amount","90071992547409.91");type("#details-note","Keep on failure");
  click('[data-action="save-expense-details"]');
  check(doc.querySelector("#details-note").value==="Keep on failure"&&doc.querySelector("#details-amount").value==="90071992547409.91"&&!doc.querySelector("#expense-details-error").hidden,"failed save preserves full draft in edit mode");
- type("#details-amount","1.23");type("#details-note","Dirty");type("#details-sourceId",sourceIds[1]);click('[data-action="open-category-picker"]');click('[data-action="choose-category"]:not([data-id])');type("#details-date",newDate);
+ type("#details-amount","1.23");type("#details-note","Dirty");type("#details-sourceId",sourceIds[1]);click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id="category-1"]');click('[data-action="select-category"]');type("#details-date",newDate);
  click('[data-action="delete-expense"]');
  check(doc.querySelector('[role="alertdialog"]')&&doc.querySelector("#expense-details")===panel,"delete only opens confirmation");
  click('[role="alertdialog"] [data-action="close-overlay"]');
- check(doc.querySelector("#details-note").value==="Dirty"&&doc.querySelector("#details-date").value===newDate&&doc.querySelector("#details-sourceId").value===sourceIds[1]&&doc.querySelector("#details-categoryId").textContent==="ללא קטגוריה","confirmation cancel preserves every draft field");
+ check(doc.querySelector("#details-note").value==="Dirty"&&doc.querySelector("#details-date").value===newDate&&doc.querySelector("#details-sourceId").value===sourceIds[1]&&doc.querySelector("#details-categoryId").textContent==="Same","confirmation cancel preserves every draft field");
  click('[data-action="cancel-expense-edit"]');
  check(panel===doc.querySelector("#expense-details")&&!panel.querySelector("input")&&!panel.textContent.includes("Dirty"),"Cancel returns saved values in same view");
  click('[data-action="begin-expense-edit"]');type("#details-note","Back discard");
  doc.dispatchEvent(new win.KeyboardEvent("keydown",{key:"Escape",bubbles:true}));
  check(!panel.querySelector("textarea")&&!panel.textContent.includes("Back discard"),"Escape editing is Cancel");
  click('[data-action="begin-expense-edit"]');
- type("#details-amount","1.23");type("#details-note","Saved");type("#details-sourceId",sourceIds[1]);click('[data-action="open-category-picker"]');click('[data-action="choose-category"]:not([data-id])');type("#details-date",newDate);
+ type("#details-amount","1.23");type("#details-note","Saved");type("#details-sourceId",sourceIds[1]);click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id="category-1"]');click('[data-action="select-category"]');type("#details-date",newDate);
  click('[data-action="save-expense-details"]');
  check(panel===doc.querySelector("#expense-details")&&!panel.querySelector("input")&&panel.textContent.includes("Saved")&&panel.textContent.includes("1.23"),"Save returns updated read-only details same node");
  check(doc.querySelectorAll('[data-inline-group] [data-action="view-expense"]').length===0,"moved final row removes empty inline group");
@@ -129,13 +132,13 @@ try {
  }
  for(let index=0;index<35;index++)await add("0.01",sourceIds[0],null);
  nav(1);click('[data-action="tab"][data-index="0"]');
- const nullCard='[data-action="expense-group"][data-kind="category"][data-id=""]';
+ const nullCard='[data-action="expense-group"][data-kind="category"][data-id="category-3"]';
  if(doc.querySelector(nullCard).getAttribute("aria-expanded")!=="true")click(nullCard);
- check(doc.querySelectorAll('[data-inline-group="category:"] [data-action="view-expense"]').length===35,"long Uncategorized list expands within Summary");
- const list=doc.querySelector('[data-inline-group="category:"]'),scroller=doc.querySelector("#page-scroll");
+ check(doc.querySelectorAll('[data-inline-group="category:category-3"] [data-action="view-expense"]').length===35,"long category list expands within Summary");
+ const list=doc.querySelector('[data-inline-group="category:category-3"]'),scroller=doc.querySelector("#page-scroll");
  check(win.getComputedStyle(list).overflowY==="visible"&&list.scrollHeight<=list.clientHeight,"inline list has no separate scrolling viewport");
  scroller.scrollTop=400;const top=scroller.scrollTop;
- click('[data-inline-group="category:"] [data-action="view-expense"]');
+ click('[data-inline-group="category:category-3"] [data-action="view-expense"]');
  check(doc.querySelector("#app").inert&&scroller.scrollTop===top,"details dim and block Summary without scrolling");
  click('[data-action="tab"][data-index="1"]');
  check(doc.querySelector('.tab.selected').dataset.index==="0","dimmed tab cannot be activated");

@@ -1,4 +1,6 @@
 {
+  "select_main_category": "Select main category",
+  "choose_category": "Choose a category",
   "category_general": "General",
   "add_subcategory": "Add subcategory",
   "no_subcategories": "No subcategories yet",
@@ -96,7 +98,7 @@
   "expense_positive_amount": "Enter an amount greater than zero with up to two decimal places",
   "expense_amount_overflow": "The amount or resulting totals are too large",
   "expense_invalid_date": "Choose a valid date",
-  "expense_missing_choice": "Choose a payment method and an existing category or Uncategorized",
+  "expense_missing_choice": "Choose a payment method and an existing category",
   "expense_save_error": "Could not save expense. Your input is preserved; you can retry.",
   "expense_saving": "Saving…",
   "expense_save_interrupted": "The previous save outcome is unknown. This form cannot be submitted again. Close it and inspect All expenses before starting a new operation.",

@@ -1,4 +1,6 @@
 {
+  "select_main_category": "בחירה בקטגוריה הראשית",
+  "choose_category": "בחירת קטגוריה",
   "category_general": "כללי",
   "add_subcategory": "הוספת תת־קטגוריה",
   "no_subcategories": "עדיין אין תת־קטגוריות",
@@ -96,7 +98,7 @@
   "expense_positive_amount": "יש להזין סכום גדול מאפס, עם עד שתי ספרות אחרי הנקודה",
   "expense_amount_overflow": "הסכום או הסכומים המצטברים גדולים מדי",
   "expense_invalid_date": "יש לבחור תאריך תקין",
-  "expense_missing_choice": "יש לבחור אמצעי תשלום וקטגוריה קיימת או ללא קטגוריה",
+  "expense_missing_choice": "יש לבחור אמצעי תשלום וקטגוריה קיימת",
   "expense_save_error": "שמירת ההוצאה נכשלה. הערכים נשמרו בטופס; אפשר לנסות שוב.",
   "expense_saving": "שומר…",
   "expense_save_interrupted": "תוצאת השמירה הקודמת אינה ידועה. אי אפשר לשלוח שוב מטופס זה. יש לסגור ולבדוק את כל ההוצאות לפני התחלת פעולה חדשה.",

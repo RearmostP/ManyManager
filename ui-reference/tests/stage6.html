@@ -2,28 +2,29 @@
 <h1>Single budget checks</h1><pre id="results">Running…</pre>
 <script type="module">
 import {periodKey,adjacentPeriod} from "../js/budget-period.js";
-import {previewModel,addSource,setBudget,totalFor,updateSource,createExpense,updateExpense,deleteExpense,snapshotFor} from "../js/preview-model.js";
+import {previewModel,addCategory,addSource,setBudget,totalFor,updateSource,createExpense,updateExpense,deleteExpense,snapshotFor} from "../js/preview-model.js";
 const results=[],check=(value,label)=>{if(!value)throw Error(label);results.push("PASS "+label)};
 try{
  const before=new Date(2026,10,9),after=new Date(2026,10,10);
  check(periodKey(before)==="2026-10"&&periodKey(after)==="2026-11","9th and 10th use distinct periods");
+ const category=addCategory("Everyday");
  const cash=addSource("Cash"),card=addSource("Card"),unused=addSource("Unused");
  check(totalFor(after)===0,"methods never create budgets");
  check(setBudget(after,2000000),"set one period budget");
- const a=createExpense({amountMinor:10000,date:"2026-11-10",sourceId:cash.id});
- const b=createExpense({amountMinor:25000,date:"2026-11-10",sourceId:card.id});
+ const a=createExpense({amountMinor:10000,date:"2026-11-10",sourceId:cash.id,categoryId:category.id});
+ const b=createExpense({amountMinor:25000,date:"2026-11-10",sourceId:card.id,categoryId:category.id});
  let s=snapshotFor(after);
  check(s.remaining===1965000&&s.spent===35000,"20000 minus 100 cash and 250 card leaves 19650");
  check(s.sourceBreakdown.find(x=>x.id===cash.id).spent===10000&&s.sourceBreakdown.find(x=>x.id===card.id).spent===25000,"payment breakdown");
  check(updateSource(cash.id,"Wallet")&&a.sourceId===cash.id&&snapshotFor(after).remaining===1965000,"rename preserves identity and money");
  check(totalFor(adjacentPeriod(after,1))===0&&previewModel.sources.length===3,"new period zero budget, methods retained");
- check(createExpense({amountMinor:100,date:"2026-11-09",sourceId:unused.id})&&snapshotFor(before).remaining===-100,"zero budget and negative remaining allowed");
+ check(createExpense({amountMinor:100,date:"2026-11-09",sourceId:unused.id,categoryId:category.id})&&snapshotFor(before).remaining===-100,"zero budget and negative remaining allowed");
  check(updateExpense(a.id,{...a,amountMinor:20000})&&snapshotFor(after).remaining===1955000,"edit recalculates");
  check(updateExpense(a.id,{...a,date:"2026-11-09"})&&snapshotFor(after).remaining===1975000&&snapshotFor(before).remaining===-20100,"move across boundary recalculates both periods");
  check(updateExpense(a.id,{...a,date:"2026-11-10"})&&snapshotFor(before).remaining===-100,"move 9th to 10th");
  check(deleteExpense(b.id)&&snapshotFor(after).remaining===1980000,"delete recalculates");
  check(!setBudget(after,-1)&&totalFor(after)===2000000,"negative budget rejected");
- check(!createExpense({amountMinor:1,date:"2026-11-10",sourceId:"missing"}),"method required");
+ check(!createExpense({amountMinor:1,date:"2026-11-10",sourceId:"missing",categoryId:category.id}),"method required");
  document.getElementById("results").textContent=results.join("\n")+"\nALL "+results.length+" PASSED";
 }catch(error){document.getElementById("results").textContent=results.join("\n")+"\nFAIL "+error.stack;throw error}
 </script>

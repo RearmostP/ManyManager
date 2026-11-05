@@ -20,7 +20,8 @@ try{
  for(const tab of [0,1]){check(render(tab).length===0&&host.textContent.includes("No expenses"),"successful empty tab "+tab)}
  const first=createExpense({amountMinor:29,date:"2026-11-10",sourceId:a.id,categoryId:ca.id});
  createExpense({amountMinor:11,date:"2026-11-10",sourceId:b.id,categoryId:cb.id});
- createExpense({amountMinor:18,date:"2026-11-10",sourceId:b.id,categoryId:null});
+ const legacy=createExpense({amountMinor:18,date:"2026-11-10",sourceId:b.id,categoryId:ca.id});
+ legacy.categoryId=null; // Historical data remains in summaries.
  let snap=snapshotFor(date);
  check(sum(snap.categoryBreakdown)===58&&sum(snap.sourceBreakdown)===58&&snap.spent===58,"independent breakdown sums each match overall spending");
  check(snap.expenses.length===3&&snap.categoryBreakdown.reduce((n,r)=>n+r.expenseCount,0)===3&&snap.sourceBreakdown.reduce((n,r)=>n+r.expenseCount,0)===3,"each expense counted once per breakdown");
@@ -58,9 +59,9 @@ try{
  await wait(()=>frame.contentDocument?.querySelector('[data-action="expense"]'));
  const doc=frame.contentDocument,click=selector=>doc.querySelector(selector).click(),type=(selector,value)=>{const input=doc.querySelector(selector);input.value=value;input.dispatchEvent(new frame.contentWindow.Event("input",{bubbles:true}))};
  click("#menu-button");click('[data-action="navigate"][data-index="3"]');click('[data-action="add-source"]');type("#source-name","Preview source");click('[data-action="confirm-add-source"]');
- click("#menu-button");click('[data-action="navigate"][data-index="0"]');click('[data-action="expense"]');type("#amount","1.23");click('[data-action="expense-source"]');click('[data-action="save-expense"]');
+ click("#menu-button");click('[data-action="navigate"][data-index="0"]');click('[data-action="expense"]');type("#amount","1.23");click('[data-action="expense-source"]');click('[data-action="add-category"]');type("#category-name","Everyday");click('[data-action="confirm-category"]');click('[data-action="save-expense"]');
  click("#menu-button");click('[data-action="navigate"][data-index="1"]');
- check(doc.querySelectorAll("[data-breakdown-id]").length===1,"real app uncategorized group after save");
+ check(doc.querySelectorAll("[data-breakdown-id]").length===1,"real app category group after save");
  click('[data-action="tab"][data-index="1"]');check(doc.querySelector("[data-breakdown-id]").textContent.includes("Preview source")&&doc.querySelector("[data-breakdown-id]").textContent.includes("1.23"),"real app source group after save");
  click('[data-action="tab"][data-index="2"]');click('[data-action="view-expense"]');click('[data-action="begin-expense-edit"]');type("#details-amount","2.34");click('[data-action="save-expense-details"]');click('#expense-details [data-action="close-overlay"]');
  click('[data-action="tab"][data-index="0"]');check(doc.querySelector("[data-breakdown-id]").textContent.includes("2.34"),"real app category follows correction");

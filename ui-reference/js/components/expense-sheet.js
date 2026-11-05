@@ -1,16 +1,16 @@
 import {state} from "../state.js";
-import {previewModel,parseAmount,categoryPath} from "../preview-model.js";
+import {previewModel,parseAmount,categoryPath,isValidCategory} from "../preview-model.js";
 import {parseCivilDate} from "../budget-period.js";
 
 export function canSaveExpense(){
  const draft=state.expenseDraft;
- return parseAmount(draft.amount)>0&&parseCivilDate(draft.date)!==null&&previewModel.sources.some(item=>item.id===draft.sourceId)&&(draft.categoryId==null||previewModel.categories.some(item=>item.id===draft.categoryId));
+ return parseAmount(draft.amount)>0&&parseCivilDate(draft.date)!==null&&previewModel.sources.some(item=>item.id===draft.sourceId)&&isValidCategory(draft.categoryId);
 }
 import {icon} from "../icons.js";
 import {tr,escapeValue} from "../render-helpers.js";
 
 export function categoryField(id="expense-category"){
-  return `<button id="${id}" class="sheet-field category-field" data-action="open-category-picker">${escapeValue(categoryPath(state.expenseDraft.categoryId)??tr("uncategorized"))}</button>`;
+  return `<button id="${id}" class="sheet-field category-field" data-action="open-category-picker">${escapeValue(categoryPath(state.expenseDraft.categoryId)??tr("choose_category"))}</button>`;
 }
 export function expense(){
 

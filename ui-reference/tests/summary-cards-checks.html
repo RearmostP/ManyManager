@@ -14,7 +14,7 @@ try{
  const nav=index=>{click("#menu-button");click('[data-action="navigate"][data-index="'+index+'"]')};
  await wait(()=>doc.querySelectorAll(".summary-group-card").length===3);
  check(doc.querySelectorAll('.summary-breakdown-row[aria-expanded="true"]').length===2,"multiple groups independently expanded");
- check(new Set([...doc.querySelectorAll('[data-kind="category"]')].map(x=>x.dataset.id)).size===3,"duplicate names and null category have distinct identities");
+ check(new Set([...doc.querySelectorAll('[data-kind="category"]')].map(x=>x.dataset.id)).size===3,"duplicate names and third category have distinct identities");
  check([...doc.querySelectorAll(".summary-group-card")].every(card=>card.querySelector(".summary-breakdown-row").parentElement===card&&card.querySelector(".summary-inline-expenses").parentElement===card),"header and rows inside one outer card");
  check(!doc.querySelector("button button"),"no nested interactive buttons");
  const row=doc.querySelector(".summary-expense-row"),id=row.dataset.id,card=row.closest(".summary-group-card"),categoryId=card.querySelector("[data-id]").dataset.id;
@@ -49,11 +49,11 @@ try{
  click('#expense-details [data-action="close-overlay"]');
  check(scroller.scrollTop===top&&doc.querySelector('[data-action="view-expense"][data-id="'+id+'"] .expense-row-note').textContent==="Updated note","close restores scroll and refreshed row");
  click('[data-action="view-expense"][data-id="'+id+'"]');click('[data-action="begin-expense-edit"]');
- click('[data-action="open-category-picker"]');click('[data-action="choose-category"]:not([data-id])');click('[data-action="save-expense-details"]');
+ click('[data-action="open-category-picker"]');click('[data-action="choose-category"][data-id="category-3"]');click('[data-action="select-category"]');click('[data-action="save-expense-details"]');
  check(doc.querySelector("#expense-details")&&!doc.querySelector("#details-categoryId"),"moving out of group keeps saved details open by ID");
  click('#expense-details [data-action="close-overlay"]');
- const nullHeader=doc.querySelector('[data-kind="category"][data-id=""]');if(nullHeader.getAttribute("aria-expanded")!=="true")nullHeader.click();
- check(doc.querySelector('[data-inline-group="category:"] [data-id="'+id+'"]'),"moved expense appears under Uncategorized");
+ const nullHeader=doc.querySelector('[data-kind="category"][data-id="category-3"]');if(nullHeader.getAttribute("aria-expanded")!=="true")nullHeader.click();
+ check(doc.querySelector('[data-inline-group="category:category-3"] [data-id="'+id+'"]'),"moved expense appears under another main category");
  click('[data-action="tab"][data-index="2"]');
  check(!doc.querySelector(".summary-group-card")&&doc.querySelectorAll(".summary-expense-row").length===4,"All Expenses remains ungrouped");
  click('[data-action="view-expense"][data-id="'+id+'"]');click('[data-action="begin-expense-edit"]');click('[data-action="delete-expense"]');click('[data-action="confirm-delete-expense"]');

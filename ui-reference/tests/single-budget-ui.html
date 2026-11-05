@@ -19,7 +19,8 @@ try{
  check(doc.querySelectorAll(".source-row").length===2&&!doc.querySelector(".source-row [dir=ltr]"),"method rows have no allocations");
  for(const [index,amount] of [[0,"100"],[1,"250"]]){
   navigate(0);click('[data-action="expense"]');type("#amount",amount);
-  doc.querySelectorAll('[data-action="expense-source"]')[index].click();click('[data-action="save-expense"]');
+  doc.querySelectorAll('[data-action="expense-source"]')[index].click();
+  click('[data-action="add-category"]');type("#category-name","Everyday");click('[data-action="confirm-category"]');click('[data-action="save-expense"]');
  }
  await wait(()=>!doc.querySelector(".sheet"));
  check(doc.querySelector(".budget-toggle").textContent.includes("19,650"),"home shows 19650 remaining");

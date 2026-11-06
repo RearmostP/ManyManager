@@ -8,8 +8,13 @@ export function canSaveExpense(){
 import {icon} from "../icons.js";
 import {tr,escapeValue} from "../render-helpers.js";
 
+export function categoryField(id){
+  const name=demo.categories.find(item=>item.id===state.expenseDraft.categoryId)?.name??tr("uncategorized");
+  return `<button id="${id}" class="sheet-field category-field" data-action="open-category-picker">${escapeValue(name)}</button>`;
+}
+
 export function expense(){
-  const categories=`<button class="chip ${state.expenseDraft.categoryId==null?"selected":""}" data-action="expense-category">${tr("uncategorized")}</button>`+demo.categories.map(category=>`<button class="chip ${state.expenseDraft.categoryId===category.id?"selected":""}" data-action="expense-category" data-id="${category.id}">${escapeValue(category.name)}</button>`).join("");
+  const categories=`<button class="chip expense-main-category ${state.expenseDraft.categoryId==null?"selected":""}" aria-pressed="${state.expenseDraft.categoryId==null}" data-action="expense-category"><span class="category-choice-label">${tr("uncategorized")}</span>${state.expenseDraft.categoryId==null?'<span aria-hidden="true">✓</span>':""}</button>`+demo.categories.map(category=>`<button class="chip expense-main-category ${state.expenseDraft.categoryId===category.id?"selected":""}" aria-pressed="${state.expenseDraft.categoryId===category.id}" data-action="expense-category" data-id="${category.id}"><span class="category-choice-label">${escapeValue(category.name)}</span>${state.expenseDraft.categoryId===category.id?'<span aria-hidden="true">✓</span>':""}</button>`).join("");
   const sources=demo.sources.map(source=>`<button class="chip ${state.expenseDraft.sourceId===source.id?"selected":""}" data-action="expense-source" data-id="${source.id}">${escapeValue(source.name)}</button>`).join("");
   return `<div class="scrim sheet-wrap" data-action="close-overlay"><div class="overlay-stage"><div class="sheet" data-stop-close><div class="drag-area" data-action="drag"><div class="drag-track"></div></div>
   <div class="sheet-head"><h2>${tr("new_expense")}</h2><button class="icon-button" data-action="close-overlay" aria-label="${tr("close")}">${icon("close")}</button></div>

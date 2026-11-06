@@ -601,16 +601,21 @@ class BudgetLifecycleTest {
         }
         screen.recreate()
         awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.editing == true }
+        // Recreation can show the retained draft before its source/category streams are ready.
+        awaitUi(screen) { controller.canSaveExpense() }
         app.database.openHelper.writableDatabase.execSQL("CREATE TRIGGER fail_correction BEFORE UPDATE ON expenses BEGIN SELECT RAISE(ABORT, 'fixture'); END")
-        screen.onActivity {
-            assertEquals("9.87", rootWith(R.id.expenseDetailsTitle)!!.findViewById<EditText>(R.id.expenseDetailsAmount).text.toString())
-            controller.submitExpenseCreation()
-            assertNull(controller.submitExpenseCreation())
+        try {
+            screen.onActivity {
+                assertEquals("9.87", rootWith(R.id.expenseDetailsTitle)!!.findViewById<EditText>(R.id.expenseDetailsAmount).text.toString())
+                assertNotNull(controller.submitExpenseCreation())
+                assertNull(controller.submitExpenseCreation())
+            }
+            awaitUi(screen) { controller.expenseCreationState.value?.error is DataError.StorageFailure }
+            assertEquals(saved, success(app.repository.expense(saved.id)))
+            assertEquals("9.87", controller.expenseCreationState.value!!.draft.amount)
+        } finally {
+            app.database.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_correction")
         }
-        awaitUi(screen) { controller.expenseCreationState.value?.error is DataError.StorageFailure }
-        assertEquals(saved, success(app.repository.expense(saved.id)))
-        assertEquals("9.87", controller.expenseCreationState.value!!.draft.amount)
-        app.database.openHelper.writableDatabase.execSQL("DROP TRIGGER fail_correction")
         val (releaseCorrection, heldCorrection) = gate()
         try {
             screen.onActivity { controller.submitExpenseCreation() }
@@ -739,8 +744,8 @@ class BudgetLifecycleTest {
             assertEquals(money(it, 600), it.findViewById<TextView>(R.id.budgetAllocatedTotal).text.toString())
             val homeRows = rows(it, R.id.budgetBreakdownRows)
             assertTrue((homeRows.getChildAt(0) as android.widget.LinearLayout).getChildAt(0).let { view -> (view as TextView).text.contains("Renamed") })
-            assertEquals(money(it, -100), ((homeRows.getChildAt(0) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
-            assertEquals(money(it, -200), ((homeRows.getChildAt(1) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
+            assertEquals(money(it, 700), ((homeRows.getChildAt(0) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
+            assertEquals(money(it, 200), ((homeRows.getChildAt(1) as android.widget.LinearLayout).getChildAt(1) as TextView).text.toString())
             val list = rows(it, R.id.expenseRows)
             val correctedRow = (0 until list.childCount).map(list::getChildAt).single { view -> view.tag == first.id }
             assertTrue(correctedRow.findViewById<TextView>(R.id.summaryExpenseAmount).text.contains(money(it, 400)))
@@ -1275,6 +1280,60 @@ class BudgetLifecycleTest {
                 window.dispose()
             }
         }
+    }
+
+    @Test fun flatCategoryPickerCancelsWithoutChangingDraftAndAllowsUncategorized(): Unit = runBlocking {
+        val period = success(app.repository.currentPeriod())
+        val source = success(app.repository.createSourceWithInitialAllocation("Source", period, 10000))
+        val first = success(app.repository.createCategory("Same name"))
+        val second = success(app.repository.createCategory("Same name"))
+        val expense = success(app.repository.createExpense(NewExpense(123, period.start, source.id, first.id, "Saved")))
+        val before = success(app.repository.snapshot())
+        val screen = launch()
+        val controller = model(screen)
+        awaitUi(screen) { it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).childCount == 1 }
+        screen.onActivity { it.findViewById<android.widget.LinearLayout>(R.id.expenseRows).getChildAt(0).performClick() }
+        awaitUi(screen) { rootWith(R.id.expenseDetailsTitle) != null && controller.expenseCreationState.value?.original != null }
+        screen.onActivity { rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.editExpenseDetails).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.editing == true }
+        screen.onActivity {
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<EditText>(R.id.expenseDetailsNote).setText("Draft note")
+            rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.expenseDetailsCategory).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
+        val draft = controller.expenseCreationState.value!!.draft
+        screen.onActivity {
+            val root = rootWith(R.id.categoryPickerRows)!!
+            val rows = root.findViewById<android.widget.LinearLayout>(R.id.categoryPickerRows)
+            assertEquals(3, rows.childCount)
+            assertTrue(rows.findViewWithTag<View>(first.id).isSelected)
+            assertFalse(rows.findViewWithTag<View>(second.id).isSelected)
+            root.findViewById<View>(android.R.id.button2).performClick()
+        }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) == null }
+        assertEquals(draft, controller.expenseCreationState.value!!.draft)
+        screen.onActivity { rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.expenseDetailsCategory).performClick() }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
+        screen.onActivity {
+            rootWith(R.id.categoryPickerRows)!!.findViewById<android.widget.LinearLayout>(R.id.categoryPickerRows)
+                .findViewWithTag<View>(second.id).performClick()
+        }
+        awaitUi(screen) { controller.expenseCreationState.value?.draft?.categoryId == second.id }
+        assertEquals(draft.copy(categoryId = second.id), controller.expenseCreationState.value!!.draft)
+        assertEquals(before, success(app.repository.snapshot()))
+        screen.onActivity { rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.expenseDetailsCategory).performClick() }
+        awaitUi(screen) { rootWith(R.id.categoryPickerRows) != null }
+        screen.onActivity {
+            rootWith(R.id.categoryPickerRows)!!.findViewById<android.widget.LinearLayout>(R.id.categoryPickerRows).getChildAt(0).performClick()
+        }
+        awaitUi(screen) { controller.expenseCreationState.value?.draft?.categoryId == null }
+        screen.onActivity { rootWith(R.id.expenseDetailsTitle)!!.findViewById<View>(R.id.saveExpenseDetails).performClick() }
+        awaitUi(screen) { controller.expenseCreationState.value?.editing == false }
+        assertEquals(expense.copy(categoryId = null, note = "Draft note"), success(app.repository.expense(expense.id)))
+        val after = success(app.repository.snapshot())
+        assertEquals(before.totalAllocatedMinor, after.totalAllocatedMinor)
+        assertEquals(before.totalSpentMinor, after.totalSpentMinor)
+        assertEquals(before.remainingMinor, after.remainingMinor)
     }
 
     private fun detailsBack(activity: MainActivity) {

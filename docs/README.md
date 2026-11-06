@@ -27,7 +27,9 @@ Home and the three Summary tabs consume the same transactional financial snapsho
 
 ## Expense and Summary interaction
 
-Creation saves only after validation and commit. Creating a category from an expense draft preserves amount/date/source/note, selecting the new stable ID only after success. Cancel returns to the unchanged draft.
+Creation saves only after validation and commit. Categories appear as full-width inline rows with a checkmark on the selected row; the list uses the form's normal scrolling. Editing uses a separate wrapping category picker: tapping confirms a draft selection, while Back/Cancel leaves every draft field unchanged. Categories remain flat and optional on main; Uncategorized is selectable even when no user categories exist. Creating a category from an expense draft preserves amount/date/source/note, selecting the new stable ID only after success. Cancel returns to the unchanged draft.
+
+Budget source dialogs use the rounded surface, blue primary action and localized cancel action shared with original's budget-dialog design. They retain main's captured period, initial allocation and +/− adjustment/preview controls. Home's expanded budget panel shows total allocated and spending by source from the existing snapshot. Remaining balances and per-source allocations continue to be calculated and stored exactly as before.
 
 Tapping an expense opens read-only details first. Edit replaces values with controls in the same window for amount, date, category, source and note. Save updates the same expense ID and returns to saved details; Cancel/Back discards the edit draft. Delete is available while editing and requires confirmation identifying the saved expense. Cancelling confirmation retains the draft; successful deletion closes details and returns to the list. Known failures retain input for explicit retry; simultaneous/repeated submissions are guarded.
 
@@ -74,6 +76,10 @@ Paths are relative to the repository root.
 | State and UI wiring | [PersistentDataViewModel.kt](../androidApp/src/main/kotlin/com/example/manymanager/PersistentDataViewModel.kt), [MainActivity.kt](../androidApp/src/main/kotlin/com/example/manymanager/MainActivity.kt) |
 | Expense flows | [ExpenseSheetDialog.kt](../androidApp/src/main/kotlin/com/example/manymanager/ExpenseSheetDialog.kt), [ExpenseDetailsDialog.kt](../androidApp/src/main/kotlin/com/example/manymanager/ExpenseDetailsDialog.kt), [ExpenseState.kt](../androidApp/src/main/kotlin/com/example/manymanager/ExpenseState.kt) |
 | Summary rendering | [SummaryBreakdownUi.kt](../androidApp/src/main/kotlin/com/example/manymanager/SummaryBreakdownUi.kt), [AllExpensesUi.kt](../androidApp/src/main/kotlin/com/example/manymanager/AllExpensesUi.kt), [UI map](../ui-reference/UI_MAP.md) |
+
+## Branch-local presentation parity
+
+The [presentation port record](presentation-port.md) documents the reviewed original commit, preserved icon/identity/version baseline, selective transfers and fresh verification. Existing business differences remain: main has per-source allocations, flat optional categories and Room schema 1; original has a single period budget, required categories with optional children and Room schema 3. Budget entry and category controls necessarily reflect those different models. main does not adopt original's schema, migrations or validation requirements. Both applications have separate package identities and app-private data.
 
 ## Release and historical records
 

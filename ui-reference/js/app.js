@@ -14,6 +14,7 @@ import {expenseDelete} from "./components/expense-delete.js";
 import {expenseDetails,expenseDetailsBody} from "./components/expense-details.js";
 import {categoryDialog,beginCategoryCreation,confirmCategoryCreation} from "./components/category-dialog.js";
 import {sourceDialog,sourcePreview} from "./components/source-dialog.js";
+import {categoryPicker} from "./components/category-picker.js";
 
 const app=document.getElementById("app");
 const page=document.getElementById("page");
@@ -30,21 +31,23 @@ function render(){
   menuButton.setAttribute("aria-label",t(state.language,"menu_button_label"));
   menuButton.innerHTML=icon("menu");
   page.innerHTML=[home,summary,settings,budget,categories][state.page]();
-  if(["expense-details","delete-expense"].includes(state.overlay)){
+  if(["expense-details","delete-expense"].includes(state.overlay)||(state.overlay==="category-picker"&&state.pickerReturnOverlay==="expense-details")){
     // Keep the details panel in place when switching between read/edit/confirmation.
     if(!overlay.querySelector("#expense-details"))overlay.innerHTML=expenseDetails();
     const panel=overlay.querySelector("#expense-details");
+    const focused=document.activeElement,focusId=panel.contains(focused)?focused.id:null;
     panel.innerHTML=expenseDetailsBody();
-    panel.inert=state.overlay==="delete-expense";
+    panel.inert=state.overlay!=="expense-details";
+    if(panel.inert)panel.setAttribute("aria-hidden","true");else panel.removeAttribute("aria-hidden");
     overlay.querySelector("[data-expense-delete-confirmation]")?.remove();
     if(panel.inert){
       const confirmation=document.createElement("div");
       confirmation.dataset.expenseDeleteConfirmation="";
-      confirmation.innerHTML=expenseDelete();
+      confirmation.innerHTML=state.overlay==="category-picker"?categoryPicker():expenseDelete();
       overlay.append(confirmation);
-    }
+    }else if(focusId)panel.querySelector("#"+CSS.escape(focusId))?.focus({preventScroll:true});
   }else overlay.innerHTML=({
-    menu:drawer,expense,"add-category":categoryDialog,
+    menu:drawer,expense,"add-category":categoryDialog,"category-picker":categoryPicker,
     "add-source":sourceDialog,"edit-source":sourceDialog
   })[state.overlay]?.()??"";
   app.inert=Boolean(state.overlay);
@@ -102,6 +105,10 @@ document.addEventListener("click",async event=>{
       state.overlay=null;break;
     }
     case "operation": state.sourceDraft.operation=button.dataset.value;break;
+    case "open-category-picker":
+      state.pickerReturnOverlay=state.overlay;state.overlay="category-picker";break;
+    case "select-category":
+      state.expenseDraft.categoryId=button.dataset.id||null;closeOverlay();break;
     case "expense-category": state.expenseDraft.categoryId=button.dataset.id??null;break;
     case "expense-source": state.expenseDraft.sourceId=button.dataset.id;break;
     case "expense":
@@ -155,24 +162,32 @@ document.addEventListener("keydown",event=>{
   if(event.key==="Escape"&&goBack(scroll)){event.preventDefault();render()}
 });
 
-// A small visual gesture demo for the existing Add Expense sheet.
-let drag;
+// original's pointer lifecycle; still only a disposable visual gesture demonstration.
+let drag=null;
 overlay.addEventListener("pointerdown",event=>{
   const handle=event.target.closest(".drag-area");
-  if(!handle)return;
-  drag={handle,sheet:handle.closest(".sheet"),start:event.clientY};
+  if(!handle||state.overlay!=="expense"||drag)return;
+  const sheet=handle.closest(".sheet");
+  drag={pointerId:event.pointerId,startY:event.clientY,distance:0,handle,sheet};
   handle.setPointerCapture(event.pointerId);
 });
 overlay.addEventListener("pointermove",event=>{
-  if(drag)drag.sheet.style.transform=`translateY(${Math.max(0,event.clientY-drag.start)}px)`;
+  if(!drag||event.pointerId!==drag.pointerId)return;
+  drag.distance=Math.max(0,event.clientY-drag.startY);
+  drag.sheet.style.transform=`translateY(${drag.distance}px)`;
 });
-function endDrag(event){
-  if(!drag)return;
-  if(event.type!=="pointercancel"&&event.clientY-drag.start>=64){state.overlay=null;render()}
-  else drag.sheet.style.transform="";
+function finishDrag(event,cancelled){
+  if(!drag||event.pointerId!==drag.pointerId)return;
+  const {handle,sheet,distance,pointerId}=drag;
   drag=null;
+  if(handle.hasPointerCapture(pointerId))handle.releasePointerCapture(pointerId);
+  if(!cancelled&&distance>=64){state.overlay=null;render()}
+  else{
+    sheet.style.transition="transform 180ms ease";
+    sheet.style.transform="translateY(0)";
+  }
 }
-overlay.addEventListener("pointerup",endDrag);
-overlay.addEventListener("pointercancel",endDrag);
+overlay.addEventListener("pointerup",event=>finishDrag(event,false));
+overlay.addEventListener("pointercancel",event=>finishDrag(event,true));
 await loadLanguage(state.language);
 render();

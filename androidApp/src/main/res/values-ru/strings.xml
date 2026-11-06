@@ -62,7 +62,7 @@
     <string name="budget_amount_for_source">Месячный бюджет для %1$s, в шекелях</string>
     <string name="budget_invalid_amount">Введите корректную неотрицательную сумму с двумя знаками после запятой или менее</string>
     <string name="budget_amount_applied">Бюджет для %1$s обновлён</string>
-    <string name="budget_toggle_description">Месячный бюджет: осталось %1$s из %2$s. Разбивка по источникам</string>
+    <string name="budget_toggle_description">Бюджет периода: осталось %1$s из %2$s. Расходы по источникам бюджета</string>
     <string name="budget_expanded">Разбивка бюджета открыта</string>
     <string name="budget_collapsed">Разбивка бюджета закрыта</string>
     <string name="back">Назад</string>
@@ -129,4 +129,5 @@
     <string name="edit">Изменить</string>
     <string name="group_expanded">Группа развёрнута</string>
     <string name="group_collapsed">Группа свёрнута</string>
+    <string name="choose_category">Выберите категорию</string>
 </resources>

@@ -218,6 +218,7 @@ class ExpenseSheetDialog(
         options.forEach { (id, name) ->
             container.addView(TextView(context, null, 0, R.style.Text).apply {
                 text = name
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = dp(8) }
                 tag = id
                 textSize = 14f
                 minHeight = dp(48)
@@ -225,6 +226,10 @@ class ExpenseSheetDialog(
                 val active = (if (sourceChoices) draft.sourceId else draft.categoryId) == id
                 setBackgroundResource(if (active) R.drawable.chip_active else R.drawable.chip)
                 isSelected = active
+                if (!sourceChoices) {
+                    setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, if (active) R.drawable.ic_check else 0, 0)
+                    compoundDrawablePadding = dp(10)
+                }
                 setTextColor(context.getColor(if (active) R.color.blue else R.color.text))
                 isClickable = true
                 isFocusable = true
@@ -235,6 +240,7 @@ class ExpenseSheetDialog(
                         (container.getChildAt(index) as TextView).apply {
                             val selected = tag == id
                             isSelected = selected
+                            if (!sourceChoices) setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, if (selected) R.drawable.ic_check else 0, 0)
                             setBackgroundResource(if (selected) R.drawable.chip_active else R.drawable.chip)
                             setTextColor(context.getColor(if (selected) R.color.blue else R.color.text))
                         }

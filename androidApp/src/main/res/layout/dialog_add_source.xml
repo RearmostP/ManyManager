@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="wrap_content"
-    android:orientation="vertical" android:padding="24dp">
+    android:fillViewport="false" android:scrollbars="none">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="24dp">
     <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:text="@string/add_source" android:textSize="23sp" android:textStyle="bold" />
     <TextView android:id="@+id/addSourceMonth" style="@style/Text"
@@ -21,5 +23,7 @@
         android:background="@drawable/chip" android:hint="@string/amount_zero"
         android:textColorHint="@color/muted"
         android:inputType="numberDecimal" android:singleLine="true"
-        android:textDirection="ltr" android:textSize="20sp" />
-</LinearLayout>
+        android:textDirection="ltr" android:textSize="14sp" />
+
+    </LinearLayout>
+</ScrollView>

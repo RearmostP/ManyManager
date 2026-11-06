@@ -62,7 +62,7 @@
   "budget_amount_for_source": "תקציב חודשי עבור %1$s, בשקלים",
   "budget_invalid_amount": "יש להזין סכום תקין שאינו שלילי, עם עד שתי ספרות אחרי הנקודה",
   "budget_amount_applied": "התקציב עבור %1$s עודכן",
-  "budget_toggle_description": "תקציב חודשי: נותרו %1$s מתוך %2$s. פירוט לפי מקור",
+  "budget_toggle_description": "תקציב לתקופה: נותרו %1$s מתוך %2$s. הוצאות לפי מקור תקציב",
   "budget_expanded": "פירוט התקציב פתוח",
   "budget_collapsed": "פירוט התקציב סגור",
   "theme_light": "בהיר",
@@ -114,5 +114,6 @@
   "expense_edit_retry": "טעינת ההוצאה נכשלה. לחצו לניסיון חוזר.",
   "expense_deleted": "ההוצאה נמחקה",
   "expense_details": "פרטי הוצאה",
-  "edit": "עריכה"
+  "edit": "עריכה",
+  "choose_category": "בחירת קטגוריה"
 }

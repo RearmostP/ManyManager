@@ -40,7 +40,7 @@ class SourceCreationDialog(
         }
     }
 
-    fun show() { dialog.showWithRoundedSurface() }
+    fun show() { dialog.showWithBudgetSurface() }
 
     fun render(state: SourceCreationState) {
         monthLabel.text = context.getString(
@@ -143,7 +143,7 @@ class SourceEditingDialog(
         }
     }
 
-    fun show() { dialog.showWithRoundedSurface() }
+    fun show() { dialog.showWithBudgetSurface() }
 
     private fun money(amount: Long): String =
         context.getString(R.string.ils_amount, BudgetAmounts.number(amount, context.resources.configuration.locales[0]))

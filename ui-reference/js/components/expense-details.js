@@ -3,7 +3,7 @@ import {demo} from "../demo.js";
 import {parseCivilDate} from "../dates.js";
 import {shortDate} from "../i18n.js";
 import {tr,money,escapeValue} from "../render-helpers.js";
-import {canSaveExpense} from "./expense-sheet.js";
+import {categoryField,canSaveExpense} from "./expense-sheet.js";
 
 export function expenseDetailsBody(){
  const saved=demo.expenses.find(item=>item.id===state.expenseEditId);
@@ -23,7 +23,7 @@ export function expenseDetailsBody(){
  ${saved?`<div class="expense-details-fields">
  ${field("amount","expense_amount",money(saved.amountMinor),input("amount","text",draft.amount).replace('type="text"','type="text" inputmode="decimal"'))}
  ${field("date","expense_date",shortDate(state.language,parseCivilDate(saved.date)),input("date","date",draft.date))}
- ${field("categoryId","expense_category",category,choices("categoryId",demo.categories,draft.categoryId,true))}
+ ${field("categoryId","expense_category",category,categoryField("details-categoryId"))}
  ${editing?`<button class="detail-new-category" data-action="add-category">${tr("new_category")}</button>`:""}
  ${field("sourceId","payment_method",source,choices("sourceId",demo.sources,draft.sourceId,false))}
  ${editing||saved.note?field("note","optional_note",saved.note??"",`<textarea id="details-note" class="sheet-field" data-details="note">${escapeValue(draft.note)}</textarea>`):""}

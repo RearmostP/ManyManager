@@ -62,7 +62,7 @@
     <string name="budget_amount_for_source">Monthly budget for %1$s, in ILS</string>
     <string name="budget_invalid_amount">Enter a valid non-negative amount with up to two decimal places</string>
     <string name="budget_amount_applied">Budget for %1$s updated</string>
-    <string name="budget_toggle_description">Monthly budget: %1$s remaining out of %2$s. Breakdown by source</string>
+    <string name="budget_toggle_description">Period budget: %1$s remaining out of %2$s. Spending by budget source</string>
     <string name="budget_expanded">Budget breakdown expanded</string>
     <string name="budget_collapsed">Budget breakdown collapsed</string>
     <string name="back">Back</string>
@@ -129,4 +129,5 @@
     <string name="edit">Edit</string>
     <string name="group_expanded">Group expanded</string>
     <string name="group_collapsed">Group collapsed</string>
+    <string name="choose_category">Choose a category</string>
 </resources>

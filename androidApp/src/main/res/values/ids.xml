@@ -21,4 +21,5 @@
     <item name="deleteExpenseDetails" type="id" />
     <item name="expenseDetailsActions" type="id" />
     <item name="expenseDetailsPrimaryActions" type="id" />
+    <item name="categoryPickerRows" type="id" />
 </resources>

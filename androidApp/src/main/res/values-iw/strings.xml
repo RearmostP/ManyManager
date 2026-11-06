@@ -62,7 +62,7 @@
     <string name="budget_amount_for_source">תקציב חודשי עבור %1$s, בשקלים</string>
     <string name="budget_invalid_amount">יש להזין סכום תקין שאינו שלילי, עם עד שתי ספרות אחרי הנקודה</string>
     <string name="budget_amount_applied">התקציב עבור %1$s עודכן</string>
-    <string name="budget_toggle_description">תקציב חודשי: נותרו %1$s מתוך %2$s. פירוט לפי מקור</string>
+    <string name="budget_toggle_description">תקציב לתקופה: נותרו %1$s מתוך %2$s. הוצאות לפי מקור תקציב</string>
     <string name="budget_expanded">פירוט התקציב פתוח</string>
     <string name="budget_collapsed">פירוט התקציב סגור</string>
     <string name="back">חזרה</string>
@@ -129,4 +129,5 @@
     <string name="edit">עריכה</string>
     <string name="group_expanded">הקבוצה מורחבת</string>
     <string name="group_collapsed">הקבוצה מכווצת</string>
+    <string name="choose_category">בחירת קטגוריה</string>
 </resources>

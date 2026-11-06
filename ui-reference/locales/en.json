@@ -62,7 +62,7 @@
   "budget_amount_for_source": "Monthly budget for %1$s, in ILS",
   "budget_invalid_amount": "Enter a valid non-negative amount with up to two decimal places",
   "budget_amount_applied": "Budget for %1$s updated",
-  "budget_toggle_description": "Monthly budget: %1$s remaining out of %2$s. Breakdown by source",
+  "budget_toggle_description": "Period budget: %1$s remaining out of %2$s. Spending by budget source",
   "budget_expanded": "Budget breakdown expanded",
   "budget_collapsed": "Budget breakdown collapsed",
   "theme_light": "Light",
@@ -114,5 +114,6 @@
   "expense_edit_retry": "Could not load the expense. Tap to retry.",
   "expense_deleted": "Expense deleted",
   "expense_details": "Expense details",
-  "edit": "Edit"
+  "edit": "Edit",
+  "choose_category": "Choose a category"
 }

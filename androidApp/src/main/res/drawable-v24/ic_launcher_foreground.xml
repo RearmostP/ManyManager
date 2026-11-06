@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:inset="25%">
+    android:inset="18%">
     <bitmap
         android:src="@drawable/manymanager_launcher_art"
         android:gravity="fill"

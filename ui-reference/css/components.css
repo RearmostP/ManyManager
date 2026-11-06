@@ -159,6 +159,14 @@ to {
 [dir=rtl] .month-row .icon {
   transform:scaleX(-1)}
 
+.categories-page h1,#picker-title{overflow-wrap:anywhere}
+.category-field,.category-option{width:100%;text-align:start;white-space:normal;overflow-wrap:anywhere}
+.category-option{margin-top:8px}
+.expense-main-category{display:flex;align-items:center;justify-content:space-between;gap:10px;white-space:normal;overflow-wrap:anywhere}
+.category-choice-label{min-width:0}
+.category-picker-rows{max-height:58vh;overflow-y:auto}
+.category-picker-footer{flex-wrap:wrap}
+.category-picker-footer button{max-width:100%;white-space:normal;overflow-wrap:anywhere}
 .expense-choices{display:flex;flex-direction:column;gap:8px}
 .expense-choices .chip{text-align:start;font-size:14px}
 .new-category{display:block;width:100%;margin-top:8px;text-align:start;font-size:14px;color:var(--blue)}

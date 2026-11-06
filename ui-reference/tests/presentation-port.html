@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>main presentation port checks</title>
+<style>body{margin:0}iframe{width:320px;height:900px;border:0;display:block}pre{white-space:pre-wrap}</style>
+<iframe id="preview" src="../index.html" title="Real application preview"></iframe>
+<pre id="result" data-status="running">Running</pre>
+<script type="module">
+const frame=document.getElementById("preview"),result=document.getElementById("result");
+let count=0;
+const check=(condition,message)=>{if(!condition)throw Error(message);count++};
+const pause=()=>new Promise(resolve=>setTimeout(resolve,30));
+async function until(condition){for(let i=0;i<150;i++){if(condition())return;await pause()}throw Error("Timed out")}
+try {
+  await until(()=>frame.contentDocument?.querySelector('[data-action="expense"]'));
+  const script=frame.contentDocument.createElement("script");script.type="module";
+  script.textContent='import {state} from "/js/state.js";import {demo} from "/js/demo.js";import {loadLanguage} from "/js/i18n.js";window.portTest={state,demo,loadLanguage};';
+  frame.contentDocument.body.append(script);
+  await until(()=>frame.contentWindow.portTest);
+  const {state,demo,loadLanguage}=frame.contentWindow.portTest,d=frame.contentDocument;
+  const click=async selector=>{const element=d.querySelector(selector);check(Boolean(element),"Missing "+selector);element.click();await pause()};
+  const input=(selector,value)=>{const element=d.querySelector(selector);element.value=value;element.dispatchEvent(new frame.contentWindow.Event("input",{bubbles:true}))};
+  const escape=async()=>{d.dispatchEvent(new frame.contentWindow.KeyboardEvent("keydown",{key:"Escape",bubbles:true}));await pause()};
+  const navigate=async index=>{await click("#menu-button");await click('[data-action="navigate"][data-index="'+index+'"]')};
+  const originalAllocations=JSON.stringify(demo.allocations);
+  demo.categories.push({id:"port-a",name:"Same name"},{id:"port-b",name:"Same name"});
+  await navigate(1);
+  await click('[data-action="tab"][data-index="2"]');
+  const record=demo.expenses[0],before={...record};
+  // Details/edit use the real app's event handlers and the same module state.
+  await click('[data-action="view-expense"][data-id="'+record.id+'"]');
+  await click('[data-action="begin-expense-edit"]');
+  input("#details-note","Unsaved note");
+  const draft=JSON.stringify(state.expenseDraft);
+  await click('[data-action="open-category-picker"]');
+  check(d.querySelector("#expense-details").inert,"Details inert under picker");
+  check(d.querySelector("#expense-details").getAttribute("aria-hidden")==="true","Background hidden from accessibility");
+  await escape();
+  check(JSON.stringify(state.expenseDraft)===draft,"Cancel preserves complete draft");
+  check(!d.querySelector("#expense-details").inert,"Details restored");
+  await click('[data-action="open-category-picker"]');
+  await click('[data-action="select-category"][data-id="port-b"]');
+  check(state.expenseDraft.categoryId==="port-b","Same-name categories use stable IDs");
+  check(JSON.stringify(record)===JSON.stringify(before),"Picker does not write saved expense");
+  await click('[data-action="open-category-picker"]');
+  await click('[data-action="select-category"][data-id=""]');
+  check(state.expenseDraft.categoryId===null,"Uncategorized remains selectable");
+  await click('[data-action="save-expense-details"]');
+  check(record.categoryId===null&&record.note==="Unsaved note","Saved edit preserves optional category");
+  check(record.amountMinor===before.amountMinor&&record.sourceId===before.sourceId&&record.date===before.date,"Other values preserved");
+  check(JSON.stringify(demo.allocations)===originalAllocations,"Category edit leaves allocations unchanged");
+  await click('[data-action="begin-expense-edit"]');
+  input("#details-note","Delete draft");
+  await click('[data-action="delete-expense"]');
+  await click('[data-expense-delete-confirmation] [data-action="close-overlay"]');
+  check(state.expenseDraft.note==="Delete draft","Cancelling delete preserves draft");
+  await escape();await escape();
+  check(state.overlay===null,"Back closes details");
+  await navigate(0);
+  await click('[data-action="budget-toggle"]');
+  const homeText=d.querySelector(".home").textContent;
+  check(homeText.includes(demo.sources[0].name),"Home source spending displayed");
+  await navigate(3);
+  await click('[data-action="edit-source"]');
+  check(Boolean(d.querySelector("#source-adjustment")),"main retains source adjustment");
+  check(Boolean(d.querySelector('[data-action="operation"][data-value="deduct"]')),"main retains +/- controls");
+  await escape();
+  const languages=["he","en","ru"],themes=["light","dark"];
+  for(const language of languages)for(const theme of themes){
+    await loadLanguage(language);state.language=language;state.theme=theme;
+    await navigate(0);await click('[data-action="expense"]');
+    input("#amount","4.56");input("#expense-note","Draft survives choice");
+    await click('[data-action="expense-category"][data-id="port-a"]');
+    check(state.expenseDraft.amount==="4.56"&&state.expenseDraft.note==="Draft survives choice","Creation choices retain fields");
+    check(Boolean(d.querySelector('[data-action="expense-category"][aria-pressed="true"] [aria-hidden="true"]')),"Inline checkmark");
+    check(Boolean(d.querySelector('[data-action="add-category"]')),"main retains category creation");
+    check(d.documentElement.dir===(language==="he"?"rtl":"ltr"),"Locale direction");
+    check(d.documentElement.scrollWidth<=frame.clientWidth,"No page overflow at 320px");
+    await escape();
+    await navigate(1);
+    await click('[data-action="view-expense"][data-id="'+record.id+'"]');
+    await click('[data-action="begin-expense-edit"]');
+    await click('[data-action="open-category-picker"]');
+    const panel=d.querySelector('[aria-labelledby="picker-title"]'),bounds=panel.getBoundingClientRect();
+    check(bounds.left>=0&&bounds.right<=frame.clientWidth,"Picker fits at 320px");
+    check(d.querySelector(".category-option").getBoundingClientRect().height>=48,"Picker touch target");
+    await escape();await escape();await escape();
+    await navigate(3);await click('[data-action="edit-source"]');
+    const budgetPanel=d.querySelector('[aria-labelledby="source-dialog-title"]').getBoundingClientRect();
+    check(budgetPanel.left>=0&&budgetPanel.right<=frame.clientWidth,"Budget dialog fits");
+    await escape();
+  }
+  // Leave a requested state open for screenshot review after all interaction checks.
+  const query=new URLSearchParams(location.search);
+  await loadLanguage(query.get("lang")||"he");state.language=query.get("lang")||"he";state.theme=query.get("theme")||"light";
+  await navigate(1);
+  await click('[data-action="view-expense"][data-id="'+record.id+'"]');
+  await click('[data-action="begin-expense-edit"]');
+  if(query.get("visual")==="creation"){await escape();await escape();await navigate(0);await click('[data-action="expense"]')}
+  else if(query.get("visual")==="budget"){await escape();await escape();await navigate(3);await click('[data-action="edit-source"]')}
+  else await click('[data-action="open-category-picker"]');
+  result.dataset.status="passed";result.textContent=count+" assertions passed";
+}catch(error){result.dataset.status="failed";result.textContent=String(error.stack||error)}
+</script>
+</html>

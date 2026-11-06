@@ -13,7 +13,7 @@ Run commands from the repository root, using a clean, reviewed commit and a comp
 
 Each application can advance and publish independently. Each release contains only its own APK and its tag points to the exact build commit. Filter tags by application prefix rather than GitHub's global “Latest”. Preserve historical tags/releases, including `0.1.0`.
 
-Both branches currently retain the same package identity; package separation has not been implemented. Distinct package identities are required before distributing divergent applications side by side. Thereafter, versionCode can advance independently for each package. Normal updates require the same applicationId and signing identity and a versionCode higher than every previously distributed build for that package; update versionName accordingly.
+The personal edition on main uses `com.example.manymanager`; Simple on original uses `com.example.simple.manymanager`. The packages can be installed side by side and keep separate app-private databases/preferences. Changing applicationId does not automatically transfer data. VersionCode can advance independently for each package. Normal updates require the same applicationId and signing identity and a versionCode higher than every previously distributed build for that package; update versionName accordingly.
 
 ## Build and verify
 

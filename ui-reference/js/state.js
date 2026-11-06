@@ -8,7 +8,7 @@ export const state={
   nextId:8,
   expenseDraft:{amount:"",date:"",note:"",categoryId:null,sourceId:null},
   expenseEditId:null,expandedSummaryGroups:new Set(),expenseEditing:false,
-  categoryDraft:"",categoryReturnOverlay:null,
+  categoryDraft:"",categoryReturnOverlay:null,pickerReturnOverlay:null,
   sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
   dialogMonth:null
 };
@@ -29,7 +29,9 @@ export function cancelExpenseEdit(){
   state.expenseDraft=savedExpenseDraft(demo.expenses.find(item=>item.id===state.expenseEditId));
 }
 export function closeOverlay(){
-  if(state.overlay==="add-category"){
+  if(state.overlay==="category-picker"){
+    state.overlay=state.pickerReturnOverlay;state.pickerReturnOverlay=null;
+  }else if(state.overlay==="add-category"){
     state.overlay=state.categoryReturnOverlay;
     state.categoryReturnOverlay=null;
   }else if(state.overlay==="delete-expense")state.overlay="expense-details";

@@ -33,6 +33,8 @@ class ExpenseDetailsDialog(
     private var datePicker: DatePickerDialog? = null
     private var confirmation: AlertDialog? = null
     private var categoryNames: Map<String, String> = emptyMap()
+    private var categoryPicker: CategoryPickerDialog? = null
+    private var categoryOptions: List<Category> = emptyList()
     private var sourceNames: Map<String, String> = emptyMap()
 
     private fun text(id: Int = View.NO_ID, size: Float = 16f) = TextView(activity).apply {
@@ -92,7 +94,17 @@ class ExpenseDetailsDialog(
     }
     private val amount = input(R.id.expenseDetailsAmount, true)
     private val date = action(R.string.expense_date, R.id.expenseDetailsDate)
-    private val category = Spinner(activity).apply { id = R.id.expenseDetailsCategory; minimumHeight = dp(48) }
+    private val category = action(R.string.choose_category, R.id.expenseDetailsCategory).apply {
+        gravity = Gravity.CENTER_VERTICAL
+        setOnClickListener {
+            if (canInteract()) {
+                categoryPicker?.dispose()
+                categoryPicker = CategoryPickerDialog(activity, categoryOptions, state?.draft?.categoryId) { id ->
+                    state?.draft?.let { onDraft(it.copy(categoryId = id)) }
+                }.also { it.show() }
+            }
+        }
+    }
     private val source = Spinner(activity).apply { id = R.id.expenseDetailsSource; minimumHeight = dp(48) }
     private val note = input(R.id.expenseDetailsNote)
     private val amountField = field(R.string.expense_amount, R.id.expenseDetailsAmountValue, amount)
@@ -184,14 +196,17 @@ class ExpenseDetailsDialog(
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (!rendering && canInteract() && parent?.selectedItemPosition == position) {
                     val choice = parent.selectedItem as? Choice ?: return
-                    if (choice.id != (if (spinner === category) state?.draft?.categoryId else state?.draft?.sourceId)) select(choice.id)
+                    if (choice.id != state?.draft?.sourceId) select(choice.id)
                 }
             }
         }
     }
     fun render(value: ExpenseCreationState, categories: CategoryListState, sources: SourceListState, canSave: Boolean) {
         state = value
-        if (categories is CategoryListState.Ready) categoryNames = categories.categories.associate { it.id to it.name }
+        if (categories is CategoryListState.Ready) {
+            categoryOptions = categories.categories
+            categoryNames = categories.categories.associate { it.id to it.name }
+        }
         if (sources is SourceListState.Ready) sourceNames = sources.sources.associate { it.id to it.name }
         val saved = value.original
         val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(activity.resources.configuration.locales[0])
@@ -215,8 +230,9 @@ class ExpenseDetailsDialog(
         if (amount.text.toString() != value.draft.amount) amount.setText(value.draft.amount)
         if (note.text.toString() != value.draft.note) note.setText(value.draft.note)
         date.text = value.draft.date?.format(formatter).orEmpty()
-        bindChoices(category, listOf(Choice(null, activity.getString(R.string.uncategorized))) +
-            categoryNames.map { Choice(it.key, it.value) }, value.draft.categoryId) { id -> state?.draft?.let { onDraft(it.copy(categoryId = id)) } }
+        category.text = if (value.draft.categoryId == null) activity.getString(R.string.uncategorized)
+            else categoryNames[value.draft.categoryId] ?: activity.getString(R.string.expense_missing_choice)
+        category.isEnabled = canInteract() && categories is CategoryListState.Ready
         bindChoices(source, sourceNames.map { Choice(it.key, it.value) }, value.draft.sourceId) { id -> state?.draft?.let { onDraft(it.copy(sourceId = id)) } }
         rendering = false
         edit.visibility = if (editing || saved == null) View.GONE else View.VISIBLE
@@ -269,6 +285,7 @@ class ExpenseDetailsDialog(
         }
     }
     fun dispose() {
+        categoryPicker?.dispose(); categoryPicker = null
         confirmation?.setOnCancelListener(null); confirmation?.dismiss(); confirmation = null
         datePicker?.dismiss(); datePicker = null
         dialog.dismiss()

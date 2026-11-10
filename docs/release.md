@@ -40,7 +40,23 @@ The helper reuses the existing external PKCS12/DPAPI credentials. `-Verify` firs
 - Manifest inspection confirmed the metadata above, no debuggable/testOnly flag, backup retained and existing application/icon/theme references.
 - `jarsigner -verify -strict` with the existing keystore succeeded; `keytool -printcert -jarfile` confirmed the historical certificate. An entry-by-entry Java verification checked **all 515 payload entries**, their expected signer fingerprint, and successful verification through both `JarFile` and `JarInputStream`. SHA-256 comparison before/after signature-entry normalization confirmed all 515 payloads unchanged. The original streaming-manifest warning was resolved. JDK still notes that POSIX ZIP attributes are not signed; file payloads are verified.
 - Bundle config requests `PAGE_ALIGNMENT_16K`. Static ELF checks passed for both 64-bit `libandroidx.graphics.path.so` libraries (arm64-v8a and x86_64): all LOAD segments aligned to at least 16384 bytes, offset/address congruence and RELRO boundary checks passed. Four native libraries are packaged overall. No runtime test on a 16 KB device or Play-generated APK has been performed for this preparation.
-- Final build commit, delivery size and checksum will be recorded after the clean-commit rebuild. Rebuilding/signing can change archive bytes; recheck the actual delivered file.
+- Final delivery was rebuilt from clean preparation commit `979434649343f3a739a5e7d061afe3c27819ee61`; the bundled `version-control-info.textproto` records that exact revision. Both Gradle output and delivery copy are **9,916,691 bytes**, SHA-256 `1356549e763135259e1de0db79b07632f24beabfe535b97dc846532bf9ee8612`. Final signature/payload, bundle validation and ELF checks were repeated on that build. This record-only documentation update does not change the built app. Rebuilding/signing can change archive bytes; recheck the actual delivered file.
+
+For repeat inspection with the verified official bundletool JAR in the ignored directory:
+
+```powershell
+$env:JAVA_HOME = 'C:\\Program Files\\Android\\Android Studio\\jbr'
+$playBundle = 'private-release/ManyManager-0.3.0-vc4-play.aab'
+$bundleTool = 'private-release/bundletool-all-1.18.3.jar'
+& "$env:JAVA_HOME\\bin\\java.exe" -jar $bundleTool validate "--bundle=$playBundle"
+& "$env:JAVA_HOME\\bin\\java.exe" -jar $bundleTool dump manifest "--bundle=$playBundle" --module=base
+& "$env:JAVA_HOME\\bin\\java.exe" -jar $bundleTool dump config "--bundle=$playBundle"
+& "$env:JAVA_HOME\\bin\\jarsigner.exe" -verify $playBundle
+& "$env:JAVA_HOME\\bin\\keytool.exe" -printcert -jarfile $playBundle
+Get-FileHash -Algorithm SHA256 $playBundle
+```
+
+The verification above additionally used trusted-keystore strict verification without exposing its password. An unconfigured public trust store can warn about a self-signed Android certificate; compare the exact certificate fingerprint above, not public-CA trust. AABs use JAR signatures; do not use APK-only `apksigner` to verify an AAB. Obtain bundletool only from [Google's official release](https://github.com/google/bundletool/releases/tag/1.18.3) and check its digest. Neither the tool JAR nor the AAB is tracked in Git.
 
 If signing files are missing, restore the **existing** `manymanager-release.p12` and matching `release-credential.clixml` in `%USERPROFILE%\\.manymanager\\signing`, or supply their secure directory with `-SigningDirectory`. DPAPI credentials require the matching Windows user/machine; otherwise securely reprovision credentials for the same key. Do not run `-InitializeKey` to repair a missing update key. Never put passwords in command history, logs, documentation or Git. The command above finishes the bundle once the existing credentials are restored.
 

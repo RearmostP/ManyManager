@@ -39,4 +39,16 @@ Fresh checks on 10 November 2026:
 - The preview was launched with the unchanged `python preview.py`. Edge headless passed the focused budget interaction/layout check (66 assertions, three locales × light/dark at 320px); the Hebrew overall-budget dialog and expanded Home screenshots were visually inspected (Home run: 69 assertions). The existing presentation smoke check was updated to expect the new optional-limit controls and passed all 160 assertions in a fresh browser profile.
 - `git diff --check` passed. Icon, applicationId, signing configuration, versionCode and versionName are unchanged.
 
-Instrumentation uses the existing isolated test Application, in-memory or UUID-named databases and test-prefixed preferences. When a device becomes available, use an isolated test installation; do not clear or uninstall the installed user application.
+### Follow-up verification on a physical device
+
+On 10 November 2026, tested commit `6eb6ba7391638a8a77501576c605246d28113d41` on a Samsung SM-S928B running Android 17 / API 37. This completes the previously pending device verification above.
+
+- Built an isolated installation using a local ignored Gradle init script under `build/`: application `com.example.manymanager.budgetdevicetest`, instrumentation `com.example.manymanager.budgetdevicetest.test`. Production build configuration, applicationId, signing, icon and versions were unchanged.
+- Ran `:androidApp:connectedDebugAndroidTest` with that init script and the connected device selected. The XML runner report confirms **76 tests, zero failures, errors or skips**: 13 database tests, 44 repository/controller tests and 19 Activity/dialog tests.
+- Real Room/SQLite schema-1→2 migration and schema validation passed with populated multi-period fixtures, including explicit zero, signed negative historical amounts, preserved expenses/IDs/dates/notes and calculator settings. File close/reopen checks passed.
+- Passed independent overall budgets and optional source limits, no automatic carryover, the 9th/10th boundary, unset versus zero, saving without thresholds or beyond them, limit editing/removal, source/date moves, deletion and observer recalculation. UI checks passed recreation, guarded submissions, storage-failure recovery, localized light/dark layouts and expense flows.
+- An additional manual visual check confirmed Hebrew Home's “Budget not set” state, the new overall-budget dialog, saving ₪5,000, an unset next period, and restoration of the saved ₪5,000 when navigating back.
+- The installed normal package `com.example.manymanager` was neither replaced nor cleared/uninstalled. Its package version and last-update timestamp were unchanged before/after the test installation. Test databases/preferences used the existing isolated test Application, in-memory or UUID-named databases and test-prefixed preferences. Fictional manual data was entered only into the isolated package.
+- Remaining scope limits: this run covers API 37 on one physical device, not API 30, exhaustive accessibility/font-size/keyboard combinations, true midnight transitions or arbitrary process death during commit.
+
+The generated local runner report is `androidApp/build/outputs/androidTest-results/connected/debug/TEST-SM-S928B - 17.xml`. Test APKs were left installed; no release, tag or APK upload was performed.

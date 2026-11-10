@@ -12,6 +12,7 @@ data class Expense(
 data class SourceBudget(
     val source: BudgetSource, val allocatedMinor: Long, val spentMinor: Long,
     val remainingMinor: Long, val expenseCount: Int,
+    val limitMinor: Long? = null,
 )
 data class CategorySummary(val categoryId: String?, val spentMinor: Long, val expenseCount: Int)
 data class BudgetSnapshot(
@@ -25,6 +26,7 @@ data class BudgetSnapshot(
     val remainingMinor: Long,
     val expenseCount: Int,
     val categoryBreakdown: List<CategorySummary>,
+    val overallBudgetMinor: Long? = null,
 ) {
     /** Spending rows only; allocation/remaining rows retain their separate management order. */
     val sourceBreakdown: List<SourceBudget> = sources.filter { it.expenseCount > 0 }

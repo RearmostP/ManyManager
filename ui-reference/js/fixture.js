@@ -2,14 +2,15 @@
 // The fixed date keeps all seven expenses visible regardless of today's date.
 export const fixture = {
   today: "2026-11-25",
+  overallBudget: 500000,
   categories: [
     {id: "c1", name: "Groceries"},
     {id: "c2", name: "Home, hobbies and weekend projects"},
     {id: "c3", name: "Travel"}
   ],
   sources: [
-    {id: "s1", name: "Everyday budget", budget: 200000},
-    {id: "s2", name: "Weekend and household project fund", budget: 100000}
+    {id: "s1", name: "Cash", budget: 80000},
+    {id: "s2", name: "Credit", budget: null}
   ],
   expenses: [
     {id: "e1", categoryId: "c1", sourceId: "s1", amountMinor: 4250, date: "2026-11-11", note: ""},

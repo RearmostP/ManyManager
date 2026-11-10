@@ -72,8 +72,10 @@ class BudgetHomeUi(
     fun render(snapshot: BudgetSnapshot, expanded: Boolean) {
         val total = snapshot.totalAllocatedMinor
         val remaining = snapshot.remainingMinor
-        val formattedRemaining = money(remaining)
-        val formattedTotal = money(total)
+        val formattedRemaining = if (snapshot.overallBudgetMinor == null) context.getString(R.string.budget_not_set)
+            else if (remaining < 0) context.getString(R.string.overall_exceeded, money(remaining))
+            else money(remaining)
+        val formattedTotal = snapshot.overallBudgetMinor?.let { money(total) } ?: context.getString(R.string.budget_not_set)
 
         root.findViewById<TextView>(R.id.homeBudgetRemaining).text = formattedRemaining
         root.findViewById<TextView>(R.id.homeBudgetTotal).text = formattedTotal
@@ -96,7 +98,7 @@ class BudgetHomeUi(
         } else {
             snapshot.sources.forEach { sourceBudget ->
                 rows.addView(LinearLayout(context).apply {
-                    orientation = LinearLayout.HORIZONTAL
+                    orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(0, dp(8), 0, dp(8))
                     layoutParams = LinearLayout.LayoutParams(
@@ -107,14 +109,17 @@ class BudgetHomeUi(
                         text = sourceBudget.source.name
                         textSize = 14f
                         setTextColor(context.getColor(R.color.text))
-                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                     })
 
                     addView(TextView(context, null, 0, R.style.Text).apply {
-                        text = money(sourceBudget.spentMinor)
+                        text = context.getString(R.string.source_spent, money(sourceBudget.spentMinor)) +
+                            (sourceBudget.limitMinor?.let { "\n" + context.getString(
+                                if (sourceBudget.remainingMinor < 0) R.string.limit_exceeded else R.string.limit_remaining,
+                                money(sourceBudget.remainingMinor)) }.orEmpty())
+                        textDirection = View.TEXT_DIRECTION_LOCALE
                         textSize = 14f
                         setTextColor(context.getColor(R.color.muted))
-                        textDirection = View.TEXT_DIRECTION_LTR
                         layoutParams = LinearLayout.LayoutParams(
                             ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
                         )

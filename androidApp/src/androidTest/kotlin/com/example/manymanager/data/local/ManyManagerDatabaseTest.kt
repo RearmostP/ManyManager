@@ -75,7 +75,8 @@ class ManyManagerDatabaseTest {
     @Test fun recordsSurviveClosingAndReopeningFileDatabase() = runBlocking {
         val name = newTestFile()
         database.close()
-        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).build()
+        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
         seedRelationships()
         val allocation = BudgetAllocationEntity(owner, source.id, period, 12345L)
         val categorized = expense("categorized")
@@ -85,7 +86,8 @@ class ManyManagerDatabaseTest {
         database.dao().insertExpense(uncategorized)
         database.close()
 
-        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).build()
+        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
         assertEquals(CalculatorEntity(owner), database.dao().initializeLocalCalculator())
         assertEquals(1L, count("calculators"))
         assertEquals(allocation, database.dao().allocation(owner, source.id, period))
@@ -232,7 +234,8 @@ class ManyManagerDatabaseTest {
                 arrayOf<Any>(owner, date, source.id))
         }
         database.close()
-        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name).build()
+        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
         assertEquals(CalculatorEntity(owner, 15, "EUR"), database.dao().initializeLocalCalculator())
         assertEquals(listOf(category), database.dao().categories(owner))
         assertEquals(listOf(source), database.dao().sources(owner))
@@ -241,6 +244,46 @@ class ManyManagerDatabaseTest {
         assertEquals(expense("schema"), database.dao().expense(owner, "schema"))
         assertEquals(expense("schema-null", categoryId = null), database.dao().expense(owner, "schema-null"))
         assertEquals(2L, count("expenses"))
+    }
+
+    @Test fun migrationPreservesMultiplePeriodsZeroNegativeAndEveryExpenseField() = runBlocking {
+        val name = newTestFile()
+        val later = LocalDate.of(2026, 12, 10).toEpochDay()
+        schemaHelper.createDatabase(name, 1).use { saved ->
+            saved.execSQL("INSERT INTO calculators VALUES (?, 10, 'ILS')", arrayOf(owner))
+            saved.execSQL("INSERT INTO categories VALUES (?, 'cat', 'Food')", arrayOf(owner))
+            saved.execSQL("INSERT INTO budget_sources VALUES (?, 'cash', 'Cash')", arrayOf(owner))
+            saved.execSQL("INSERT INTO budget_sources VALUES (?, 'card', 'Card')", arrayOf(owner))
+            listOf(Triple("cash", period, 80000L), Triple("card", period, 420000L),
+                Triple("cash", later, 0L), Triple("card", later, -123L)).forEach { (id, start, amount) ->
+                saved.execSQL("INSERT INTO budget_allocations VALUES (?, ?, ?, ?)",
+                    arrayOf<Any>(owner, id, start, amount))
+            }
+            saved.execSQL("INSERT INTO expenses VALUES (?, 'old', 20000, ?, 'cat', 'cash', 'kept note')",
+                arrayOf<Any>(owner, date))
+            saved.execSQL("INSERT INTO expenses VALUES (?, 'later', 30000, ?, NULL, 'card', NULL)",
+                arrayOf<Any>(owner, later))
+        }
+        schemaHelper.runMigrationsAndValidate(name, 2, true, ManyManagerDatabase.MIGRATION_1_2).close()
+        database.close()
+        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
+        val dao = database.dao()
+        assertEquals(CalculatorEntity(owner), dao.calculator(owner))
+        assertEquals(500000L, dao.periodBudget(owner, period)!!.amountMinor)
+        assertEquals(-123L, dao.periodBudget(owner, later)!!.amountMinor)
+        assertEquals(0L, dao.allocation(owner, "cash", later)!!.allocatedMinor)
+        assertEquals(-123L, dao.allocation(owner, "card", later)!!.allocatedMinor)
+        assertNull(dao.periodBudget(owner, later + 31))
+        assertTrue(dao.allocations(owner, later + 31).isEmpty())
+        assertEquals(ExpenseEntity(owner, "old", 20000, date, "cat", "cash", "kept note"),
+            dao.expense(owner, "old"))
+        assertEquals(ExpenseEntity(owner, "later", 30000, later, null, "card", null),
+            dao.expense(owner, "later"))
+        assertEquals(2L, count("budget_sources"))
+        assertEquals(1L, count("categories"))
+        assertEquals(4L, count("budget_allocations"))
+        assertEquals(2L, count("period_budgets"))
     }
 
     private suspend fun seedRelationships() {

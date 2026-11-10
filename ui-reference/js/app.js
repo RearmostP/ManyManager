@@ -2,7 +2,7 @@ import {adjacentPeriod,civilDate,periodKey} from "./dates.js";
 import {state,changePage,goBack,closeOverlay,cancelExpenseEdit,savedExpenseDraft} from "./state.js";
 import {loadLanguage,t} from "./i18n.js";
 import {icon} from "./icons.js";
-import {demo,parseAmount} from "./demo.js";
+import {demo,parseAmount,amountFor,totalFor} from "./demo.js";
 import {home} from "./screens/home.js";
 import {summary} from "./screens/summary.js";
 import {budget} from "./screens/budget.js";
@@ -13,7 +13,7 @@ import {expense,canSaveExpense} from "./components/expense-sheet.js";
 import {expenseDelete} from "./components/expense-delete.js";
 import {expenseDetails,expenseDetailsBody} from "./components/expense-details.js";
 import {categoryDialog,beginCategoryCreation,confirmCategoryCreation} from "./components/category-dialog.js";
-import {sourceDialog,sourcePreview} from "./components/source-dialog.js";
+import {sourceDialog} from "./components/source-dialog.js";
 import {categoryPicker} from "./components/category-picker.js";
 
 const app=document.getElementById("app");
@@ -48,7 +48,7 @@ function render(){
     }else if(focusId)panel.querySelector("#"+CSS.escape(focusId))?.focus({preventScroll:true});
   }else overlay.innerHTML=({
     menu:drawer,expense,"add-category":categoryDialog,"category-picker":categoryPicker,
-    "add-source":sourceDialog,"edit-source":sourceDialog
+    "add-source":sourceDialog,"edit-source":sourceDialog,"overall-budget":sourceDialog
   })[state.overlay]?.()??"";
   app.inert=Boolean(state.overlay);
   scroll.style.overflow=state.overlay?"hidden":"auto";
@@ -67,8 +67,6 @@ document.addEventListener("input",event=>{
   if(field.hasAttribute("data-category-draft"))state.categoryDraft=field.value;
   if(field.dataset.sourceDraft){
     state.sourceDraft[field.dataset.sourceDraft]=field.value;
-    const preview=document.getElementById("source-preview");
-    if(preview)preview.textContent=sourcePreview();
   }
 });
 
@@ -83,28 +81,42 @@ document.addEventListener("click",async event=>{
     case "back": goBack(scroll);break;
     case "add-category": beginCategoryCreation();break;
     case "confirm-category": confirmCategoryCreation();break;
+    case "overall-budget":
     case "add-source":
     case "edit-source":{
       const source=demo.sources.find(item=>item.id===button.dataset.id);
       state.dialogMonth=new Date(state.budgetMonth);
-      state.sourceDraft={name:source?.name??"",initial:"0",adjustment:"",operation:"add",sourceId:source?.id};
+      const amount=button.dataset.action==="overall-budget"?totalFor(state.dialogMonth):source?amountFor(state.dialogMonth,source.id):null;
+      state.sourceDraft={name:source?.name??"",initial:amount==null?"":String(amount/100),sourceId:source?.id};
       state.overlay=button.dataset.action;break;
     }
     case "confirm-add-source":{
       const id="s"+state.nextId++;
       demo.sources.push({id,name:state.sourceDraft.name||"Example source"});
-      demo.allocations[id]={[periodKey(state.dialogMonth)]:parseAmount(state.sourceDraft.initial)};
+      demo.allocations[id]=state.sourceDraft.initial.trim()===""?{}:{[periodKey(state.dialogMonth)]:parseAmount(state.sourceDraft.initial)};
       state.overlay=null;break;
     }
     case "confirm-edit-source":{
       const draft=state.sourceDraft;
       const source=demo.sources.find(item=>item.id===draft.sourceId);
       source.name=draft.name||source.name;
-      const key=periodKey(state.dialogMonth),amount=parseAmount(draft.adjustment);
-      demo.allocations[source.id][key]=(demo.allocations[source.id][key]??0)+(draft.operation==="add"?amount:-amount);
+      const key=periodKey(state.dialogMonth);
+      if(draft.initial.trim()==="")delete demo.allocations[source.id][key];
+      else demo.allocations[source.id][key]=parseAmount(draft.initial);
       state.overlay=null;break;
     }
-    case "operation": state.sourceDraft.operation=button.dataset.value;break;
+    case "confirm-overall":{
+      const key=periodKey(state.dialogMonth);
+      if(state.sourceDraft.initial.trim()==="")delete demo.budgets[key];
+      else demo.budgets[key]=parseAmount(state.sourceDraft.initial);
+      state.overlay=null;break;
+    }
+    case "remove-threshold":{
+      const key=periodKey(state.dialogMonth);
+      if(state.overlay==="overall-budget")delete demo.budgets[key];
+      else delete demo.allocations[state.sourceDraft.sourceId][key];
+      state.overlay=null;break;
+    }
     case "open-category-picker":
       state.pickerReturnOverlay=state.overlay;state.overlay="category-picker";break;
     case "select-category":

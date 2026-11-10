@@ -53,6 +53,10 @@
   color:var(--muted);
   font-size:14px;
   padding-bottom:10px}
+.budget-source {flex-direction:column;gap:4px;align-items:stretch}
+.budget-source span:last-child {text-align:start}
+.budget-source span:first-child {color:var(--text)}
+.budget-toggle .spacer,.budget-toggle .money {flex:1;min-width:0}
 .budget-empty {
   text-align:center;
   color:var(--muted);

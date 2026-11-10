@@ -18,11 +18,16 @@
         android:layout_marginTop="24dp" android:background="@drawable/card"
         android:padding="24dp" android:orientation="vertical">
         <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="@string/monthly_budget" android:textSize="13sp" android:textColor="@color/muted" />
+            android:text="@string/overall_budget" android:textSize="13sp" android:textColor="@color/muted" />
         <TextView android:id="@+id/budgetAllocatedTotal" style="@style/Text"
             android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="12dp" android:textSize="40sp" android:textDirection="ltr"
             android:textStyle="bold" android:accessibilityLiveRegion="polite" />
+        <TextView android:id="@+id/editOverallBudget" style="@style/Text"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:minHeight="48dp" android:gravity="center_vertical"
+            android:text="@string/edit_overall_budget" android:textColor="@color/blue"
+            android:clickable="true" android:focusable="true" />
     </LinearLayout>
     <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:layout_marginTop="24dp" android:text="@string/budget_by_source"

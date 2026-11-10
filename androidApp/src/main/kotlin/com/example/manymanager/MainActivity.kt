@@ -57,6 +57,7 @@ class MainActivity : AppCompatActivity() {
     private var categoryDialog: CategoryCreationDialog? = null
     private var sourceCreationDialog: SourceCreationDialog? = null
     private var sourceEditingDialog: SourceEditingDialog? = null
+    private var budgetEditorDialog: BudgetEditorDialog? = null
     private var homeBudgetUi: BudgetHomeUi? = null
     private var budgetManagementUi: BudgetManagementUi? = null
     private var categoryManagementUi: CategoryManagementUi? = null
@@ -95,6 +96,7 @@ class MainActivity : AppCompatActivity() {
                 launch { persistentViewModel.categoryCreation.collect(::renderCategoryCreation) }
                 launch { persistentViewModel.sourceCreationState.collect(::renderSourceCreation) }
                 launch { persistentViewModel.sourceEditingState.collect(::renderSourceEditing) }
+                launch { persistentViewModel.budgetEditor.collect(::renderBudgetEditor) }
                 launch { persistentViewModel.expenseCreationState.collect(::renderExpenseCreation) }
             }
         }
@@ -251,7 +253,8 @@ class MainActivity : AppCompatActivity() {
             persistentViewModel::selectPreviousPeriod,
             persistentViewModel::selectNextPeriod,
             ::showAddSource,
-            ::showEditSource
+            ::showEditSource,
+            { period, amount -> persistentViewModel.beginBudgetEditor(period, null, amount) }
         )
         categoryManagementUi = CategoryManagementUi(
             findViewById(R.id.categoriesPage), ::navigateBack, ::showAddCategory,
@@ -292,6 +295,9 @@ class MainActivity : AppCompatActivity() {
         savedInstanceState?.getBundle("sourceEditing")?.let {
             SourceEditingState.fromBundle(it)?.let(persistentViewModel::restoreSourceEditing)
         }
+        savedInstanceState?.getBundle("budgetEditor")?.let {
+            persistentViewModel.restoreBudgetEditor(BudgetEditorState.fromBundle(it))
+        }
         renderedConfiguration = Configuration(resources.configuration)
         contentReady = true
         renderPersistentDataState(persistentViewModel.state.value)
@@ -302,6 +308,7 @@ class MainActivity : AppCompatActivity() {
         renderCategoryCreation(persistentViewModel.categoryCreation.value)
         renderSourceCreation(persistentViewModel.sourceCreationState.value)
         renderSourceEditing(persistentViewModel.sourceEditingState.value)
+        renderBudgetEditor(persistentViewModel.budgetEditor.value)
         finishAppearanceTransition(savedInstanceState)
     }
 
@@ -475,10 +482,30 @@ class MainActivity : AppCompatActivity() {
         renderSourceCreation(persistentViewModel.sourceCreationState.value)
     }
 
-    private fun showEditSource(source: BudgetSource, period: BudgetPeriod, currentAllocation: Long) {
+    private fun showEditSource(source: BudgetSource, period: BudgetPeriod, currentAllocation: Long?) {
         dismissActiveDialogImmediately()
-        persistentViewModel.beginSourceEditing(source, period, currentAllocation)
-        renderSourceEditing(persistentViewModel.sourceEditingState.value)
+        persistentViewModel.beginBudgetEditor(period, source, currentAllocation)
+        renderBudgetEditor(persistentViewModel.budgetEditor.value)
+    }
+
+    private fun renderBudgetEditor(state: BudgetEditorState?) {
+        if (!contentReady || isFinishing || isDestroyed) return
+        if (state == null) {
+            if (activeDialog === budgetEditorDialog?.dialog) activeDialog = null
+            budgetEditorDialog?.dispose()
+            budgetEditorDialog = null
+            return
+        }
+        if (budgetEditorDialog == null) {
+            val window = BudgetEditorDialog(this, state,
+                persistentViewModel::updateBudgetEditor,
+                persistentViewModel::submitBudgetEditor,
+                persistentViewModel::cancelBudgetEditor)
+            budgetEditorDialog = window
+            activeDialog = window.dialog
+            window.show()
+        }
+        budgetEditorDialog?.render(state)
     }
 
     private fun renderSourceCreation(state: SourceCreationState?) {
@@ -612,6 +639,8 @@ class MainActivity : AppCompatActivity() {
         sourceCreationDialog = null
         sourceEditingDialog?.dispose()
         sourceEditingDialog = null
+        budgetEditorDialog?.dispose()
+        budgetEditorDialog = null
         val dialog = activeDialog
         when (dialog) {
             is ExpenseSheetDialog -> dialog.dismissImmediately()
@@ -730,6 +759,7 @@ class MainActivity : AppCompatActivity() {
         persistentViewModel.sourceEditingState.value?.let {
             outState.putBundle("sourceEditing", it.toBundle())
         }
+        persistentViewModel.budgetEditor.value?.let { outState.putBundle("budgetEditor", it.toBundle()) }
         persistentViewModel.selectedPeriod?.let {
             outState.putLongArray("selectedBudgetPeriod", longArrayOf(it.startEpochDay, it.endExclusiveEpochDay))
         }

@@ -22,7 +22,7 @@ class BudgetCalculationsTest {
         val snapshot = snapshot(listOf(
             expense("1", 30, category = "cat"), expense("2", 20, source = "b"),
             expense("3", 10, source = "b"),
-        ), mapOf("a" to 100, "b" to 0))
+        ), mapOf("a" to 100, "b" to 0), 100)
         assertEquals(60L, snapshot.totalSpentMinor)
         assertEquals(100L, snapshot.totalAllocatedMinor)
         assertEquals(40L, snapshot.remainingMinor)
@@ -93,6 +93,21 @@ class BudgetCalculationsTest {
         assertTrue(empty.sourceBreakdown.isEmpty())
     }
 
-    private fun snapshot(expenses: List<Expense>, allocations: Map<String, Long> = emptyMap()) =
-        BudgetCalculations.snapshot(calculator, period, emptyList(), sources, allocations, expenses)
+    @Test fun overallBudgetIsIndependentAndLimitsAreOptional() {
+        val rows = listOf(expense("cash", 20000), expense("credit", 30000, "b"))
+        val result = snapshot(rows, mapOf("a" to 80000), 500000)
+        assertEquals(450000L, result.remainingMinor)
+        assertEquals(60000L, result.sources[0].remainingMinor)
+        assertNull(result.sources[1].limitMinor)
+        assertEquals(30000L, result.sources[1].spentMinor)
+        assertEquals(500000L, snapshot(rows, mapOf("a" to 0), 500000).overallBudgetMinor)
+        assertEquals(-20000L, snapshot(rows, mapOf("a" to 0), 500000).sources[0].remainingMinor)
+        assertNull(snapshot(rows).overallBudgetMinor)
+        assertEquals(0L, snapshot(rows, overall = 0).overallBudgetMinor)
+        assertEquals(-50000L, snapshot(rows, overall = 0).remainingMinor)
+    }
+
+    private fun snapshot(expenses: List<Expense>, allocations: Map<String, Long> = emptyMap(),
+        overall: Long? = null) =
+        BudgetCalculations.snapshot(calculator, period, emptyList(), sources, allocations, expenses, overall)
 }

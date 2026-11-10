@@ -13,6 +13,7 @@ object BudgetCalculations {
         sources: List<BudgetSource>,
         allocations: Map<String, Long>,
         expenses: List<Expense>,
+        overallBudgetMinor: Long? = null,
     ): BudgetSnapshot {
         val bySource = expenses.groupBy { it.sourceId }
         val sourceBudgets = sources.map { source ->
@@ -20,16 +21,16 @@ object BudgetCalculations {
             val allocated = allocations[source.id] ?: 0L
             val spent = exactSum(rows.map { it.amountMinor })
             SourceBudget(source, allocated, spent.checkedLong(),
-                BigInteger.valueOf(allocated).subtract(spent).checkedLong(), rows.size)
+                BigInteger.valueOf(allocated).subtract(spent).checkedLong(), rows.size, allocations[source.id])
         }
-        val allocated = exactSum(allocations.values)
+        val allocated = BigInteger.valueOf(overallBudgetMinor ?: 0L)
         val spent = exactSum(expenses.map { it.amountMinor })
         val breakdown = expenses.groupBy { it.categoryId }.map { (id, rows) ->
             CategorySummary(id, sum(rows.map { it.amountMinor }), rows.size)
         }.sortedWith(compareByDescending<CategorySummary> { it.spentMinor }.thenBy { it.categoryId })
         return BudgetSnapshot(calculator, period, categories.toList(), sourceBudgets,
             expenses.toList(), allocated.checkedLong(), spent.checkedLong(),
-            allocated.subtract(spent).checkedLong(), expenses.size, breakdown)
+            allocated.subtract(spent).checkedLong(), expenses.size, breakdown, overallBudgetMinor)
     }
 
     // BigInteger.longValueExact() requires API 31; the app also supports API 30.

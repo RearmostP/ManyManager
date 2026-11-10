@@ -9,7 +9,7 @@ export const state={
   expenseDraft:{amount:"",date:"",note:"",categoryId:null,sourceId:null},
   expenseEditId:null,expandedSummaryGroups:new Set(),expenseEditing:false,
   categoryDraft:"",categoryReturnOverlay:null,pickerReturnOverlay:null,
-  sourceDraft:{name:"",initial:"0",adjustment:"",operation:"add",sourceId:null},
+  sourceDraft:{name:"",initial:"",sourceId:null},
   dialogMonth:null
 };
 export function changePage(index,scrollElement){

@@ -122,10 +122,12 @@
             <TextView
                 android:id="@+id/homeBudgetRemaining"
                 style="@style/Text"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:gravity="end"
                 android:layout_height="wrap_content"
                 android:textSize="17sp"
-                android:textDirection="ltr"
+                android:textDirection="locale"
                 android:textColor="@color/text"
                 android:textStyle="bold" />
 
@@ -175,7 +177,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:textSize="14sp"
-                    android:textDirection="ltr"
+                    android:textDirection="locale"
                     android:textColor="@color/muted" />
             </LinearLayout>
 

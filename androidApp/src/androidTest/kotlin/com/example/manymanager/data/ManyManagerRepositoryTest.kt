@@ -89,7 +89,7 @@ class ManyManagerRepositoryTest {
             is DataError.StorageFailure)
         val state = snapshot()
         assertEquals("Before", state.sources.single().source.name)
-        assertEquals(100L, state.totalAllocatedMinor)
+        assertEquals(100L, state.limitTotal())
     }
 
     @Test fun foreignAndMissingSourcesAreRejectedAndForeignDataIsExcluded() = runBlocking {
@@ -117,7 +117,7 @@ class ManyManagerRepositoryTest {
         val source = success(repository.createSourceWithInitialAllocation("Cash", period, 100))
         val preview = success(repository.previewBudgetAdjustment(source.id, period, 10))
         assertEquals(110L, preview.resultingAllocatedMinor)
-        assertEquals(100L, snapshot().totalAllocatedMinor)
+        assertEquals(100L, snapshot().limitTotal())
         success(repository.updateSourceAndAdjustAllocation(source.id, "Card", period, 50))
         val confirmed = success(repository.updateSourceAndAdjustAllocation(source.id, "Final", period, 10))
         assertEquals(150L, confirmed.currentAllocatedMinor)
@@ -135,7 +135,7 @@ class ManyManagerRepositoryTest {
         assertEquals(DataError.BlankName,
             error(repository.updateSourceAndAdjustAllocation(source.id, "  ", period, 10)))
         assertEquals("Cash", snapshot().sources.single().source.name)
-        assertEquals(100L, snapshot().totalAllocatedMinor)
+        assertEquals(100L, snapshot().limitTotal())
         assertEquals(DataError.NegativeAllocatedBudget,
             error(repository.createSourceWithInitialAllocation("Negative", period, -1)))
         assertEquals(1, snapshot().sources.size)
@@ -150,8 +150,8 @@ class ManyManagerRepositoryTest {
                 async { success(repository.updateSourceAndAdjustAllocation(source.id, "Cash", period, 1)) }
             }.awaitAll()
         }
-        assertEquals(130L, snapshot().totalAllocatedMinor)
-        assertEquals(300L, success(repository.snapshot(next)).totalAllocatedMinor)
+        assertEquals(130L, snapshot().limitTotal())
+        assertEquals(300L, success(repository.snapshot(next)).limitTotal())
         assertEquals(0, snapshot().expenseCount)
     }
 
@@ -168,7 +168,7 @@ class ManyManagerRepositoryTest {
         assertEquals(-300L, snapshot.sources.single().remainingMinor)
         assertEquals(2, snapshot.expenseCount)
         success(repository.updateSourceAndAdjustAllocation(source.id, "Cash", period, 10))
-        assertEquals(-290L, snapshot().remainingMinor)
+        assertEquals(-300L, snapshot().remainingMinor)
         assertEquals(CategorySummary(null, 200, 1),
             snapshot.categoryBreakdown.single { it.categoryId == null })
         assertEquals(setOf("start", "last"), snapshot.expenses.map { it.id }.toSet())
@@ -199,13 +199,13 @@ class ManyManagerRepositoryTest {
             error(repository.previewBudgetAdjustment(source.id, period, 1)))
         assertEquals(DataError.AmountOverflow,
             error(repository.updateSourceAndAdjustAllocation(source.id, "Changed", period, 1)))
-        assertEquals(DataError.AmountOverflow,
-            error(repository.createSourceWithInitialAllocation("Another", period, 1)))
-        assertEquals("Maximum", snapshot().sources.single().source.name)
+        // Independent limits need not have a representable sum and never reserve overall money.
+        success(repository.createSourceWithInitialAllocation("Another", period, 1))
+        assertEquals("Maximum", snapshot().sources.first().source.name)
         val zero = success(repository.createSourceWithInitialAllocation("Zero", period, 0))
-        assertEquals(DataError.AmountOverflow,
-            error(repository.updateSourceAndAdjustAllocation(zero.id, "Changed", period, 1)))
-        assertEquals(2, snapshot().sources.size)
+        success(repository.updateSourceAndAdjustAllocation(zero.id, "Changed", period, 1))
+        assertNull(snapshot().overallBudgetMinor)
+        assertEquals(3, snapshot().sources.size)
     }
 
     @Test fun expenseOverflowIsTypedRatherThanWrappedOrRounded() = runBlocking {
@@ -241,9 +241,9 @@ class ManyManagerRepositoryTest {
                     while (true) {
                         val snapshot = success(emitted.receive())
                         val version = snapshot.sources.single().source.name.removePrefix("v").toLong()
-                        assertEquals(100L + version, snapshot.totalAllocatedMinor)
+                        assertEquals(100L + version, snapshot.limitTotal())
                         assertEquals(version, snapshot.totalSpentMinor)
-                        assertEquals(100L, snapshot.remainingMinor)
+                        assertEquals(-version, snapshot.remainingMinor)
                         if (version == 15L) break
                     }
                 }
@@ -449,19 +449,19 @@ class ManyManagerRepositoryTest {
                     it is PersistentDataState.Ready && it.snapshot.sources.any { s -> s.source.name == "Main Cash" && s.allocatedMinor == 30000L }
                 }
             } as PersistentDataState.Ready
-            assertEquals(30000L, updatedState.snapshot.totalAllocatedMinor)
+            assertEquals(30000L, updatedState.snapshot.limitTotal())
 
             withContext(Dispatchers.Main) { model.selectNextPeriod() }
             val nextState = withTimeout(10_000) {
                 model.state.first { it is PersistentDataState.Ready && it.snapshot.period != currentPeriod }
             } as PersistentDataState.Ready
-            assertEquals(0L, nextState.snapshot.totalAllocatedMinor)
+            assertEquals(0L, nextState.snapshot.limitTotal())
 
             withContext(Dispatchers.Main) { model.selectPreviousPeriod() }
             val prevState = withTimeout(10_000) {
                 model.state.first { it is PersistentDataState.Ready && it.snapshot.period == currentPeriod }
             } as PersistentDataState.Ready
-            assertEquals(30000L, prevState.snapshot.totalAllocatedMinor)
+            assertEquals(30000L, prevState.snapshot.limitTotal())
         } finally {
             withContext(Dispatchers.Main) { store.clear() }
             collection.cancelAndJoin()
@@ -617,7 +617,7 @@ class ManyManagerRepositoryTest {
             waiting.complete(Result.success(database.dao().calculator(owner)!!))
             pending.join()
             val source = success(model.sourceCreationState.value!!.result!!)
-            assertEquals(1234L, snapshot().totalAllocatedMinor)
+            assertEquals(1234L, snapshot().limitTotal())
             withContext(Dispatchers.Main) {
                 assertNull(model.submitSourceCreation())
                 model.acknowledgeSourceCreation()
@@ -627,7 +627,7 @@ class ManyManagerRepositoryTest {
                 model.cancelSourceEditing()
             }
             assertEquals("Cash", snapshot().sources.single().source.name)
-            assertEquals(1234L, snapshot().totalAllocatedMinor)
+            assertEquals(1234L, snapshot().limitTotal())
 
             database.openHelper.writableDatabase.execSQL("""
                 CREATE TRIGGER form_fail BEFORE INSERT ON budget_allocations
@@ -693,11 +693,11 @@ class ManyManagerRepositoryTest {
             assertEquals("2", failed.adjustmentText)
             assertFalse(failed.isAdd)
             assertEquals("Cash", snapshot().sources.single().source.name)
-            assertEquals(1000L, snapshot().totalAllocatedMinor)
+            assertEquals(1000L, snapshot().limitTotal())
             database.openHelper.writableDatabase.execSQL("DROP TRIGGER edit_form_fail")
             withContext(Dispatchers.Main) { model.submitSourceEditing()!! }.join()
             withContext(Dispatchers.Main) { assertNull(model.submitSourceEditing()) }
-            assertEquals(800L, snapshot().totalAllocatedMinor)
+            assertEquals(800L, snapshot().limitTotal())
             assertEquals(source.id, snapshot().sources.single().source.id)
             val restored = SourceEditingState.fromBundle(model.sourceEditingState.value!!.toBundle())!!
             assertTrue(restored.submitResult is DataResult.Success)
@@ -717,13 +717,13 @@ class ManyManagerRepositoryTest {
         try {
             withContext(Dispatchers.Main) { model.selectPeriod(next) }
             withTimeout(10_000) { model.state.first {
-                it is PersistentDataState.Ready && it.snapshot.period == next && it.snapshot.totalAllocatedMinor == 0L
+                it is PersistentDataState.Ready && it.snapshot.period == next && it.snapshot.limitTotal() == 0L
             } }
             val home = withTimeout(10_000) {
                 model.activeBudget.first { it is PersistentDataState.Ready }
             } as PersistentDataState.Ready
             assertEquals(period, home.snapshot.period)
-            assertEquals(400L, home.snapshot.totalAllocatedMinor)
+            assertEquals(400L, home.snapshot.limitTotal())
             fixtureExpense("overflow-a", Long.MAX_VALUE, period.start, source.id)
             fixtureExpense("overflow-b", 1, period.start, source.id)
             withTimeout(10_000) { model.activeBudget.first { it is PersistentDataState.Failed } }
@@ -756,11 +756,11 @@ class ManyManagerRepositoryTest {
             val reopened = success(durable.snapshot(period))
             assertEquals(setOf(first.id, second.id), reopened.sources.map { it.source.id }.toSet())
             assertEquals("Renamed", reopened.sources.single { it.source.id == first.id }.source.name)
-            assertEquals(150L, reopened.totalAllocatedMinor)
+            assertEquals(150L, reopened.limitTotal())
             assertEquals(first.id, reopened.expenses.single().sourceId)
             assertEquals(30L, reopened.totalSpentMinor)
             val next = success(durable.snapshot(BudgetPeriodCalculator(10, clock).next(period)))
-            assertEquals(0L, next.totalAllocatedMinor)
+            assertEquals(0L, next.limitTotal())
             assertEquals(2, next.sources.size)
         } finally {
             disk.close()
@@ -778,7 +778,7 @@ class ManyManagerRepositoryTest {
         assertEquals(7L, currentSnapshot.totalSpentMinor)
         assertEquals(-7L, currentSnapshot.remainingMinor)
         assertEquals(-7L, currentSnapshot.sources.single().remainingMinor)
-        assertEquals(0L, currentSnapshot.totalAllocatedMinor)
+        assertEquals(0L, currentSnapshot.limitTotal())
         val previous = success(repository.snapshot(BudgetPeriodCalculator(10, clock).previous(period)))
         assertEquals(listOf(before), previous.expenses)
         assertEquals(123L, previous.categoryBreakdown.single().spentMinor)
@@ -819,8 +819,8 @@ class ManyManagerRepositoryTest {
         }
         assertEquals(listOf(corrected), updated.expenses)
         assertEquals(1, updated.expenseCount)
-        assertEquals(1000L, updated.totalAllocatedMinor)
-        assertEquals(544L, updated.remainingMinor)
+        assertEquals(1000L, updated.limitTotal())
+        assertEquals(-456L, updated.remainingMinor)
         observer.cancelAndJoin()
         assertEquals(DataError.NonPositiveAmount, error(repository.updateAmount(original.id, 0)))
         assertEquals(corrected, snapshot().expenses.single())
@@ -909,8 +909,8 @@ class ManyManagerRepositoryTest {
         success(repository.updateSourceAndAdjustAllocation(b.id, "Renamed", period, 100))
         val adjusted = snapshot()
         verify(adjusted, 59)
-        assertEquals(600L, adjusted.totalAllocatedMinor)
-        assertEquals(541L, adjusted.remainingMinor)
+        assertEquals(600L, adjusted.limitTotal())
+        assertEquals(-59L, adjusted.remainingMinor)
         assertEquals(before.categoryBreakdown, adjusted.categoryBreakdown)
         assertTrue(success(repository.snapshot(BudgetPeriodCalculator(10, clock).next(period))).categoryBreakdown.isEmpty())
     }
@@ -929,9 +929,9 @@ class ManyManagerRepositoryTest {
         assertTrue(success(repository.snapshot(oldPeriod)).expenses.isEmpty())
         val after = snapshot()
         assertEquals(1, after.expenseCount)
-        assertEquals(100L, after.totalAllocatedMinor)
+        assertEquals(100L, after.limitTotal())
         assertEquals(123L, after.totalSpentMinor)
-        assertEquals(-23L, after.remainingMinor)
+        assertEquals(-123L, after.remainingMinor)
         assertEquals(0L, after.sources.single { it.source.id == a.id }.spentMinor)
         assertEquals(-123L, after.sources.single { it.source.id == b.id }.remainingMinor)
         assertEquals(d.id, after.categoryBreakdown.single().categoryId)
@@ -1002,7 +1002,7 @@ class ManyManagerRepositoryTest {
         assertEquals(before.categories, after.categories)
         assertEquals(before.sources.map { it.allocatedMinor }, after.sources.map { it.allocatedMinor })
         assertEquals(20L, after.totalSpentMinor)
-        assertEquals(80L, after.remainingMinor)
+        assertEquals(-20L, after.remainingMinor)
         assertEquals(1, after.expenseCount)
         assertEquals(listOf(CategorySummary(null, 20, 1)), after.categoryBreakdown)
         assertEquals(DataError.MissingEntity(EntityKind.EXPENSE, first.id), error(repository.deleteExpense(first.id)))
@@ -1024,6 +1024,84 @@ class ManyManagerRepositoryTest {
     ) {
         database.dao().insertExpense(ExpenseEntity(owner, id, amount, date.toEpochDay(),
             categoryId, sourceId))
+    }
+
+    // Legacy adjustment tests assert source limits, never the independent overall budget.
+    private fun BudgetSnapshot.limitTotal() = BudgetCalculations.sum(sources.mapNotNull { it.limitMinor })
+
+    @Test fun independentBudgetOptionalLimitsAndNoCarryover() = runBlocking {
+        val cash = success(repository.createSourceWithInitialAllocation("Cash", period, 80000))
+        val credit = success(repository.createSourceWithInitialAllocation("Credit", period, null))
+        assertNull(snapshot().overallBudgetMinor)
+        assertNull(snapshot().sources.single { it.source.id == credit.id }.limitMinor)
+        success(repository.createExpense(NewExpense(20000, period.start, cash.id)))
+        success(repository.createExpense(NewExpense(30000, period.start, credit.id)))
+        success(repository.setOverallBudget(period, 500000))
+        assertEquals(450000L, snapshot().remainingMinor)
+        assertEquals(60000L, snapshot().sources.single { it.source.id == cash.id }.remainingMinor)
+        success(repository.setSourceLimit(cash.id, "Cash", period, 0))
+        assertEquals(500000L, snapshot().overallBudgetMinor)
+        assertEquals(-20000L, snapshot().sources.single { it.source.id == cash.id }.remainingMinor)
+        success(repository.setSourceLimit(cash.id, "Cash", period, null))
+        assertNull(snapshot().sources.single { it.source.id == cash.id }.limitMinor)
+        assertEquals(500000L, snapshot().overallBudgetMinor)
+        val next = BudgetPeriodCalculator(10, clock).next(period)
+        assertNull(success(repository.snapshot(next)).overallBudgetMinor)
+        assertTrue(success(repository.snapshot(next)).sources.all { it.limitMinor == null })
+        assertEquals(2, success(repository.snapshot(next)).sources.size)
+        success(repository.setOverallBudget(next, 0))
+        assertEquals(0L, success(repository.snapshot(next)).overallBudgetMinor)
+        assertEquals(500000L, snapshot().overallBudgetMinor)
+        success(repository.setOverallBudget(period, null))
+        assertNull(snapshot().overallBudgetMinor)
+        assertEquals(50000L, snapshot().totalSpentMinor)
+    }
+
+    @Test fun thresholdsNeverBlockAndSourceDateChangesRecalculateBothPeriods() = runBlocking {
+        val cash = success(repository.createSourceWithInitialAllocation("Cash", period, 0))
+        val credit = success(repository.createSourceWithInitialAllocation("Credit", period, null))
+        val ninth = period.start.minusDays(1)
+        val previous = success(repository.periodContaining(ninth))
+        success(repository.setOverallBudget(previous, 0))
+        success(repository.setSourceLimit(cash.id, "Cash", previous, 0))
+        val original = success(repository.createExpense(NewExpense(12345, ninth, cash.id, note = "Keep")))
+        assertEquals(-12345L, success(repository.snapshot(previous)).remainingMinor)
+        assertEquals(0L, snapshot().totalSpentMinor)
+        // Move from the 9th to the 10th and to an unlimited source, into an unset overall budget.
+        val moved = success(repository.updateExpense(original.id, NewExpense(23456, period.start, credit.id, note = "Keep")))
+        assertEquals(original.id, moved.id)
+        assertEquals(0L, success(repository.snapshot(previous)).totalSpentMinor)
+        assertEquals(23456L, snapshot().totalSpentMinor)
+        assertEquals(0L, snapshot().sources.single { it.source.id == cash.id }.spentMinor)
+        assertEquals(23456L, snapshot().sources.single { it.source.id == credit.id }.spentMinor)
+        success(repository.setOverallBudget(period, 1))
+        assertEquals(-23455L, snapshot().remainingMinor)
+        success(repository.deleteExpense(original.id))
+        assertEquals(0L, snapshot().totalSpentMinor)
+        assertEquals(1L, snapshot().remainingMinor)
+        assertEquals(0L, success(repository.snapshot(previous)).overallBudgetMinor)
+    }
+
+    @Test fun overallAndLimitObserversPublishCommittedChanges() = runBlocking {
+        val cash = success(repository.createSourceWithInitialAllocation("Cash", period, null))
+        val emissions = Channel<DataResult<BudgetSnapshot>>(Channel.UNLIMITED)
+        val job = repository.observeSnapshot(period).onEach { emissions.send(it) }.launchIn(this)
+        try {
+            withTimeout(10000) { emissions.receive() }
+            success(repository.setOverallBudget(period, 100))
+            withTimeout(10000) {
+                while (success(emissions.receive()).overallBudgetMinor != 100L) { }
+            }
+            success(repository.setSourceLimit(cash.id, "Cash", period, 20))
+            withTimeout(10000) {
+                while (success(emissions.receive()).sources.single().limitMinor != 20L) { }
+            }
+            success(repository.setSourceLimit(cash.id, "Cash", period, null))
+            withTimeout(10000) {
+                while (success(emissions.receive()).sources.single().limitMinor != null) { }
+            }
+            assertEquals(100L, snapshot().overallBudgetMinor)
+        } finally { job.cancelAndJoin() }
     }
 
     private suspend fun snapshot() = success(repository.snapshot(period))

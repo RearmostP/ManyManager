@@ -2,12 +2,11 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent" android:layout_height="wrap_content"
     android:layout_marginBottom="16dp" android:background="@drawable/card"
-    android:padding="20dp" android:orientation="horizontal" android:gravity="center_vertical"
+    android:padding="20dp" android:orientation="vertical" android:gravity="center_vertical"
     android:clickable="true" android:focusable="true">
     <TextView android:id="@+id/budgetSourceName" style="@style/Text"
-        android:layout_width="0dp" android:layout_height="wrap_content"
-        android:layout_weight="1" android:textSize="16sp" android:textStyle="bold" />
+        android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="16sp" android:textStyle="bold" />
     <TextView android:id="@+id/budgetSourceAmount" style="@style/Text"
         android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:textSize="17sp" android:textDirection="ltr" />
+        android:layout_marginTop="8dp" android:textSize="14sp" android:textDirection="locale" />
 </LinearLayout>

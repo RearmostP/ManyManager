@@ -62,8 +62,8 @@ try {
   check(homeText.includes(demo.sources[0].name),"Home source spending displayed");
   await navigate(3);
   await click('[data-action="edit-source"]');
-  check(Boolean(d.querySelector("#source-adjustment")),"main retains source adjustment");
-  check(Boolean(d.querySelector('[data-action="operation"][data-value="deduct"]')),"main retains +/- controls");
+  check(Boolean(d.querySelector("#source-initial")),"Source limit uses an absolute optional amount");
+  check(Boolean(d.querySelector('[data-action="remove-threshold"]')),"Source limit can be removed");
   await escape();
   const languages=["he","en","ru"],themes=["light","dark"];
   for(const language of languages)for(const theme of themes){

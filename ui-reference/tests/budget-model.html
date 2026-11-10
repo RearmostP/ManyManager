@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Budget model smoke check</title>
+<style>body{margin:0}iframe{width:320px;height:900px;border:0}pre{white-space:pre-wrap}</style>
+<iframe id="preview" src="../index.html"></iframe><pre id="result" data-status="running">Running</pre>
+<script type="module">
+const frame=document.getElementById("preview"),result=document.getElementById("result");
+let count=0;
+const check=(ok,message)=>{if(!ok)throw Error(message);count++};
+const pause=()=>new Promise(resolve=>setTimeout(resolve,20));
+async function until(fn){for(let n=0;n<200;n++){if(fn())return;await pause()}throw Error("Timed out")}
+try{
+ await until(()=>frame.contentDocument?.querySelector('[data-action="expense"]'));
+ const d=frame.contentDocument,script=d.createElement("script");script.type="module";
+ script.textContent='import {state} from "/js/state.js";import {demo,totalFor,amountFor,summaryData} from "/js/demo.js";import {loadLanguage} from "/js/i18n.js";window.budgetTest={state,demo,totalFor,amountFor,summaryData,loadLanguage};';
+ d.body.append(script);await until(()=>frame.contentWindow.budgetTest);
+ const {state,demo,totalFor,amountFor,summaryData,loadLanguage}=frame.contentWindow.budgetTest;
+ const click=async selector=>{const node=d.querySelector(selector);check(!!node,"Missing "+selector);node.click();await pause()};
+ const input=(selector,value)=>{const node=d.querySelector(selector);node.value=value;node.dispatchEvent(new frame.contentWindow.Event("input",{bubbles:true}))};
+ const navigate=async index=>{await click("#menu-button");await click('[data-action="navigate"][data-index="'+index+'"]')};
+ const initialDemo=structuredClone(demo);
+ const initial=totalFor(state.currentDate);
+ check(initial===500000,"Independent fixture budget");
+ check(amountFor(state.currentDate,"s1")===80000&&amountFor(state.currentDate,"s2")===null,"Limited and unlimited source");
+ check(summaryData(state.currentDate).sources.every(s=>Number.isFinite(s.spent)),"Source spending prepared");
+ await navigate(3);
+ await click('[data-action="edit-source"][data-id="s1"]');input("#source-initial","100");
+ await click('[data-action="confirm-edit-source"]');check(totalFor(state.currentDate)===initial,"Limit edit preserves overall");
+ await click('[data-action="edit-source"][data-id="s1"]');await click('[data-action="remove-threshold"]');
+ check(amountFor(state.currentDate,"s1")===null&&totalFor(state.currentDate)===initial,"Limit removal preserves overall");
+ await click('[data-action="overall-budget"]');input("#source-initial","0");await click('[data-action="confirm-overall"]');
+ check(totalFor(state.currentDate)===0,"Explicit zero retained");
+ await click('[data-action="budget-next"]');check(totalFor(state.budgetMonth)===null,"No budget carryover");
+ check(demo.sources.every(s=>amountFor(state.budgetMonth,s.id)===null),"No limit carryover");
+ await click('[data-action="budget-prev"]');check(totalFor(state.budgetMonth)===0,"Historical budget retained");
+ await click('[data-action="add-source"]');input("#source-name","Unlimited sample");input("#source-initial","");
+ await click('[data-action="confirm-add-source"]');check(amountFor(state.budgetMonth,demo.sources.at(-1).id)===null,"Optional initial limit");
+ for(const language of ["he","en","ru"]){
+   await loadLanguage(language);state.language=language;
+   for(const theme of ["light","dark"]){
+     state.theme=theme;await click('[data-action="budget-next"]');await click('[data-action="budget-prev"]');
+     check(d.documentElement.dir===(language==="he"?"rtl":"ltr"),"Direction "+language);
+     check(d.documentElement.scrollWidth<=320,"Page width "+language+" "+theme);
+     await click('[data-action="overall-budget"]');
+     check(d.querySelector(".dialog-panel").scrollWidth<=320,"Dialog width "+language+" "+theme);
+     await click('[data-action="close-overlay"]');
+   }
+ }
+ Object.assign(demo,initialDemo);
+ const params=new URLSearchParams(location.search);
+ await loadLanguage(params.get("lang")||"he");state.language=params.get("lang")||"he";state.theme=params.get("theme")||"light";
+ await click('[data-action="budget-next"]');await click('[data-action="budget-prev"]');
+ if(params.get("visual")==="dialog")await click('[data-action="overall-budget"]');
+ if(params.get("visual")==="home"){await navigate(0);await click('[data-action="budget-toggle"]')}
+ result.dataset.status="passed";result.textContent="PASS "+count+" checks";
+}catch(error){result.dataset.status="failed";result.textContent=error.stack}
+</script></html>

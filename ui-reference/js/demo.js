@@ -4,14 +4,15 @@ import {periodKey, parseCivilDate} from "./dates.js";
 // Mutable page examples, reset by reloading the module/page. No repository or storage.
 export const demo = structuredClone(fixture);
 demo.allocations = Object.fromEntries(demo.sources.map(source =>
-  [source.id, {[periodKey(parseCivilDate(fixture.today))]: source.budget}]));
+  [source.id, source.budget == null ? {} : {[periodKey(parseCivilDate(fixture.today))]: source.budget}]));
+demo.budgets = {[periodKey(parseCivilDate(fixture.today))]: fixture.overallBudget};
 
 export const parseAmount = text => {
   const value = Number(String(text).trim().replace(",", "."));
   return Number.isFinite(value) ? Math.round(value * 100) : 0;
 };
-export const amountFor = (date, id) => demo.allocations[id]?.[periodKey(date)] ?? 0;
-export const totalFor = date => demo.sources.reduce((sum, source) => sum + amountFor(date, source.id), 0);
+export const amountFor = (date, id) => demo.allocations[id]?.[periodKey(date)] ?? null;
+export const totalFor = date => demo.budgets[periodKey(date)] ?? null;
 
 // Small display-only sums keep the cards consistent after a demonstration edit/delete.
 export function summaryData(date) {
@@ -28,7 +29,8 @@ export function summaryData(date) {
   return {
     expenses, spent, allocated, remaining: allocated - spent,
     sources: demo.sources.map(source => ({
-      source, remaining: amountFor(date, source.id) - sum(expenses.filter(item => item.sourceId === source.id))
+      source, spent: sum(expenses.filter(item => item.sourceId === source.id)), limit: amountFor(date, source.id),
+      remaining: amountFor(date, source.id) == null ? null : amountFor(date, source.id) - sum(expenses.filter(item => item.sourceId === source.id))
     })),
     categoryBreakdown: groups(categories, "categoryId"),
     sourceBreakdown: groups(demo.sources, "sourceId")

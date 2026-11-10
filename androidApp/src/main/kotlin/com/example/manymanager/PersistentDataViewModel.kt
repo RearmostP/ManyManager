@@ -30,7 +30,7 @@ sealed interface PersistentDataState {
 data class SourceCreationState(
     val period: BudgetPeriod,
     val name: String = "",
-    val initialAmountText: String = "0",
+    val initialAmountText: String = "",
     val submitting: Boolean = false,
     val result: DataResult<BudgetSource>? = null,
     val interrupted: Boolean = false,
@@ -61,7 +61,7 @@ data class SourceCreationState(
             return SourceCreationState(
                 period = period,
                 name = bundle.getString("name").orEmpty(),
-                initialAmountText = bundle.getString("initialAmountText", "0"),
+                initialAmountText = bundle.getString("initialAmountText", ""),
                 result = source?.let { DataResult.Success(it) },
                 interrupted = bundle.getBoolean("submitting") || bundle.getBoolean("interrupted"),
             )
@@ -261,7 +261,7 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         val current = sourceCreation.value ?: return null
         if (current.submitting || current.interrupted || current.result is DataResult.Success) return null
         val parsed = BudgetAmounts.parse(current.initialAmountText)
-        if (parsed == null) {
+        if (parsed == null && current.initialAmountText.isNotBlank()) {
             sourceCreation.value = current.copy(result = DataResult.Failure(DataError.AmountOverflow))
             return null
         }
@@ -270,6 +270,48 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
             val result = repository.createSourceWithInitialAllocation(current.name, current.period, parsed)
             currentCoroutineContext().ensureActive()
             sourceCreation.value = current.copy(result = result, interrupted = false)
+        }
+    }
+
+    private val budgetEditorState = MutableStateFlow<BudgetEditorState?>(null)
+    val budgetEditor: StateFlow<BudgetEditorState?> = budgetEditorState
+
+    fun restoreBudgetEditor(restored: BudgetEditorState) {
+        if (budgetEditorState.value == null) budgetEditorState.value = restored
+    }
+
+    fun beginBudgetEditor(period: BudgetPeriod, source: BudgetSource?, amount: Long?) {
+        if (budgetEditorState.value == null) budgetEditorState.value = BudgetEditorState(
+            period, source, source?.name.orEmpty(), amount?.let { java.math.BigDecimal.valueOf(it, 2).toPlainString() }.orEmpty())
+    }
+
+    fun updateBudgetEditor(name: String, amount: String) {
+        budgetEditorState.value?.takeUnless { it.submitting || it.interrupted }?.let {
+            budgetEditorState.value = it.copy(name = name, amount = amount, error = null)
+        }
+    }
+
+    fun cancelBudgetEditor() {
+        if (budgetEditorState.value?.submitting != true) budgetEditorState.value = null
+    }
+
+    fun submitBudgetEditor(remove: Boolean = false) {
+        val current = budgetEditorState.value ?: return
+        if (current.submitting || current.interrupted) return
+        val amount = if (remove || current.amount.isBlank()) null else BudgetAmounts.parse(current.amount)
+        if ((!remove && current.amount.isNotBlank() && amount == null) || (amount != null && amount < 0)) {
+            budgetEditorState.value = current.copy(error = DataError.InvalidAmount)
+            return
+        }
+        budgetEditorState.value = current.copy(submitting = true, error = null)
+        viewModelScope.launch {
+            val result = if (current.source == null) repository.setOverallBudget(current.period, amount)
+                else repository.setSourceLimit(current.source.id, current.name, current.period, amount)
+            ensureActive()
+            budgetEditorState.value = when (result) {
+                is DataResult.Success -> null
+                is DataResult.Failure -> current.copy(error = result.error)
+            }
         }
     }
 

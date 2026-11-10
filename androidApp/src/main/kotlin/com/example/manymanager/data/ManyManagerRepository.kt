@@ -51,7 +51,7 @@ class ManyManagerRepository(
      * Callers restart/refresh on resume or civil-date changes; no background scheduler is installed.
      */
     fun observeSnapshot(period: BudgetPeriod? = null): Flow<DataResult<BudgetSnapshot>> =
-        observe(arrayOf("calculators", "categories", "budget_sources", "budget_allocations", "expenses")) {
+        observe(arrayOf("calculators", "categories", "budget_sources", "budget_allocations", "period_budgets", "expenses")) {
             snapshot(period)
         }
 
@@ -63,7 +63,6 @@ class ManyManagerRepository(
 
     private suspend fun readSnapshot(calculator: CalculatorEntity, selected: BudgetPeriod): BudgetSnapshot {
             val allocations = dao.allocations(calculator.id, selected.startEpochDay)
-            if (allocations.any { it.allocatedMinor < 0 }) reject(DataError.NegativeAllocatedBudget)
             return BudgetCalculations.snapshot(
                 calculator.domain(), selected,
                 dao.categories(calculator.id).map { it.domain() },
@@ -71,6 +70,7 @@ class ManyManagerRepository(
                 allocations.associate { it.sourceId to it.allocatedMinor },
                 dao.expenses(calculator.id, selected.startEpochDay, selected.endExclusiveEpochDay)
                     .map { it.domain() },
+                dao.periodBudget(calculator.id, selected.startEpochDay)?.amountMinor,
             )
         }
 
@@ -138,17 +138,17 @@ class ManyManagerRepository(
     }
 
     suspend fun createSourceWithInitialAllocation(
-        name: String, period: BudgetPeriod, initialMinor: Long
+        name: String, period: BudgetPeriod, initialMinor: Long?
     ): DataResult<BudgetSource> = execute { calculator ->
         val clean = cleanName(name)
         val selected = resolvePeriod(calculator, period)
-        if (initialMinor < 0) reject(DataError.NegativeAllocatedBudget)
+        if (initialMinor != null && initialMinor < 0) reject(DataError.NegativeAllocatedBudget)
         val source = BudgetSourceEntity(calculator.id, UUID.randomUUID().toString(), clean)
-        validateAllocationTotal(calculator.id, selected, source.id, initialMinor)
         dao.insertSource(source)
-        dao.insertAllocation(BudgetAllocationEntity(
+        if (initialMinor != null) dao.insertAllocation(BudgetAllocationEntity(
             calculator.id, source.id, selected.startEpochDay, initialMinor
         ))
+        readSnapshot(calculator, selected)
         source.domain()
     }
 
@@ -191,9 +191,32 @@ class ManyManagerRepository(
     private suspend fun validateAllocationTotal(
         calculatorId: String, period: BudgetPeriod, sourceId: String, replacement: Long
     ) {
-        val others = dao.allocations(calculatorId, period.startEpochDay)
-            .filter { it.sourceId != sourceId }.map { it.allocatedMinor }
-        BudgetCalculations.sum(others + replacement)
+        val spent = BudgetCalculations.sum(dao.expenses(calculatorId, period.startEpochDay,
+            period.endExclusiveEpochDay).filter { it.sourceId == sourceId }.map { it.amountMinor })
+        Math.subtractExact(replacement, spent)
+    }
+
+    suspend fun setOverallBudget(period: BudgetPeriod, amountMinor: Long?): DataResult<Unit> =
+        execute { calculator ->
+            val selected = resolvePeriod(calculator, period)
+            if (amountMinor != null && amountMinor < 0) reject(DataError.NegativeAllocatedBudget)
+            if (amountMinor == null) dao.removePeriodBudget(calculator.id, selected.startEpochDay)
+            else dao.putPeriodBudget(PeriodBudgetEntity(calculator.id, selected.startEpochDay, amountMinor))
+            readSnapshot(calculator, selected)
+            Unit
+        }
+
+    /** Absolute optional limit; does not touch the independent overall budget. */
+    suspend fun setSourceLimit(sourceId: String, name: String, period: BudgetPeriod,
+        amountMinor: Long?): DataResult<Unit> = execute { calculator ->
+        val selected = resolvePeriod(calculator, period)
+        requireSource(calculator.id, sourceId)
+        if (amountMinor != null && amountMinor < 0) reject(DataError.NegativeAllocatedBudget)
+        check(dao.renameSource(calculator.id, sourceId, cleanName(name)) == 1)
+        if (amountMinor == null) dao.removeSourceLimit(calculator.id, sourceId, selected.startEpochDay)
+        else dao.putAllocation(BudgetAllocationEntity(calculator.id, sourceId, selected.startEpochDay, amountMinor))
+        readSnapshot(calculator, selected)
+        Unit
     }
 
     private suspend fun requireSource(calculatorId: String, sourceId: String): BudgetSourceEntity =

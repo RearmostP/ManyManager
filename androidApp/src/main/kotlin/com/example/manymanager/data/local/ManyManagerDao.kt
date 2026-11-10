@@ -81,6 +81,18 @@ abstract class ManyManagerDao {
     @Upsert
     abstract suspend fun putAllocation(allocation: BudgetAllocationEntity)
 
+    @Query("SELECT * FROM period_budgets WHERE calculatorId = :calculatorId AND periodStartEpochDay = :period")
+    abstract suspend fun periodBudget(calculatorId: String, period: Long): PeriodBudgetEntity?
+
+    @Upsert
+    abstract suspend fun putPeriodBudget(budget: PeriodBudgetEntity)
+
+    @Query("DELETE FROM period_budgets WHERE calculatorId = :calculatorId AND periodStartEpochDay = :period")
+    abstract suspend fun removePeriodBudget(calculatorId: String, period: Long)
+
+    @Query("DELETE FROM budget_allocations WHERE calculatorId = :calculatorId AND sourceId = :sourceId AND periodStartEpochDay = :period")
+    abstract suspend fun removeSourceLimit(calculatorId: String, sourceId: String, period: Long)
+
     companion object {
         /** Internal identity of the initial local calculator; never derived from a translated label. */
         const val LOCAL_CALCULATOR_ID = "local-calculator"

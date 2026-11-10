@@ -52,6 +52,22 @@ data class BudgetAllocationEntity(
     val allocatedMinor: Long,
 )
 
+/** One independently configured overall budget; absence of a row means unset. */
+@Entity(
+    tableName = "period_budgets",
+    primaryKeys = ["calculatorId", "periodStartEpochDay"],
+    foreignKeys = [ForeignKey(
+        entity = CalculatorEntity::class,
+        parentColumns = ["id"], childColumns = ["calculatorId"],
+        onDelete = ForeignKey.RESTRICT,
+    )],
+)
+data class PeriodBudgetEntity(
+    val calculatorId: String,
+    val periodStartEpochDay: Long,
+    val amountMinor: Long,
+)
+
 /** Money is integer minor units; dates are civil epoch days. Null category means uncategorized. */
 @Entity(
     tableName = "expenses",

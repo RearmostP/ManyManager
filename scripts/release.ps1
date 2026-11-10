@@ -1,5 +1,8 @@
 [CmdletBinding()]
 param(
+    [ValidateSet('Apk', 'Bundle')]
+    [string]$Artifact = 'Apk',
+    [switch]$Verify,
     [switch]$InitializeKey,
     [switch]$CopyPassword,
     [string]$SigningDirectory = (Join-Path $env:USERPROFILE '.manymanager\signing'),
@@ -76,8 +79,20 @@ try {
     Push-Location $repositoryRoot
     try {
         # Do not serialize signing credentials into the Gradle configuration cache.
-        & .\gradlew.bat :androidApp:assembleRelease --no-configuration-cache --console=plain
+        if ($Verify) {
+            & .\gradlew.bat :androidApp:testDebugUnitTest --rerun :androidApp:lintRelease --no-configuration-cache --console=plain
+            if ($LASTEXITCODE -ne 0) { throw 'Release verification failed; bundle build was not started.' }
+        }
+        $releaseTask = if ($Artifact -eq 'Bundle') { ':androidApp:bundleRelease' } else { ':androidApp:assembleRelease' }
+        & .\gradlew.bat $releaseTask --no-configuration-cache --console=plain
         if ($LASTEXITCODE -ne 0) { throw 'Signed release build failed.' }
+        if ($Artifact -eq 'Bundle') {
+            # Place the JAR manifest/signature entries first for streaming verifiers too.
+            # Reuse the same existing key; no application payload is changed.
+            $bundleFile = Join-Path $repositoryRoot 'androidApp\build\outputs\bundle\release\androidApp-release.aab'
+            & (Join-Path $JavaHome 'bin\jarsigner.exe') -keystore $keyFile -storepass:env MANYMANAGER_RELEASE_STORE_PASSWORD -keypass:env MANYMANAGER_RELEASE_KEY_PASSWORD $bundleFile $alias
+            if ($LASTEXITCODE -ne 0) { throw 'Bundle JAR signing failed.' }
+        }
     } finally { Pop-Location }
 } finally {
     foreach ($name in @('MANYMANAGER_RELEASE_STORE_FILE', 'MANYMANAGER_RELEASE_KEY_ALIAS', 'MANYMANAGER_RELEASE_STORE_PASSWORD', 'MANYMANAGER_RELEASE_KEY_PASSWORD')) {

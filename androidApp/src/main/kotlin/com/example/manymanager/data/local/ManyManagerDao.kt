@@ -24,6 +24,8 @@ abstract class ManyManagerDao {
 
     // ABORT is intentional: these are inserts, never silent replacement of existing facts.
     @Insert abstract suspend fun insertCategory(category: CategoryEntity)
+    @Query("UPDATE categories SET name = :name WHERE calculatorId = :calculatorId AND id = :id")
+    abstract suspend fun renameCategory(calculatorId: String, id: String, name: String): Int
     @Insert abstract suspend fun insertSource(source: BudgetSourceEntity)
     @Insert abstract suspend fun insertAllocation(allocation: BudgetAllocationEntity)
     @Insert abstract suspend fun insertExpense(expense: ExpenseEntity)
@@ -39,6 +41,9 @@ abstract class ManyManagerDao {
     abstract suspend fun allocation(
         calculatorId: String, sourceId: String, periodStartEpochDay: Long
     ): BudgetAllocationEntity?
+
+    @Query("SELECT * FROM categories WHERE calculatorId = :calculatorId AND id = :id")
+    abstract suspend fun category(calculatorId: String, id: String): CategoryEntity?
 
     @Query("SELECT * FROM categories WHERE calculatorId = :calculatorId ORDER BY rowid")
     abstract suspend fun categories(calculatorId: String): List<CategoryEntity>

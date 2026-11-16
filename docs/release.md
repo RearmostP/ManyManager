@@ -2,7 +2,15 @@
 
 This guide targets the personal edition on `main`. For the first Google Play preparation, use the signed AAB and [short upload guide](play-upload.md) below. For separately authorized GitHub APK releases, use `v<VERSION>` and `ManyManager-<VERSION>.apk` for this branch. The tag naming follows the confirmed 0.3.0 release convention; preserve existing historical tags.
 
-Run commands from the repository root, using a clean, reviewed commit and a compatible JDK. The current checked-in ManyManager configuration is `com.example.manymanager`, versionName `0.3.0`, versionCode `4` (the last distributed GitHub APK used code `3`). Recheck [androidApp/build.gradle.kts](../androidApp/build.gradle.kts) before each release; this is not a claim that an APK was published.
+Run commands from the repository root, using a clean, reviewed commit and a compatible JDK. The current checked-in ManyManager configuration is `com.example.manymanager`, versionName `0.4.0`, versionCode `5` (the last distributed GitHub APK used code `3`). Recheck [androidApp/build.gradle.kts](../androidApp/build.gradle.kts) before each release; this is not a claim that an APK was published.
+
+## Local APK handoff — 16 November 2026
+
+- Signed APK: `private-release/ManyManager-0.4.0.apk`; package `com.example.manymanager`, versionName `0.4.0`, versionCode `5`.
+- Built from the current working tree based on `1b9b68e5d1e57925853420983e0ba92416e79af2`, including uncommitted changes; this is not a clean-commit release. No tag, upload or publication was performed.
+- `scripts/release.ps1 -Artifact Apk -Verify` completed unit tests, `lintRelease` and `assembleRelease` successfully.
+- APK signature verified with the existing release certificate SHA-256 `E4:AE:E9:D1:75:AC:C7:1C:7A:A6:FA:5D:96:02:3E:CB:2D:93:FD:03:B3:23:42:0A:37:9E:A7:7C:A8:DA:55:FC`. Manifest has no debuggable/testOnly flag and retains backup.
+- Delivery SHA-256: `94BABA1D3897E1A14C8B58494BAA104C6C9DFC76F3C16FE84CA96B20C7471316`. No installation or device upgrade test was performed for this handoff.
 
 ## First Google Play bundle preparation — 10 November 2026
 

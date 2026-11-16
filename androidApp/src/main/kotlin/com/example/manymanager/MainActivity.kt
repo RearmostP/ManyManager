@@ -73,6 +73,53 @@ class MainActivity : AppCompatActivity() {
     private var expenseDialog: ExpenseSheetDialog? = null
     private var expenseDetailsDialog: ExpenseDetailsDialog? = null
     private val expanded = mutableSetOf<Int>()
+    private val setupPreferences by lazy { getSharedPreferences("initial_setup", MODE_PRIVATE) }
+    private var welcomeDialog: androidx.appcompat.app.AlertDialog? = null
+
+    private fun renderSetup() {
+        if (!contentReady || isFinishing || isDestroyed) return
+        val step = setupPreferences.getInt("step", 0)
+        val banner = findViewById<View>(R.id.setupBanner)
+        banner.visibility = if (step in 1..3) View.VISIBLE else View.GONE
+        if (step == 0) {
+            val categories = (persistentViewModel.categories.value as? CategoryListState.Ready)?.categories ?: return
+            val sources = (persistentViewModel.sources.value as? SourceListState.Ready)?.sources ?: return
+            val snapshot = (persistentViewModel.activeBudget.value as? PersistentDataState.Ready)?.snapshot ?: return
+            // Upgrades with existing data must not interrupt users with first-run setup.
+            if (categories.isNotEmpty() || sources.isNotEmpty() || snapshot.expenseCount > 0 || snapshot.overallBudgetMinor != null) {
+                setupPreferences.edit().putInt("step", 4).apply()
+                return
+            }
+            if (welcomeDialog != null) return
+            welcomeDialog = androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle(R.string.setup_title)
+                .setMessage(R.string.setup_intro)
+                .setPositiveButton(R.string.setup_start) { _, _ -> advanceSetup(1) }
+                .setNegativeButton(R.string.setup_skip) { _, _ -> advanceSetup(4) }
+                .setCancelable(false).create().also {
+                    it.showWithRoundedSurface()
+                    it.styleBudgetDialogButtons()
+                }
+        } else if (step in 1..3) {
+            findViewById<TextView>(R.id.setupMessage).setText(when (step) {
+                1 -> R.string.setup_categories
+                2 -> R.string.setup_budget
+                else -> R.string.setup_sources
+            })
+            findViewById<TextView>(R.id.setupNext).setText(if (step == 3) R.string.setup_finish else R.string.setup_next)
+            findViewById<View>(R.id.setupNext).setOnClickListener { advanceSetup(step + 1) }
+            findViewById<View>(R.id.setupSkip).setOnClickListener { advanceSetup(4) }
+        }
+    }
+
+    private fun advanceSetup(step: Int) {
+        setupPreferences.edit().putInt("step", step).apply()
+        welcomeDialog?.dismiss()
+        welcomeDialog = null
+        if (step == 2 || step == 3) persistentViewModel.selectPeriod(null)
+        navigateToPage(when (step) { 1 -> 4; 2, 3 -> 3; else -> 0 })
+        renderSetup()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         dark = preferences.dark
@@ -166,6 +213,8 @@ class MainActivity : AppCompatActivity() {
                 else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
         )
         setContentView(R.layout.activity_main)
+        val versionName = packageManager.getPackageInfo(packageName, 0).versionName.orEmpty()
+        findViewById<TextView>(R.id.appVersion).text = getString(R.string.app_version, versionName)
 
         val container = findViewById<View>(R.id.appContainer)
         container.layoutParams = (container.layoutParams as FrameLayout.LayoutParams).apply {
@@ -258,7 +307,15 @@ class MainActivity : AppCompatActivity() {
         )
         categoryManagementUi = CategoryManagementUi(
             findViewById(R.id.categoriesPage), ::navigateBack, ::showAddCategory,
-            persistentViewModel::retryCategories
+            persistentViewModel::retryCategories,
+            { category ->
+                persistentViewModel.beginCategoryEditing(category)
+                renderCategoryCreation(persistentViewModel.categoryCreation.value)
+            },
+            { category ->
+                persistentViewModel.beginCategoryCreation(false, category.id)
+                renderCategoryCreation(persistentViewModel.categoryCreation.value)
+            }
         )
         listOf(R.id.previousMonth, R.id.nextMonth).forEach { id ->
             findViewById<View>(id).apply {
@@ -310,6 +367,9 @@ class MainActivity : AppCompatActivity() {
         renderSourceEditing(persistentViewModel.sourceEditingState.value)
         renderBudgetEditor(persistentViewModel.budgetEditor.value)
         finishAppearanceTransition(savedInstanceState)
+        val setupStep = setupPreferences.getInt("step", 0)
+        if (setupStep in 1..3) navigateToPage(if (setupStep == 1) 4 else 3)
+        renderSetup()
     }
 
     private fun prepareAppearanceTransition(durationMillis: Long = 500L) {
@@ -444,6 +504,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderActiveBudget(state: PersistentDataState) {
         if (!contentReady) return
+        renderSetup()
         homeBudgetUi?.renderState(state, budgetState.breakdownExpanded, persistentViewModel::refresh)
         val scroll = findViewById<ScrollView>(R.id.pageScroll)
         val top = if (page == 1) summaryDialogScroll ?: scroll.scrollY else scroll.scrollY
@@ -471,6 +532,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderSources(state: SourceListState) {
         if (!contentReady) return
+        renderSetup()
         expenseDialog?.renderSources(state)
         renderExpenseCreation(persistentViewModel.expenseCreationState.value)
 
@@ -582,6 +644,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderCategoryState(state: CategoryListState) {
         if (!contentReady) return
+        renderSetup()
         categoryManagementUi?.render(state)
         expenseDialog?.renderCategories(state)
         renderExpenseCreation(persistentViewModel.expenseCreationState.value)
@@ -630,6 +693,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun dismissActiveDialogImmediately() {
+        welcomeDialog?.dismiss()
+        welcomeDialog = null
         expenseDialog?.setOnDismissListener(null)
         expenseDetailsDialog?.dispose()
         expenseDetailsDialog = null

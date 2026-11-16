@@ -24,6 +24,9 @@
     <string name="monthly_total">סך ההוצאות החודש</string>
     <string name="add_expense">הוספת הוצאה</string>
     <string name="home_footer">עוד הוצאה קטנה. קצת יותר סדר.</string>
+    <string name="about">אודות</string>
+    <string name="app_version">גרסת האפליקציה: %1$s</string>
+    <string name="app_creator">יוצר: RearmostP</string>
     <string name="settings_intro">הכול, בדרך שלך</string>
     <string name="settings">הגדרות</string>
     <string name="add_category">הוספה</string>
@@ -143,4 +146,16 @@
     <string name="limit_exceeded">חריגה מהמגבלה · יתרה: %1$s</string>
     <string name="overall_exceeded">חריגה מהתקציב · יתרה: %1$s</string>
     <string name="source_limit_amount">מגבלת הוצאה: %1$s</string>
+    <string name="add_subcategory">הוספת תת־קטגוריה</string>
+    <string name="rename_category">שינוי שם</string>
+    <string name="save_category">שמירה</string>
+    <string name="setup_title">ברוכים הבאים ל־ManyManager</string>
+    <string name="setup_intro">נגדיר קטגוריות ותתי־קטגוריות לבחירתכם, תקציב לתקופה הנוכחית ומקורות הוצאה. אפשר לדלג ולשנות הכול בהמשך.</string>
+    <string name="setup_start">מתחילים בהגדרה</string>
+    <string name="setup_next">לשלב הבא</string>
+    <string name="setup_finish">סיום ההגדרה</string>
+    <string name="setup_skip">דילוג על ההגדרה</string>
+    <string name="setup_categories">1 מתוך 3 · הוסיפו קטגוריות. בכל קטגוריה אפשר לבחור בהוספת תת־קטגוריה. כל ההגדרות כאן הן לבחירתכם.</string>
+    <string name="setup_budget">2 מתוך 3 · הגדירו תקציב כולל לתקופה הנוכחית בכרטיס התקציב למטה. אפשר להשאיר ללא תקציב.</string>
+    <string name="setup_sources">3 מתוך 3 · הוסיפו מקורות הוצאה, למשל מזומן או כרטיס אשראי. אפשר להגדיר גם מגבלת הוצאה לכל מקור.</string>
 </resources>

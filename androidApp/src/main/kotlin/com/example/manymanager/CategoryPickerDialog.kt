@@ -1,5 +1,8 @@
 package com.example.manymanager
 
+import com.example.manymanager.domain.displayName
+import com.example.manymanager.domain.hierarchyOrder
+
 import android.content.Context
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -38,7 +41,7 @@ class CategoryPickerDialog(
 
     init {
         val options = listOf(null to context.getString(R.string.uncategorized)) +
-            categories.map { it.id to it.name }
+            categories.hierarchyOrder().map { it.id to it.displayName(categories) }
         options.forEach { (id, name) ->
             rows.addView(TextView(context, null, 0, R.style.Text).apply {
                 text = name

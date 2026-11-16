@@ -1,0 +1,3 @@
+gradle.projectsEvaluated {
+    gradle.rootProject.project(':androidApp').android.buildTypes.debug.applicationIdSuffix = gradle.startParameter.projectProperties['deviceTestSuffix'] ?: '.onboardingtest'
+}

@@ -1,5 +1,8 @@
 package com.example.manymanager
 
+import com.example.manymanager.domain.displayName
+import com.example.manymanager.domain.hierarchyOrder
+
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -96,7 +99,7 @@ class SummaryBreakdownUi(private val root: View, private val onRetry: () -> Unit
         if (category) {
             val names = snapshot.categories.associateBy { it.id }
             snapshot.categoryBreakdown.forEach {
-                add(it.categoryId, names[it.categoryId]?.name ?: context.getString(R.string.uncategorized), it.spentMinor, it.expenseCount)
+                add(it.categoryId, names[it.categoryId]?.displayName(snapshot.categories) ?: context.getString(R.string.uncategorized), it.spentMinor, it.expenseCount)
             }
         } else snapshot.sourceBreakdown.forEach { add(it.source.id, it.source.name, it.spentMinor, it.expenseCount) }
     }

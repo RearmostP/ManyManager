@@ -24,6 +24,9 @@
   "monthly_total": "סך ההוצאות החודש",
   "add_expense": "הוספת הוצאה",
   "home_footer": "עוד הוצאה קטנה. קצת יותר סדר.",
+  "about": "אודות",
+  "app_version": "גרסת האפליקציה: %1$s",
+  "app_creator": "יוצר: RearmostP",
   "settings_intro": "הכול, בדרך שלך",
   "settings": "הגדרות",
   "add_category": "הוספה",
@@ -128,5 +131,8 @@
   "limit_remaining": "נותר עד למגבלה: %1$s",
   "limit_exceeded": "חריגה מהמגבלה · יתרה: %1$s",
   "overall_exceeded": "חריגה מהתקציב · יתרה: %1$s",
-  "source_limit_amount": "מגבלת הוצאה: %1$s"
+  "source_limit_amount": "מגבלת הוצאה: %1$s",
+  "add_subcategory": "הוספת תת־קטגוריה",
+  "rename_category": "שינוי שם",
+  "save_category": "שמירה"
 }

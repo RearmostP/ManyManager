@@ -3,6 +3,9 @@ package com.example.manymanager
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Button
+import com.example.manymanager.domain.Category
+
 
 /** Displays prepared category state and submits actions; owns no mutable data list. */
 class CategoryManagementUi(
@@ -10,6 +13,8 @@ class CategoryManagementUi(
     onBack: () -> Unit,
     onAdd: () -> Unit,
     private val onRetry: () -> Unit,
+    private val onEdit: (Category) -> Unit,
+    private val onAddChild: (Category) -> Unit,
 ) {
     init {
         root.findViewById<View>(R.id.categoryBack).setOnClickListener { onBack() }
@@ -28,18 +33,44 @@ class CategoryManagementUi(
         val rows = root.findViewById<LinearLayout>(R.id.categoryRows)
         rows.removeAllViews()
         if (state !is CategoryListState.Ready) return
-        state.categories.forEach { category ->
-            rows.addView(TextView(root.context, null, 0, R.style.Text).apply {
+        fun categoryRow(category: Category) = LinearLayout(root.context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            val inset = (12 * resources.displayMetrics.density).toInt()
+            setPadding(inset, inset / 2, inset, inset / 2)
+            addView(TextView(root.context, null, 0, R.style.Text).apply {
                 tag = category.id
                 text = category.name
                 textSize = 16f
-                val inset = (20 * resources.displayMetrics.density).toInt()
-                setPadding(inset, inset, inset, inset)
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            })
+            addView(Button(root.context, null, 0, R.style.ActionButton_Secondary).apply {
+                setText(R.string.rename_category)
+                contentDescription = "${text}: ${category.name}"
+                setOnClickListener { onEdit(category) }
+            })
+        }
+        state.categories.filter { it.parentId == null }.forEach { parent ->
+            val card = LinearLayout(root.context).apply {
+                orientation = LinearLayout.VERTICAL
                 setBackgroundResource(R.drawable.card)
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { bottomMargin = (16 * resources.displayMetrics.density).toInt() }
+            }
+            card.addView(categoryRow(parent))
+            state.categories.filter { it.parentId == parent.id }.forEach { child ->
+                card.addView(categoryRow(child).apply {
+                    setPaddingRelative((32 * resources.displayMetrics.density).toInt(), paddingTop,
+                        paddingEnd, paddingBottom)
+                })
+            }
+            card.addView(Button(root.context, null, 0, R.style.ActionButton_Secondary).apply {
+                setText(R.string.add_subcategory)
+                contentDescription = "${text}: ${parent.name}"
+                setOnClickListener { onAddChild(parent) }
             })
+            rows.addView(card)
         }
     }
 }

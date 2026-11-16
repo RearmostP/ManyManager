@@ -56,6 +56,28 @@ class ManyManagerRepositoryTest {
         assertEquals(DataError.BlankName, error(repository.createCategory(" \n ")))
     }
 
+    @Test fun subcategoriesAndRenamesPreserveExpenseIdentityAndAmounts() = runBlocking {
+        val parent = success(repository.createCategory("Food"))
+        val child = success(repository.createCategory(" Supermarket ", parent.id))
+        val source = success(repository.createSourceWithInitialAllocation("Cash", period, null))
+        val expense = success(repository.createExpense(NewExpense(1250, LocalDate.of(2026, 11, 15), source.id, child.id)))
+        assertEquals(parent.id, child.parentId)
+        assertEquals("Supermarket", child.name)
+        assertTrue(repository.createCategory("Third level", child.id) is DataResult.Failure)
+        assertTrue(repository.createCategory("Missing", "missing") is DataResult.Failure)
+        assertEquals(DataError.BlankName, error(repository.renameCategory(child.id, "  ")))
+        success(repository.renameCategory(parent.id, " Groceries "))
+        val renamed = success(repository.renameCategory(child.id, "Market"))
+        val categories = success(repository.observeCategories().first())
+        assertEquals(child.id, renamed.id)
+        assertEquals(parent.id, renamed.parentId)
+        assertEquals("Groceries / Market", renamed.displayName(categories))
+        assertEquals(expense, success(repository.expense(expense.id)))
+        assertEquals(1250L, snapshot().totalSpentMinor)
+        assertEquals(child.id, snapshot().categoryBreakdown.single().categoryId)
+        assertTrue(repository.renameCategory("missing", "Name") is DataResult.Failure)
+    }
+
     @Test fun sourceAndAllocationAreCreatedTogetherAndObservedEvenWhenUnallocated() = runBlocking {
         val source = success(repository.createSourceWithInitialAllocation(" Cash ", period, 12345L))
         assertEquals("Cash", source.name)
@@ -702,6 +724,48 @@ class ManyManagerRepositoryTest {
             val restored = SourceEditingState.fromBundle(model.sourceEditingState.value!!.toBundle())!!
             assertTrue(restored.submitResult is DataResult.Success)
         } finally { withContext(Dispatchers.Main) { store.clear() } }
+    }
+
+    @Test fun managementSharesActiveSnapshotAfterRefreshAndReturningFromHistory() = runBlocking {
+        val store = ViewModelStore()
+        val model = withContext(Dispatchers.Main) {
+            ViewModelProvider(store, PersistentDataViewModelFactory(repository))[PersistentDataViewModel::class.java]
+        }
+        val active = model.activeBudget.launchIn(this)
+        val selected = model.state.launchIn(this)
+        suspend fun awaitSharedBudget(amount: Long?) {
+            withTimeout(10_000) {
+                combine(model.activeBudget, model.state) { home, management ->
+                    home is PersistentDataState.Ready &&
+                        home.snapshot.overallBudgetMinor == amount && home === management
+                }.first { it }
+            }
+        }
+        try {
+            awaitSharedBudget(null)
+            success(repository.setOverallBudget(period, 1200))
+            awaitSharedBudget(1200)
+            val next = BudgetPeriodCalculator(10, clock).next(period)
+            withContext(Dispatchers.Main) { model.selectPeriod(next) }
+            withTimeout(10_000) {
+                model.state.first { it is PersistentDataState.Ready && it.snapshot.period == next }
+            }
+            withContext(Dispatchers.Main) { model.refresh() }
+            withTimeout(10_000) {
+                model.state.first { it is PersistentDataState.Ready && it.snapshot.period == next }
+            }
+            assertEquals(period, (model.activeBudget.first { it is PersistentDataState.Ready }
+                as PersistentDataState.Ready).snapshot.period)
+            withContext(Dispatchers.Main) { model.selectPeriod(null) }
+            awaitSharedBudget(1200)
+            withContext(Dispatchers.Main) { model.refresh() }
+            success(repository.setOverallBudget(period, 2400))
+            awaitSharedBudget(2400)
+        } finally {
+            withContext(Dispatchers.Main) { store.clear() }
+            active.cancelAndJoin()
+            selected.cancelAndJoin()
+        }
     }
 
     @Test fun activeBudgetAndSourceChoicesRemainIndependentOfHistoricalSelectionAndOverflow() = runBlocking {

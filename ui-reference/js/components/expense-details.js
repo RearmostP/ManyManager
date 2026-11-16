@@ -1,5 +1,5 @@
 import {state} from "../state.js";
-import {demo} from "../demo.js";
+import {demo,categoryName,categoryChoices} from "../demo.js";
 import {parseCivilDate} from "../dates.js";
 import {shortDate} from "../i18n.js";
 import {tr,money,escapeValue} from "../render-helpers.js";
@@ -16,7 +16,7 @@ export function expenseDetailsBody(){
  const choices=(key,items,selected,optional)=>`<select id="details-${key}" class="sheet-field" data-details="${key}">
  ${optional?`<option value="" ${selected==null?"selected":""}>${tr("uncategorized")}</option>`:""}
  ${items.map(item=>`<option value="${escapeValue(item.id)}" ${selected===item.id?"selected":""}>${escapeValue(item.name)}</option>`).join("")}</select>`;
- const category=demo.categories.find(item=>item.id===saved?.categoryId)?.name??tr("uncategorized");
+ const category=categoryName(demo.categories.find(item=>item.id===saved?.categoryId))??tr("uncategorized");
  const source=demo.sources.find(item=>item.id===saved?.sourceId)?.name??"";
  return `<header class="expense-details-header"><h2 id="expense-details-title">${tr("expense_details")}</h2>
  <button class="chip secondary-action" data-action="close-overlay">${tr("close")}</button></header>

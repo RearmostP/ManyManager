@@ -24,6 +24,9 @@
   "monthly_total": "Всего расходов за месяц",
   "add_expense": "Добавить расход",
   "home_footer": "Ещё один небольшой расход. Чуть больше порядка.",
+  "about": "О приложении",
+  "app_version": "Версия приложения: %1$s",
+  "app_creator": "Автор: RearmostP",
   "settings_intro": "Всё по-вашему",
   "settings": "Настройки",
   "add_category": "Добавить",
@@ -128,5 +131,8 @@
   "limit_remaining": "До лимита осталось: %1$s",
   "limit_exceeded": "Лимит превышен · остаток: %1$s",
   "overall_exceeded": "Бюджет превышен · остаток: %1$s",
-  "source_limit_amount": "Лимит расходов: %1$s"
+  "source_limit_amount": "Лимит расходов: %1$s",
+  "add_subcategory": "Добавить подкатегорию",
+  "rename_category": "Переименовать",
+  "save_category": "Сохранить"
 }

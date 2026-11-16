@@ -24,6 +24,9 @@
     <string name="monthly_total">Всего расходов за месяц</string>
     <string name="add_expense">Добавить расход</string>
     <string name="home_footer">Ещё один небольшой расход. Чуть больше порядка.</string>
+    <string name="about">О приложении</string>
+    <string name="app_version">Версия приложения: %1$s</string>
+    <string name="app_creator">Автор: RearmostP</string>
     <string name="settings_intro">Всё по-вашему</string>
     <string name="settings">Настройки</string>
     <string name="add_category">Добавить</string>
@@ -143,4 +146,16 @@
     <string name="limit_exceeded">Лимит превышен · остаток: %1$s</string>
     <string name="overall_exceeded">Бюджет превышен · остаток: %1$s</string>
     <string name="source_limit_amount">Лимит расходов: %1$s</string>
+    <string name="add_subcategory">Добавить подкатегорию</string>
+    <string name="rename_category">Переименовать</string>
+    <string name="save_category">Сохранить</string>
+    <string name="setup_title">Добро пожаловать в ManyManager</string>
+    <string name="setup_intro">Настройте категории и подкатегории, бюджет текущего периода и источники расходов. Можно пропустить и изменить всё позже.</string>
+    <string name="setup_start">Начать настройку</string>
+    <string name="setup_next">Далее</string>
+    <string name="setup_finish">Завершить настройку</string>
+    <string name="setup_skip">Пропустить настройку</string>
+    <string name="setup_categories">1 из 3 · Добавьте категории. У каждой категории можно добавить подкатегорию. Все настройки необязательны.</string>
+    <string name="setup_budget">2 из 3 · Установите общий бюджет текущего периода в карточке ниже. Бюджет можно не задавать.</string>
+    <string name="setup_sources">3 из 3 · Добавьте источники расходов, например наличные или карту. Лимит каждого источника необязателен.</string>
 </resources>

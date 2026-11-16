@@ -1,10 +1,10 @@
 import {state} from "../state.js";
-import {demo} from "../demo.js";
+import {demo,categoryName,categoryChoices} from "../demo.js";
 import {tr,escapeValue} from "../render-helpers.js";
 
 // main has flat, optional categories; opening/cancelling never changes the draft.
 export function categoryPicker(){
-  const choices=[{id:null,name:tr("uncategorized")},...demo.categories];
+  const choices=[{id:null,name:tr("uncategorized")},...categoryChoices()];
   return `<div class="scrim dialog-wrap" data-action="close-overlay"><div class="overlay-stage">
   <section class="dialog-panel" role="dialog" aria-modal="true" aria-labelledby="picker-title" data-stop-close>
   <h2 id="picker-title">${tr("choose_category")}</h2>

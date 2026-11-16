@@ -130,25 +130,23 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
     private data class Selection(val period: BudgetPeriod? = null, val refresh: Long = 0)
     private val selection = MutableStateFlow(Selection())
 
-    val state: StateFlow<PersistentDataState> = selection.flatMapLatest { selected ->
-        repository.observeSnapshot(selected.period).map { result ->
-            when (result) {
-                is DataResult.Success -> PersistentDataState.Ready(result.value)
-                is DataResult.Failure -> PersistentDataState.Failed(result.error)
-            }
-        }.onStart { emit(PersistentDataState.Loading) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PersistentDataState.Loading)
-
-    // Home always follows today; management may retain an explicit historical selection.
+    // Home and management share one observation when management follows today.
     private val activeRefresh = MutableStateFlow(0L)
     val activeBudget: StateFlow<PersistentDataState> = activeRefresh.flatMapLatest {
-        repository.observeSnapshot().map { result ->
+        observeBudgetState(null)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PersistentDataState.Loading)
+
+    val state: StateFlow<PersistentDataState> = selection.flatMapLatest { selected ->
+        if (selected.period == null) activeBudget else observeBudgetState(selected.period)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PersistentDataState.Loading)
+
+    private fun observeBudgetState(period: BudgetPeriod?) =
+        repository.observeSnapshot(period).map { result ->
             when (result) {
                 is DataResult.Success -> PersistentDataState.Ready(result.value)
                 is DataResult.Failure -> PersistentDataState.Failed(result.error)
             }
         }.onStart { emit(PersistentDataState.Loading) }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PersistentDataState.Loading)
 
     private val sourceRefresh = MutableStateFlow(0L)
     val sources: StateFlow<SourceListState> = sourceRefresh.flatMapLatest {
@@ -183,8 +181,13 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
 
     fun retryCategories() { categoryRefresh.update { it + 1 } }
 
-    fun beginCategoryCreation(fromExpense: Boolean) {
-        if (creation.value == null) creation.value = CategoryCreationState(fromExpense)
+    fun beginCategoryCreation(fromExpense: Boolean, parentId: String? = null) {
+        if (creation.value == null) creation.value = CategoryCreationState(fromExpense, parentId = parentId)
+    }
+
+    fun beginCategoryEditing(category: com.example.manymanager.domain.Category) {
+        if (creation.value == null) creation.value = CategoryCreationState(false,
+            parentId = category.parentId, editingId = category.id, name = category.name)
     }
 
     fun restoreCategoryCreation(restored: CategoryCreationState) {
@@ -213,7 +216,8 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         if (current.submitting || current.result is DataResult.Success) return null
         creation.value = current.copy(submitting = true, result = null, interrupted = false)
         return viewModelScope.launch {
-            val result = repository.createCategory(current.name)
+            val result = current.editingId?.let { repository.renameCategory(it, current.name) }
+                ?: repository.createCategory(current.name, current.parentId)
             currentCoroutineContext().ensureActive()
             creation.value = current.copy(result = result, interrupted = false)
         }
@@ -576,7 +580,7 @@ class PersistentDataViewModel(private val repository: ManyManagerRepository) : V
         selection.update { it.copy(period = period) }
     }
     fun refresh() {
-        selection.update { it.copy(refresh = it.refresh + 1) }
+        selection.update { if (it.period == null) it else it.copy(refresh = it.refresh + 1) }
         activeRefresh.update { it + 1 }
         retrySources()
     }

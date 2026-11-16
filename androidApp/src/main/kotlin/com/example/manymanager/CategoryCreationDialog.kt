@@ -40,19 +40,27 @@ class CategoryCreationDialog(
         }
     }
 
-    fun show() { dialog.showWithRoundedSurface() }
+    fun show() {
+        dialog.showWithRoundedSurface()
+        dialog.styleBudgetDialogButtons()
+    }
 
     fun render(state: CategoryCreationState) {
         if (input.text.toString() != state.name) {
             input.setText(state.name)
             input.setSelection(input.length())
         }
+        dialog.setTitle(when {
+            state.editingId != null -> R.string.rename_category
+            state.parentId != null -> R.string.add_subcategory
+            else -> R.string.add_category_action
+        })
         input.isEnabled = !state.submitting
         dialog.setCancelable(!state.submitting)
         dialog.setCanceledOnTouchOutside(!state.submitting)
         dialog.getButton(DialogInterface.BUTTON_POSITIVE).apply {
             isEnabled = !state.submitting && state.result !is DataResult.Success
-            setText(if (state.submitting) R.string.category_saving else R.string.add_category)
+            setText(if (state.submitting) R.string.category_saving else if (state.editingId != null) R.string.save_category else R.string.add_category)
         }
         dialog.getButton(DialogInterface.BUTTON_NEGATIVE).isEnabled = !state.submitting
         val error = (state.result as? DataResult.Failure)?.error

@@ -7,7 +7,7 @@ This is the authoritative development reference for ManyManager on `main`. Confi
 - Money is exact integer `Long` minor units (agorot); the current UI uses ILS. Input accepts decimal points or commas and at most two fractional digits. No floating-point money or silent rounding.
 - Expenses must be positive, with a civil date, required source, optional category and optional note. `categoryId=null` means localized “Uncategorized”, not a seeded category. Referenced entities must belong to the same calculator.
 - Each period has one independent optional overall budget and optional per-source spending limits. Sources persist across periods and may be used without a limit. Limits do not reserve money or contribute to the overall budget. Spending is allowed without either threshold and beyond both; overages are labelled. Unset differs from explicitly configured zero. New user-entered thresholds are nonnegative; migrated signed historical amounts remain unchanged. See [the budget model and migration](budget-model.md).
-- Categories, sources and expenses have stable UUID identities scoped by `calculatorId`; names and list positions are not identities. Duplicate names are allowed and groups remain separate. Source renaming preserves references. The UI supports category creation, not category renaming or an icon selector.
+- Categories, sources and expenses have stable UUID identities scoped by `calculatorId`; names and list positions are not identities. Duplicate names are allowed and groups remain separate. Source renaming preserves references. The UI supports creating and renaming categories and one level of optional subcategories; there is no icon selector.
 - One local calculator is initialized idempotently, with start day 10 and currency ILS. User categories, sources and expenses start empty. There is no calculator-switching, currency or start-day settings UI.
 - `BudgetPeriodCalculator` owns monthly civil-date boundaries `[start, endExclusive)`, defaulting to the 10th through the 9th. Dates are stored as epoch days, not UTC-midnight timestamps. Only “today” depends on the device clock/zone. Supported start days are 1–28.
 - Expense date determines its period, including when editing moves it across a boundary. A new period starts with no overall budget and no source limits; neither is copied forward. Previous periods retain their own saved amounts.
@@ -15,7 +15,7 @@ This is the authoritative development reference for ManyManager on `main`. Confi
 
 ## Storage and ownership
 
-Room schema 2 stores six entities in app-private `databases/many-manager.db`: calculators, categories, expense sources, period source limits (legacy `budget_allocations` table), expenses and independent `period_budgets`. Composite foreign keys enforce ownership and prevent orphan references. Registered migration 1→2 preserves all old tables/rows and initializes each represented period's overall budget from its exact allocation sum. No other periods are created. Zero and raw negative legacy amounts are retained. Positive expense validation remains a repository rule.
+Room schema 3 stores six entities in app-private `databases/many-manager.db`: calculators, categories, expense sources, period source limits (legacy `budget_allocations` table), expenses and independent `period_budgets`. Composite foreign keys enforce ownership and prevent orphan references. Registered migration 1→2 preserves all old tables/rows and initializes each represented period's overall budget from its exact allocation sum. No other periods are created. Zero and raw negative legacy amounts are retained. Registered migration 2→3 adds optional category parents while preserving existing categories and expense references. Positive expense validation remains a repository rule.
 
 `ManyManagerApplication` owns Room and the process repository and initializes the local calculator off the main thread. Business reads and writes go through `ManyManagerRepository`; only calculator initialization calls the DAO directly outside it. The repository reloads saved calculator settings, validates IDs/amounts/periods, performs transactions and emits observed results. Success follows commit; storage errors and overflow roll back writes.
 
@@ -27,7 +27,7 @@ Home and the three Summary tabs consume the same transactional financial snapsho
 
 ## Expense and Summary interaction
 
-Creation saves only after validation and commit. Categories appear as full-width inline rows with a checkmark on the selected row; the list uses the form's normal scrolling. Editing uses a separate wrapping category picker: tapping confirms a draft selection, while Back/Cancel leaves every draft field unchanged. Categories remain flat and optional on main; Uncategorized is selectable even when no user categories exist. Creating a category from an expense draft preserves amount/date/source/note, selecting the new stable ID only after success. Cancel returns to the unchanged draft.
+Creation saves only after validation and commit. Categories appear as full-width inline rows with a checkmark on the selected row; the list uses the form's normal scrolling. Editing uses a separate wrapping category picker: tapping confirms a draft selection, while Back/Cancel leaves every draft field unchanged. Categories support one level of subcategories and remain optional on main; Uncategorized is selectable even when no user categories exist. Creating a category from an expense draft preserves amount/date/source/note, selecting the new stable ID only after success. Cancel returns to the unchanged draft.
 
 Budget dialogs retain rounded surfaces, blue primary actions, localized cancellation and captured periods. Overall budget editing is at the top of Budget Management; source editing uses an absolute optional spending limit, with blank/remove clearing that period's limit. Source creation may leave the limit blank. Home shows overall spending/remaining or “Budget not set”; its expanded panel shows source spending and remaining/overage only when a limit exists. Views render controller/domain values.
 
@@ -38,6 +38,8 @@ Summary contains All Expenses, Categories and Sources for the active period. All
 Each group expands expense rows inside one unified rounded card in the same tab, using normal page scrolling. Multiple groups can remain expanded; there is no intermediate group screen. Rows emphasize amount, contextual secondary information and a two-line note preview, omitting the repeated grouping field. Details open above the list; tab, expanded group IDs and scroll survive closing and ordinary configuration changes.
 
 ## Language, appearance and design reference
+
+On first launch with empty user data, a localized welcome dialog offers guided setup or skipping. Three optional steps use the existing management screens: categories (including optional subcategories), the current period’s overall budget, and expense sources with optional limits. A guide above the page advances each step or skips the rest. Progress and completion are stored in app-private `initial_setup` preferences, so interrupted setup resumes and completed/skipped setup does not reopen. Existing categories, sources, current-period expenses or a configured current budget suppress the welcome on upgrade. Each form retains its normal validation and commit behavior; setup does not seed or duplicate data. The visual playground demonstrates the same flow on reload using its fictional fixture.
 
 Hebrew (default), Russian and English support RTL/LTR and light/dark themes. Appearance stays in SharedPreferences; locales use AppCompat/platform storage, outside Room.
 
@@ -79,7 +81,7 @@ Paths are relative to the repository root.
 
 ## Branch-local presentation parity
 
-The [presentation port record](presentation-port.md) documents the reviewed original commit, preserved icon/identity/version baseline, selective transfers and fresh verification. main now has an independent period budget with optional source limits, flat optional categories and Room schema 2; original's model and Room schema 3 remain branch-specific. This implementation does not adopt original's schema, migrations or category validation requirements. Both applications have separate package identities and app-private data.
+The [presentation port record](presentation-port.md) documents the reviewed original commit, preserved icon/identity/version baseline, selective transfers and fresh verification. main now has an independent period budget with optional source limits, optional categories/subcategories and Room schema 3; original's model and Room schema 3 remain branch-specific. This implementation does not adopt original's schema, migrations or category validation requirements. Both applications have separate package identities and app-private data.
 
 ## Release and historical records
 

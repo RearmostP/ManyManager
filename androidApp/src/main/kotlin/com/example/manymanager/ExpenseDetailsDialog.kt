@@ -1,5 +1,8 @@
 package com.example.manymanager
 
+import com.example.manymanager.domain.displayName
+import com.example.manymanager.domain.hierarchyOrder
+
 import android.app.DatePickerDialog
 import android.view.Gravity
 import android.view.View
@@ -205,7 +208,7 @@ class ExpenseDetailsDialog(
         state = value
         if (categories is CategoryListState.Ready) {
             categoryOptions = categories.categories
-            categoryNames = categories.categories.associate { it.id to it.name }
+            categoryNames = categories.categories.associate { it.id to it.displayName(categories.categories) }
         }
         if (sources is SourceListState.Ready) sourceNames = sources.sources.associate { it.id to it.name }
         val saved = value.original

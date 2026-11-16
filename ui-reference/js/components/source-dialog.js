@@ -10,8 +10,8 @@ export function sourceDialog(){
     <label class="field-label" for="source-initial">${tr(overall?"overall_budget":"source_spending_limit")}</label>
     <input id="source-initial" class="sheet-field" data-source-draft="initial" inputmode="decimal" aria-label="${tr("optional_amount")}" placeholder="${tr("optional_amount")}" value="${escapeValue(state.sourceDraft.initial)}">
     <p>${tr("limit_independent_hint")}</p>
-    <div class="dialog-actions"><button data-action="close-overlay">${tr("cancel")}</button>
-    ${edit||overall?`<button data-action="remove-threshold">${tr("remove_threshold")}</button>`:""}
-    <button class="primary" data-action="${overall?"confirm-overall":edit?"confirm-edit-source":"confirm-add-source"}">${tr("update_budget")}</button></div>
+    <div class="dialog-actions"><button class="action-button secondary-action" data-action="close-overlay">${tr("cancel")}</button>
+    ${edit||overall?`<button class="action-button secondary-action" data-action="remove-threshold">${tr("remove_threshold")}</button>`:""}
+    <button class="action-button primary" data-action="${overall?"confirm-overall":edit?"confirm-edit-source":"confirm-add-source"}">${tr("update_budget")}</button></div>
     </div></div></div>`;
 }

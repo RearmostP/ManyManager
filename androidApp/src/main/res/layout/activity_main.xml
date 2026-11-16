@@ -28,6 +28,22 @@
                 android:src="@drawable/ic_menu"
                 android:contentDescription="@string/open_menu" />
         </LinearLayout>
+        <LinearLayout
+            android:id="@+id/setupBanner"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+            <TextView android:id="@+id/setupMessage" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/text" android:textSize="16sp" android:accessibilityLiveRegion="polite" />
+            <Button android:id="@+id/setupNext" style="@style/ActionButton.Primary"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="12dp" android:textSize="16sp"
+                android:text="@string/setup_next" />
+            <Button android:id="@+id/setupSkip" style="@style/ActionButton.Secondary"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:text="@string/setup_skip" />
+        </LinearLayout>
         <ScrollView
             android:id="@+id/pageScroll"
             android:layout_width="match_parent"

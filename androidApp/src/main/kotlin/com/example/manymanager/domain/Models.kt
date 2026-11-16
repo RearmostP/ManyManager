@@ -3,7 +3,14 @@ package com.example.manymanager.domain
 import java.time.LocalDate
 
 data class Calculator(val id: String, val periodStartDay: Int, val currencyCode: String)
-data class Category(val calculatorId: String, val id: String, val name: String)
+data class Category(val calculatorId: String, val id: String, val name: String, val parentId: String? = null)
+
+fun Category.displayName(categories: List<Category>): String =
+    categories.firstOrNull { it.id == parentId }?.let { "${it.name} / $name" } ?: name
+
+fun List<Category>.hierarchyOrder(): List<Category> = filter { it.parentId == null }.flatMap { parent ->
+    listOf(parent) + filter { it.parentId == parent.id }
+}
 data class BudgetSource(val calculatorId: String, val id: String, val name: String)
 data class Expense(
     val calculatorId: String, val id: String, val amountMinor: Long, val date: LocalDate,

@@ -3,6 +3,13 @@ import {periodKey, parseCivilDate} from "./dates.js";
 
 // Mutable page examples, reset by reloading the module/page. No repository or storage.
 export const demo = structuredClone(fixture);
+export const categoryName = category => {
+  const parent = demo.categories.find(item => item.id === category?.parentId);
+  return parent ? `${parent.name} / ${category.name}` : category?.name;
+};
+export const categoryChoices = () => demo.categories.filter(item => !item.parentId)
+  .flatMap(parent => [parent, ...demo.categories.filter(item => item.parentId === parent.id)])
+  .map(item => ({...item, name: categoryName(item)}));
 demo.allocations = Object.fromEntries(demo.sources.map(source =>
   [source.id, source.budget == null ? {} : {[periodKey(parseCivilDate(fixture.today))]: source.budget}]));
 demo.budgets = {[periodKey(parseCivilDate(fixture.today))]: fixture.overallBudget};
@@ -23,7 +30,7 @@ export function summaryData(date) {
     const rows = expenses.filter(expense => expense[field] === item.id);
     return {...item, spent: sum(rows), expenseCount: rows.length};
   }).filter(item => item.expenseCount).sort((a, b) => b.spent - a.spent);
-  const categories = [...demo.categories];
+  const categories = categoryChoices();
   if (expenses.some(item => !item.categoryId)) categories.push({id: null, name: null});
   const spent = sum(expenses), allocated = totalFor(date);
   return {

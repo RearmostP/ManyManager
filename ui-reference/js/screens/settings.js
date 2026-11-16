@@ -14,5 +14,8 @@ export function settings(){
   <p class="settings-heading">${tr("language_and_appearance")}</p>
   ${expandable("language","language","app_language",tr(languageNames[state.language]),`<div class="chips">${langChips}</div>`)}
   ${expandable("theme","theme","app_appearance",tr(state.theme==="light"?"theme_light":"theme_dark"),`<div class="chips">${themeChips}</div>`)}
+  <h2 class="settings-heading">${tr("about")}</h2>
+  <p class="setting-title">${tr("app_version","0.4.0")}</p>
+  <p class="setting-title">${tr("app_creator")}</p>
   </section>`;
 }

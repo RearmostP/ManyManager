@@ -10,7 +10,7 @@ import androidx.room.RoomDatabase
         CalculatorEntity::class, CategoryEntity::class, BudgetSourceEntity::class,
         BudgetAllocationEntity::class, ExpenseEntity::class, PeriodBudgetEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class ManyManagerDatabase : RoomDatabase() {
@@ -45,12 +45,42 @@ abstract class ManyManagerDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : androidx.room.migration.Migration(2, 3) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("""CREATE TABLE categories_new (
+                    calculatorId TEXT NOT NULL, id TEXT NOT NULL, name TEXT NOT NULL, parentId TEXT,
+                    PRIMARY KEY(calculatorId, id),
+                    FOREIGN KEY(calculatorId) REFERENCES calculators(id) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                    FOREIGN KEY(calculatorId, parentId) REFERENCES categories_new(calculatorId, id) ON UPDATE NO ACTION ON DELETE RESTRICT
+                )""")
+                db.execSQL("INSERT INTO categories_new (calculatorId,id,name) SELECT calculatorId,id,name FROM categories")
+                // Rebuild referencing expenses before replacing categories; keep foreign keys enabled.
+                db.execSQL("""CREATE TABLE expenses_new (
+                    calculatorId TEXT NOT NULL, id TEXT NOT NULL, amountMinor INTEGER NOT NULL,
+                    dateEpochDay INTEGER NOT NULL, categoryId TEXT, sourceId TEXT NOT NULL, note TEXT,
+                    PRIMARY KEY(calculatorId,id),
+                    FOREIGN KEY(calculatorId) REFERENCES calculators(id) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                    FOREIGN KEY(calculatorId,categoryId) REFERENCES categories_new(calculatorId,id) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                    FOREIGN KEY(calculatorId,sourceId) REFERENCES budget_sources(calculatorId,id) ON UPDATE NO ACTION ON DELETE RESTRICT
+                )""")
+                db.execSQL("INSERT INTO expenses_new SELECT * FROM expenses")
+                db.execSQL("DROP TABLE expenses")
+                db.execSQL("DROP TABLE categories")
+                db.execSQL("ALTER TABLE categories_new RENAME TO categories")
+                db.execSQL("ALTER TABLE expenses_new RENAME TO expenses")
+                db.execSQL("CREATE INDEX index_categories_calculatorId_parentId ON categories(calculatorId,parentId)")
+                listOf("dateEpochDay", "categoryId", "sourceId").forEach { column ->
+                    db.execSQL("CREATE INDEX index_expenses_calculatorId_${column} ON expenses(calculatorId,$column)")
+                }
+            }
+        }
+
         private const val DATABASE_NAME = "many-manager.db"
 
         /** Owned once by the Application. Future schema versions require tested migrations. */
         fun create(context: Context): ManyManagerDatabase =
             Room.databaseBuilder(
                 context.applicationContext, ManyManagerDatabase::class.java, DATABASE_NAME
-            ).addMigrations(MIGRATION_1_2).build()
+            ).addMigrations(MIGRATION_1_2, MIGRATION_2_3).build()
     }
 }

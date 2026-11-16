@@ -1,5 +1,8 @@
 package com.example.manymanager
 
+import com.example.manymanager.domain.displayName
+import com.example.manymanager.domain.hierarchyOrder
+
 import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.Dialog
@@ -182,7 +185,7 @@ class ExpenseSheetDialog(
         val container = content.findViewById<LinearLayout>(R.id.expenseCategoryChoices)
         container.removeAllViews()
         if (state is CategoryListState.Ready) {
-            bindChoices(container, listOf(null to context.getString(R.string.uncategorized)) + state.categories.map { it.id to it.name }, false)
+            bindChoices(container, listOf(null to context.getString(R.string.uncategorized)) + state.categories.hierarchyOrder().map { it.id to it.displayName(state.categories) }, false)
         }
     }
 

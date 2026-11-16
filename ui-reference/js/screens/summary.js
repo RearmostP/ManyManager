@@ -1,5 +1,5 @@
 import {state} from "../state.js";
-import {demo,summaryData} from "../demo.js";
+import {demo,summaryData,categoryName} from "../demo.js";
 import {parseCivilDate} from "../dates.js";
 import {shortDate,number} from "../i18n.js";
 import {tr,monthControls,money,escapeValue} from "../render-helpers.js";
@@ -11,7 +11,7 @@ const panels=[
 ];
 export function expenseRows(expenses,groupKind=null){
  return expenses.map(item=>{
-   const category=demo.categories.find(value=>value.id===item.categoryId)?.name??tr("uncategorized");
+   const category=categoryName(demo.categories.find(value=>value.id===item.categoryId))??tr("uncategorized");
    const source=demo.sources.find(value=>value.id===item.sourceId)?.name??"";
    const date=shortDate(state.language,parseCivilDate(item.date));
    const secondary=[date,...(groupKind==="category"?[source]:groupKind==="source"?[category]:[category,source])].filter(Boolean);

@@ -24,6 +24,9 @@
   "monthly_total": "Total expenses this month",
   "add_expense": "Add Expense",
   "home_footer": "One more small expense. A little more order.",
+  "about": "About",
+  "app_version": "App version: %1$s",
+  "app_creator": "Creator: RearmostP",
   "settings_intro": "Everything, your way",
   "settings": "Settings",
   "add_category": "Add",
@@ -128,5 +131,8 @@
   "limit_remaining": "Remaining until limit: %1$s",
   "limit_exceeded": "Limit exceeded · balance: %1$s",
   "overall_exceeded": "Budget exceeded · balance: %1$s",
-  "source_limit_amount": "Spending limit: %1$s"
+  "source_limit_amount": "Spending limit: %1$s",
+  "add_subcategory": "Add subcategory",
+  "rename_category": "Rename",
+  "save_category": "Save"
 }

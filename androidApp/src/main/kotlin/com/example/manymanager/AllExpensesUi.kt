@@ -1,5 +1,8 @@
 package com.example.manymanager
 
+import com.example.manymanager.domain.displayName
+import com.example.manymanager.domain.hierarchyOrder
+
 import android.view.View
 import android.view.LayoutInflater
 import android.widget.LinearLayout
@@ -44,7 +47,7 @@ class AllExpensesUi(private val root: View, private val onCorrect: (Expense) -> 
         val dateFormat = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale)
         expenses.forEachIndexed { index, expense ->
             val amount = context.getString(R.string.ils_amount, BudgetAmounts.number(expense.amountMinor, locale))
-            val category = categories[expense.categoryId]?.name ?: context.getString(R.string.uncategorized)
+            val category = categories[expense.categoryId]?.displayName(snapshot.categories) ?: context.getString(R.string.uncategorized)
             val source = sources[expense.sourceId]?.source?.name.orEmpty()
             val secondary = (listOf(expense.date.format(dateFormat)) + when (groupCategory) {
                 true -> listOf(source)

@@ -78,4 +78,13 @@
             android:text="@string/theme_dark" android:textSize="13sp" android:padding="11dp"
             android:background="@drawable/chip" android:clickable="true" android:focusable="true" />
     </com.example.manymanager.ChipFlowLayout>
+    <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="25dp" android:text="@string/about"
+        android:textSize="12sp" android:textColor="@color/muted" android:accessibilityHeading="true" />
+    <TextView android:id="@+id/appVersion" style="@style/Text"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="20dp" android:textSize="16sp" />
+    <TextView style="@style/Text" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:layout_marginBottom="20dp"
+        android:text="@string/app_creator" android:textSize="16sp" />
 </LinearLayout>

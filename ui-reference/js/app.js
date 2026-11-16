@@ -17,6 +17,8 @@ import {sourceDialog} from "./components/source-dialog.js";
 import {categoryPicker} from "./components/category-picker.js";
 
 const app=document.getElementById("app");
+import {setupStep,advanceSetup,setupBanner,setupWelcome} from "./components/setup.js";
+state.overlay="setup";
 const page=document.getElementById("page");
 const scroll=document.getElementById("page-scroll");
 const overlay=document.getElementById("overlay-root");
@@ -30,6 +32,7 @@ function render(){
   document.title=t(state.language,"app_name");
   menuButton.setAttribute("aria-label",t(state.language,"menu_button_label"));
   menuButton.innerHTML=icon("menu");
+  document.getElementById("setup-banner").innerHTML=setupBanner();
   page.innerHTML=[home,summary,settings,budget,categories][state.page]();
   if(["expense-details","delete-expense"].includes(state.overlay)||(state.overlay==="category-picker"&&state.pickerReturnOverlay==="expense-details")){
     // Keep the details panel in place when switching between read/edit/confirmation.
@@ -47,7 +50,7 @@ function render(){
       overlay.append(confirmation);
     }else if(focusId)panel.querySelector("#"+CSS.escape(focusId))?.focus({preventScroll:true});
   }else overlay.innerHTML=({
-    menu:drawer,expense,"add-category":categoryDialog,"category-picker":categoryPicker,
+    setup:setupWelcome,menu:drawer,expense,"add-category":categoryDialog,"category-picker":categoryPicker,
     "add-source":sourceDialog,"edit-source":sourceDialog,"overall-budget":sourceDialog
   })[state.overlay]?.()??"";
   app.inert=Boolean(state.overlay);
@@ -76,10 +79,14 @@ document.addEventListener("click",async event=>{
   if(button.classList.contains("scrim")&&event.target.closest("[data-stop-close]"))return;
   const saved=()=>demo.expenses.find(item=>item.id===state.expenseEditId);
   switch(button.dataset.action){
+    case "setup-next": advanceSetup(setupStep+1);break;
+    case "setup-skip": advanceSetup(4);break;
     case "close-overlay": closeOverlay(); break;
     case "navigate": changePage(Number(button.dataset.index),scroll);state.overlay=null;break;
     case "back": goBack(scroll);break;
     case "add-category": beginCategoryCreation();break;
+    case "add-subcategory": beginCategoryCreation(button.dataset.id);break;
+    case "rename-category": beginCategoryCreation(null,button.dataset.id);break;
     case "confirm-category": confirmCategoryCreation();break;
     case "overall-budget":
     case "add-source":

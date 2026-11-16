@@ -24,6 +24,9 @@
     <string name="monthly_total">סך ההוצאות החודש</string>
     <string name="add_expense">הוספת הוצאה</string>
     <string name="home_footer">עוד הוצאה קטנה. קצת יותר סדר.</string>
+    <string name="about">אודות</string>
+    <string name="app_version">גרסת האפליקציה: %1$s</string>
+    <string name="app_creator">יוצר: RearmostP</string>
     <string name="settings_intro">הכול, בדרך שלך</string>
     <string name="settings">הגדרות</string>
     <string name="add_category">הוספה</string>
@@ -143,4 +146,16 @@
     <string name="limit_exceeded">חריגה מהמגבלה · יתרה: %1$s</string>
     <string name="overall_exceeded">חריגה מהתקציב · יתרה: %1$s</string>
     <string name="source_limit_amount">מגבלת הוצאה: %1$s</string>
+    <string name="add_subcategory">הוספת תת־קטגוריה</string>
+    <string name="rename_category">שינוי שם</string>
+    <string name="save_category">שמירה</string>
+    <string name="setup_title">Welcome to ManyManager</string>
+    <string name="setup_intro">Let’s set up categories and optional subcategories, a budget for the current period, and expense sources. You can skip and change everything later.</string>
+    <string name="setup_start">Start setup</string>
+    <string name="setup_next">Next step</string>
+    <string name="setup_finish">Finish setup</string>
+    <string name="setup_skip">Skip setup</string>
+    <string name="setup_categories">1 of 3 · Add categories. Use Add subcategory on a category to organize it further. Everything here is optional.</string>
+    <string name="setup_budget">2 of 3 · Set the overall budget for the current period using the budget card below. You can leave it unset.</string>
+    <string name="setup_sources">3 of 3 · Add expense sources, such as cash or a credit card. A spending limit for each source is optional.</string>
 </resources>

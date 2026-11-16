@@ -76,7 +76,7 @@ class ManyManagerDatabaseTest {
         val name = newTestFile()
         database.close()
         database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
-            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2, ManyManagerDatabase.MIGRATION_2_3).build()
         seedRelationships()
         val allocation = BudgetAllocationEntity(owner, source.id, period, 12345L)
         val categorized = expense("categorized")
@@ -87,7 +87,7 @@ class ManyManagerDatabaseTest {
         database.close()
 
         database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
-            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2, ManyManagerDatabase.MIGRATION_2_3).build()
         assertEquals(CalculatorEntity(owner), database.dao().initializeLocalCalculator())
         assertEquals(1L, count("calculators"))
         assertEquals(allocation, database.dao().allocation(owner, source.id, period))
@@ -235,7 +235,7 @@ class ManyManagerDatabaseTest {
         }
         database.close()
         database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
-            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2, ManyManagerDatabase.MIGRATION_2_3).build()
         assertEquals(CalculatorEntity(owner, 15, "EUR"), database.dao().initializeLocalCalculator())
         assertEquals(listOf(category), database.dao().categories(owner))
         assertEquals(listOf(source), database.dao().sources(owner))
@@ -267,7 +267,7 @@ class ManyManagerDatabaseTest {
         schemaHelper.runMigrationsAndValidate(name, 2, true, ManyManagerDatabase.MIGRATION_1_2).close()
         database.close()
         database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
-            .addMigrations(ManyManagerDatabase.MIGRATION_1_2).build()
+            .addMigrations(ManyManagerDatabase.MIGRATION_1_2, ManyManagerDatabase.MIGRATION_2_3).build()
         val dao = database.dao()
         assertEquals(CalculatorEntity(owner), dao.calculator(owner))
         assertEquals(500000L, dao.periodBudget(owner, period)!!.amountMinor)
@@ -284,6 +284,36 @@ class ManyManagerDatabaseTest {
         assertEquals(1L, count("categories"))
         assertEquals(4L, count("budget_allocations"))
         assertEquals(2L, count("period_budgets"))
+    }
+
+    @Test fun migrationTwoToThreePreservesDataAndEnforcesParentOwnership() = runBlocking {
+        val name = newTestFile()
+        schemaHelper.createDatabase(name, 2).use { saved ->
+            saved.execSQL("INSERT INTO calculators VALUES (?, 15, 'ILS')", arrayOf(owner))
+            saved.execSQL("INSERT INTO categories VALUES (?, 'parent', 'Food')", arrayOf(owner))
+            saved.execSQL("INSERT INTO budget_sources VALUES (?, 'cash', 'Cash')", arrayOf(owner))
+            saved.execSQL("INSERT INTO budget_allocations VALUES (?, 'cash', ?, -123)", arrayOf<Any>(owner, period))
+            saved.execSQL("INSERT INTO period_budgets VALUES (?, ?, 0)", arrayOf<Any>(owner, period))
+            saved.execSQL("INSERT INTO expenses VALUES (?, 'old', 12345, ?, 'parent', 'cash', 'kept')", arrayOf<Any>(owner, date))
+            saved.execSQL("INSERT INTO expenses VALUES (?, 'none', 1, ?, NULL, 'cash', NULL)", arrayOf<Any>(owner, date))
+        }
+        schemaHelper.runMigrationsAndValidate(name, 3, true, ManyManagerDatabase.MIGRATION_2_3).close()
+        database.close()
+        database = Room.databaseBuilder(context, ManyManagerDatabase::class.java, name)
+            .addMigrations(ManyManagerDatabase.MIGRATION_2_3).build()
+        val dao = database.dao()
+        assertEquals(CalculatorEntity(owner, 15, "ILS"), dao.calculator(owner))
+        assertEquals(CategoryEntity(owner, "parent", "Food"), dao.categories(owner).single())
+        assertEquals(ExpenseEntity(owner, "old", 12345, date, "parent", "cash", "kept"), dao.expense(owner, "old"))
+        assertEquals(ExpenseEntity(owner, "none", 1, date, null, "cash", null), dao.expense(owner, "none"))
+        assertEquals(-123L, dao.allocation(owner, "cash", period)!!.allocatedMinor)
+        assertEquals(0L, dao.periodBudget(owner, period)!!.amountMinor)
+        dao.insertCategory(CategoryEntity(owner, "child", "Market", "parent"))
+        expectConstraint { dao.insertCategory(CategoryEntity(owner, "orphan", "Missing", "missing")) }
+        database.openHelper.writableDatabase.execSQL("INSERT INTO calculators VALUES ('other', 10, 'ILS')")
+        expectConstraint { dao.insertCategory(CategoryEntity("other", "foreign", "Foreign", "parent")) }
+        assertEquals(1, dao.renameCategory(owner, "parent", "Groceries"))
+        assertEquals("parent", dao.categories(owner).last().parentId)
     }
 
     private suspend fun seedRelationships() {

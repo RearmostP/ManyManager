@@ -3,7 +3,10 @@ import {icon} from "../icons.js";
 import {tr,escapeValue} from "../render-helpers.js";
 
 export function categories(){
-  const rows=demo.categories.map(category=>`<div class="card category-row" data-id="${category.id}">${escapeValue(category.name)}</div>`).join("");
+  const row=category=>`<div class="category-item"><span>${escapeValue(category.name)}</span><button class="action-button secondary-action" data-action="rename-category" data-id="${category.id}" aria-label="${tr("rename_category")}: ${escapeValue(category.name)}">${tr("rename_category")}</button></div>`;
+  const rows=demo.categories.filter(category=>!category.parentId).map(category=>`<div class="card category-row" data-id="${category.id}">${row(category)}
+    <div class="subcategory-rows">${demo.categories.filter(child=>child.parentId===category.id).map(row).join("")}</div>
+    <button class="action-button secondary-action" data-action="add-subcategory" data-id="${category.id}">${tr("add_subcategory")}</button></div>`).join("");
   return `<section class="categories-page fade-in"><button class="icon-button" data-action="back" aria-label="${tr("back")}">${icon("right")}</button>
   <h1>${tr("expense_categories")}</h1>
   ${rows||`<p class="category-empty">${tr("no_categories")}</p>`}
